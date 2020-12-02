@@ -1,0 +1,8 @@
+nfs-client-provisioner:
+  storageClass:
+    defaultClass: true
+  nodeSelector:
+    cajun.pro/cluster-gen: "2"
+  nfs:
+    server: storage2.waltr.lab
+    path: /tank/k8s
