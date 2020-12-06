@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-12-06T03:48:08.655Z" agent="5.0 (X11)" etag="m8m5srQSh-8Izdy8rJwR" version="13.10.9" type="gitlab" pages="5">
+<mxfile host="app.diagrams.net" modified="2020-12-06T03:53:39.863Z" agent="5.0 (X11)" etag="Pqyocw3YjOJFghv-xNMC" version="13.10.9" type="gitlab" pages="5">
   <diagram id="GX5NthRJ2ZPAM7HmEhzi" name="home.waltr.tech Overall Network">
     <mxGraphModel dx="1222" dy="1133" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -242,13 +242,13 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="j93-0ZjBtXm-CNL1zx17-2" value="Speedtest.home.waltr.tech" style="label;whiteSpace=wrap;html=1;image=img/clipart/Gear_128x128.png" vertex="1" parent="j93-0ZjBtXm-CNL1zx17-1">
-          <mxGeometry x="50" y="100" width="220" height="60" as="geometry" />
+          <mxGeometry x="40" y="40" width="220" height="60" as="geometry" />
         </mxCell>
         <mxCell id="j93-0ZjBtXm-CNL1zx17-3" value="POD-Librespeed " style="whiteSpace=wrap;html=1;" vertex="1" parent="j93-0ZjBtXm-CNL1zx17-1">
           <mxGeometry x="370" y="540" width="100" height="30" as="geometry" />
         </mxCell>
         <mxCell id="j93-0ZjBtXm-CNL1zx17-4" value=" Service-Librespeed" style="whiteSpace=wrap;html=1;" vertex="1" parent="j93-0ZjBtXm-CNL1zx17-1">
-          <mxGeometry x="100" y="540" width="120" height="30" as="geometry" />
+          <mxGeometry x="90" y="540" width="120" height="30" as="geometry" />
         </mxCell>
         <mxCell id="j93-0ZjBtXm-CNL1zx17-5" value="" style="endArrow=none;endFill=0;" edge="1" source="j93-0ZjBtXm-CNL1zx17-3" target="j93-0ZjBtXm-CNL1zx17-4" parent="j93-0ZjBtXm-CNL1zx17-1">
           <mxGeometry x="-20" y="380" as="geometry" />
@@ -263,7 +263,7 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="j93-0ZjBtXm-CNL1zx17-9" value=" Ingress-Librespeed" style="whiteSpace=wrap;html=1;" vertex="1" parent="j93-0ZjBtXm-CNL1zx17-1">
-          <mxGeometry x="100" y="360" width="120" height="30" as="geometry" />
+          <mxGeometry x="90" y="360" width="120" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
