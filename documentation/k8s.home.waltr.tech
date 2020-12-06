@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-12-06T14:21:14.700Z" agent="5.0 (X11)" etag="_U_1ASHw-GNVJT6X6sIz" version="13.10.9" type="gitlab" pages="6">
+<mxfile host="app.diagrams.net" modified="2020-12-06T14:24:49.531Z" agent="5.0 (X11)" etag="o6-HUIzwFbdoEBtALQUv" version="13.10.9" type="gitlab" pages="6">
   <diagram id="d4FryDLANHifbg4Fqs_y" name="Old.home.waltr.tech">
     <mxGraphModel dx="1222" dy="1133" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -120,6 +120,9 @@
         <mxCell id="sXllUSeeKmlcV8Uh6NA5-0" value="Managed DNS" style="label;whiteSpace=wrap;html=1;image=https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fdigital.com%2Fwp-content%2Fuploads%2Fnamecheap-logo.png%3Fx27771&amp;f=1&amp;nofb=1;" vertex="1" parent="HTCapsW6YFOB3doTcwS1-1">
           <mxGeometry x="430" y="6" width="149" height="74" as="geometry" />
         </mxCell>
+        <mxCell id="sXllUSeeKmlcV8Uh6NA5-1" value="&lt;div&gt;Home.waltr.tech&lt;/div&gt;&lt;div&gt;2020-12-06&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="HTCapsW6YFOB3doTcwS1-1">
+          <mxGeometry x="730" width="120" height="60" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -224,6 +227,9 @@
         </mxCell>
         <mxCell id="Vmm0YIQKO_xL4UTyY-y6-42" value="&lt;div&gt;Local User Net&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;192.168.1.0/24&lt;/div&gt;&lt;br&gt;Overload nat" style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.users;" parent="1" vertex="1">
           <mxGeometry x="10" y="602" width="90" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="67aIn2aaxOKBaOEZj73W-1" value="&lt;div&gt;home.waltr.tech&lt;/div&gt;&lt;div&gt;Planned&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="730" width="120" height="60" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
