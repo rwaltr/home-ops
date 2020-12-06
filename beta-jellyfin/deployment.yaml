@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jellyfin
+  name: jellyfin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyfin
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: jellyfin
+    spec:
+      containers:
+      - image: jellyfin/jellyfin
+        name: jellyfin
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /media
+            name: media 
+            readOnly: true
+          - mountPath: /config
+            name: config
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: 4
+        livenessProbe:
+          httpGet:
+            path: /web/index.html
+            port: 8096
+          periodSeconds: 3
+          initialDelaySeconds: 10
+        startupProbe:
+          httpGet:
+            path: /web/index.html
+            port: 8096
+          failureThreshold: 3
+          periodSeconds: 10
+          initialDelaySeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: jellyfin-config
+        - name: media
+          nfs:
+            server: storage2.waltr.lab
+            path: /tank/nas/library
+
