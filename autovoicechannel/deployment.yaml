@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auto-voice-channels
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auto-voice-channels
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: auto-voice-channels
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: auto-voice-channels
+        image: itscontained/auto-voice-channels:1.0.0
+        volumeMounts:
+          - name: data
+            mountPath: /app/guilds
+          - name: config
+            mountPath: /app/config.json
+            subPath: config.json
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: 1
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: auto-voice-channel
+        - name: config
+          secret:
+            secretName: auto-voice-channel
+            items:
+              - key: config.json
+                path: config.json
