@@ -1,0 +1,33 @@
+variant: fcos
+version: 1.2.0
+passwd:
+  users:
+    - name: blackphidora
+      groups:
+        - docker
+        - wheel
+        - sudo
+      password_hash: <replace-this>
+      ssh_authorized_keys:
+        - <replace-this>
+storage:
+  files:
+    - path: /etc/sysctl.d/20-silence-audit.conf
+      contents:
+        inline: |
+                    kernel.printk=4
+    - path: /etc/hostname
+      mode: 420
+      contents:
+        source: "data:,fcos"
+    - path: /etc/yum.repos.d/kubernetes.repo
+      contents:
+        inline: |
+                [kubernetes]
+                name=Kubernetes
+                baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+                enabled=1
+                gpgcheck=1
+                repo_gpgcheck=1
+                gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+                exclude=kube*
