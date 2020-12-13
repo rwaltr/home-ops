@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-12-13T07:06:35.116Z" agent="5.0 (X11)" etag="82ENBR83KAbXn3YSVqDT" version="14.0.1" type="gitlab" pages="6">
+<mxfile host="app.diagrams.net" modified="2020-12-13T07:07:22.621Z" agent="5.0 (X11)" etag="vhBgjW8l3wsBrAAdESxl" version="14.0.1" type="gitlab" pages="6">
   <diagram id="d4FryDLANHifbg4Fqs_y" name="Old.home.waltr.tech">
     <mxGraphModel dx="1222" dy="1133" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -251,7 +251,7 @@
         <mxCell id="L77Ibq3B9dN-UWLVFp5J-1" value="Node2.k8s" style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.nas_filer;" parent="x1-V0p4pM7yUjdVVi1Zo-1" vertex="1">
           <mxGeometry x="333" y="330" width="100" height="35" as="geometry" />
         </mxCell>
-        <mxCell id="L77Ibq3B9dN-UWLVFp5J-2" value="Node3.k8s" style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.nas_filer;" parent="x1-V0p4pM7yUjdVVi1Zo-1" vertex="1">
+        <mxCell id="L77Ibq3B9dN-UWLVFp5J-2" value="NodeN.k8s" style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.nas_filer;" parent="x1-V0p4pM7yUjdVVi1Zo-1" vertex="1">
           <mxGeometry x="475" y="330" width="100" height="35" as="geometry" />
         </mxCell>
         <mxCell id="JCL89EIsQ9hU7bPLl3y8-1" value="router.home.waltr.tech" style="fontColor=#0066CC;verticalAlign=middle;verticalLabelPosition=middle;labelPosition=right;align=left;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.router;" parent="x1-V0p4pM7yUjdVVi1Zo-1" vertex="1">
@@ -273,7 +273,7 @@
           <mxGeometry x="170" y="550" width="420" height="60" as="geometry" />
         </mxCell>
         <mxCell id="o9rZdPTG0f2hjFzcKS5Y-0" value="VIP:10.10.0.5/24" style="html=1;dashed=0;whitespace=wrap;fillColor=#2875E2;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon;prIcon=api;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
-          <mxGeometry x="140" y="272" width="40" height="38" as="geometry" />
+          <mxGeometry x="140" y="250" width="40" height="38" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
