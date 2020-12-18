@@ -27,7 +27,7 @@ spec:
         resources:
           limits:
             memory: "1Gi"
-            cpu: 1
+            cpu: 2
       volumes:
         - name: data
           persistentVolumeClaim:
