@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-12-23T21:15:18.968Z" agent="5.0 (X11)" etag="ZGhdHEJzKGWgEijHu4jY" version="14.1.2" type="gitlab" pages="3">
+<mxfile host="app.diagrams.net" modified="2020-12-23T21:42:21.998Z" agent="5.0 (X11)" etag="MgGfKL8iXUeMudUl7_5c" version="14.1.2" type="gitlab" pages="3">
   <diagram id="d4FryDLANHifbg4Fqs_y" name="Old.home.waltr.tech">
     <mxGraphModel dx="1222" dy="1133" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -334,6 +334,21 @@
         </mxCell>
         <mxCell id="bcu0OTXxvnfqAaZ4_n6G-6" value="Certificate&#xa;Provider&#xa;" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://lwstatic-a.akamaihd.net/kb/wp-content/uploads/2019/03/le_logo3.png;spacingBottom=0;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
           <mxGeometry x="721.5" y="15.5" width="78.5" height="78.5" as="geometry" />
+        </mxCell>
+        <mxCell id="zowbwC-bzI01s71icgD7-1" value="EVALUATING" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
+          <mxGeometry x="175" y="717.5" width="90" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="zowbwC-bzI01s71icgD7-2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fad9d5;strokeColor=#ae4132;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
+          <mxGeometry x="79" y="752.5" width="296" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="zowbwC-bzI01s71icgD7-3" value="NodeN.k8s" style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.nas_filer;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
+          <mxGeometry x="10" y="822.5" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="zowbwC-bzI01s71icgD7-5" value="ContainerD&#xa;Runtime&#xa;" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://camo.githubusercontent.com/ce52ba4f81cf2a2f218567cb2eaed08a9a1a6968b18ba3618dec889f94018b24/68747470733a2f2f636f6e7461696e6572642e696f2f696d672f6c6f676f732f69636f6e2f626c61636b2f636f6e7461696e6572642d69636f6e2d626c61636b2e706e67;" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
+          <mxGeometry x="115" y="762.5" width="130" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="zowbwC-bzI01s71icgD7-6" value="Fedora CoreOS" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cdn2.iconfinder.com/data/icons/system-flat-buttons/512/fedora-128.png" vertex="1" parent="x1-V0p4pM7yUjdVVi1Zo-1">
+          <mxGeometry x="240" y="763.5" width="128" height="128" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
