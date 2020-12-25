@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  namespace: bots
   name: auto-voice-channel
 spec:
   accessModes:
