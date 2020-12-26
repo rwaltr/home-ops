@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: oblteamspeak
+  name: oblteamspeak
+  namespace: obl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oblteamspeak
+  template:
+    metadata:
+      labels:
+        app: oblteamspeak
+    spec:
+      containers:
+      - image: teamspeak
+        name: teamspeak
+        volumeMounts:
+          - name: data
+            mountPath: /var/ts3server
+        env:
+          - name: TS3SERVER_LICENSE
+            value: accept
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: oblteamspeak
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oblteamspeak
+  namespace: obl
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: nfs-client
+
+---
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: ts.obl.waltr.tech
+spec:
+  endpoints:
+  - dnsName: ts.obl.waltr.tech
+    recordTTL: 180
+    recordType: CNAME
+    targets:
+      - home.waltr.tech
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: oblteamspeak
+  name: oblteamspeak
+  namespace: obl
+spec:
+  ports:
+  - name: "10011"
+    port: 10011
+    protocol: TCP
+    targetPort: 10011
+  - name: "30033"
+    port: 30033
+    protocol: TCP
+    targetPort: 30033
+  - name: "9987"
+    port: 9987
+    protocol: UDP
+    targetPort: 9987
+  externalIPs:
+    - 172.30.0.11
+  selector:
+    app: oblteamspeak
+  type: ClusterIP
