@@ -1,0 +1,28 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    # add an annotation indicating the issuer to use.
+    traefik.ingress.kuberenetes.io/router.entrypoints: websecure
+    cert-manager.io/cluster-issuer: le-staging
+    traefik.ingress.kubernetes.io/service.passhostheader: "false"
+  name: jellyfin
+  labels:
+    app: jellyfin
+spec:
+  rules:
+    - host: jellyfin.waltr.tech
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jellyfin
+                port:
+                  number: 8096
+  tls: # < placing a host in the TLS config will indicate a certificate should be created
+    - hosts:
+      - jellyfin.waltr.tech
+      secretName: jellyfinwaltrtech-cert # < cert-manager will store the created certificate in this secret

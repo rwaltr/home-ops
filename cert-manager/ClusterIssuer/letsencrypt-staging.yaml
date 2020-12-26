@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: le-staging
+spec:
+  acme:
+    email: ryan@blackphidora.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: le-staging
+    solvers:
+    - dns01:
+        cloudflare:
+          email: ryan@blackphidora.com
+          apiKeySecretRef:
+            name: cloudflareapikey
+            key: API_KEY
