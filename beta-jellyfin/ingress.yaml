@@ -4,10 +4,9 @@ kind: Ingress
 metadata:
   annotations:
     # add an annotation indicating the issuer to use.
-    traefik.ingress.kuberenetes.io/router.entrypoints: websecure
-    cert-manager.io/cluster-issuer: le-staging
-    traefik.ingress.kubernetes.io/service.passhostheader: "false"
-    namespace: media
+    cert-manager.io/cluster-issuer: le-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+  namespace: media
   name: jellyfin
   labels:
     app: jellyfin

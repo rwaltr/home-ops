@@ -2,7 +2,6 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
   labels:
     app: jellyfin
   name: jellyfin
@@ -15,7 +14,6 @@ spec:
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
         app: jellyfin
     spec:
@@ -42,6 +40,6 @@ spec:
             claimName: jellyfin-config
         - name: media
           nfs:
-            server: storage2.waltr.lab
+            server: 10.10.0.8
             path: /tank/nas/library
 
