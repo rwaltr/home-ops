@@ -7,6 +7,8 @@ additionalArguments:
   - "--api.insecure=true"
   - "--accesslog=true"
   - "--log.level=INFO"
+  - "--providers.kubernetesingress.ingressclass=traefik"
+  - "--entryPoints.websecure.http.tls=true"
 env:
   - name: CF_DNS_API_TOKEN
     valueFrom:

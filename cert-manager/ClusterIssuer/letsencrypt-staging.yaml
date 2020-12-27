@@ -12,6 +12,6 @@ spec:
     - dns01:
         cloudflare:
           email: ryan@blackphidora.com
-          apiKeySecretRef:
+          apiTokenSecretRef:
             name: cloudflareapikey
             key: API_KEY

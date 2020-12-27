@@ -6,6 +6,7 @@ metadata:
   labels:
     app: jellyfin
   name: jellyfin
+  namespace: media
 spec:
   replicas: 1
   selector:
