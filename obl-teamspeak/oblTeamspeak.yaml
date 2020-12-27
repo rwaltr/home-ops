@@ -25,6 +25,11 @@ spec:
         env:
           - name: TS3SERVER_LICENSE
             value: accept
+        resources:
+          requests:
+            cpu: "500M"
+          limits:
+            cpu: "2000M"
       volumes:
         - name: data
           persistentVolumeClaim:
