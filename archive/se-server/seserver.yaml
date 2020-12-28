@@ -1,0 +1,43 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spaceengineers
+  name: spaceengineers
+  namespace: obl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spaceengineers
+  template:
+    metadata:
+      labels:
+        app: spaceengineers
+    spec:
+      containers:
+      - image: devidian/spaceengineers
+        name: spaceengineers
+        volumeMounts:
+          - name: data
+            mountPath: /appdata/space-engineers/instances
+          - name: serverpath
+            mountPath: /appdata/space-engineers/SpaceEngineersDedicated
+          - name: steam
+            mountPath: /root/.steam
+        env:
+          - name: WINEDEBUG
+            value: -all
+          - name: INSTANCE_NAME
+            value: OBL-SE
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: spaceengineers-data
+        - name: serverpath
+          persistentVolumeClaim:
+              claimName: spaceengineers-path
+        - name: steam
+          persistentVolumeClaim:
+              claimName: spaceengineers-steam
