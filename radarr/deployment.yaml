@@ -1,0 +1,45 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: radarr
+  name: radarr
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: radarr
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: radarr
+    spec:
+      containers:
+      - image: ghcr.io/linuxserver/radarr
+        name: radarr
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /config
+            name: config
+          - mountPath: /media
+            name: media
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        env:
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: radarr-config
+        - name: media
+          nfs:
+            server: 10.10.0.8
+            path: /tank/nas/library

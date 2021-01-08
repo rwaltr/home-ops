@@ -3,23 +3,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: ombi
-  name: ombi
-  namespace: media
+    app: grocy
+  name: grocy
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ombi
+      app: grocy
   strategy: {}
   template:
     metadata:
       labels:
-        app: ombi
+        app: grocy
     spec:
       containers:
-      - image: ghcr.io/linuxserver/ombi
-        name: ombi
+      - image: ghcr.io/linuxserver/grocy
+        name: grocy
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /config
@@ -28,8 +27,13 @@ spec:
           limits:
             memory: "1Gi"
             cpu: 500m
+        env:
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
       volumes:
         - name: config
           persistentVolumeClaim:
-            claimName: ombi-config
+            claimName: grocy-config
 
