@@ -1,12 +1,11 @@
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: statping-config
+  name: xbackbone
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
-      storage: 10Gi
+      storage: 1Gi
   storageClassName: nfs-client

@@ -21,7 +21,7 @@ spec:
         name: statping
         imagePullPolicy: Always
         volumeMounts:
-          - mountPath: /config
+          - mountPath: /app
             name: config
         resources:
           limits:
