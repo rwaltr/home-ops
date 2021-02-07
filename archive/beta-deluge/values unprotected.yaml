@@ -12,17 +12,22 @@ strategy:
 service:
   port:
     port: 8112
+    port: 53442
+  externalIPs:
+    - 172.30.0.23
 
 persistence:
   config:
-    enabled: false
+    enabled: true
     emptyDir: false
     mountPath: /config
+    storageClass: nfs-client
 
   downloads:
     enabled: false
     emptyDir: false
     mountPath: /downloads
+    #storageClass: nfs-client
     ## Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning
@@ -30,11 +35,19 @@ persistence:
     ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
     ##   GKE, AWS & OpenStack)
     # storageClass: "-"
-    # accessMode: ReadWriteOnce
-    # size: 1Gi
+    #accessMode: ReadWriteOnce
+    #size: 1Gi
     ## Do not delete the pvc upon helm uninstall
     # skipuninstall: false
     # existingClaim: ""
+additionalVolumeMounts: 
+  - name: downloads
+    mountPath: /downloads
+additionalVolumes:
+  - name: downloads
+    nfs:
+      server: 10.10.0.8
+      path: /tank/nas/library/downloads
 
 env: {}
   ## Optional ENV Vars that can be set.
@@ -49,42 +62,4 @@ addons:
 
   # Enable running a VPN in the pod to route traffic through a VPN
   vpn:
-    enabled: true
-    type: wireguard
-
-    # WireGuard specific configuration
-    wireguard:
-      image:
-        repository: k8sathome/wireguard
-        pullPolicy: IfNotPresent
-        tag: 1.0.20200827
-
-    # Set the VPN container securityContext
-    securityContext:
-      capabilities:
-        add:
-          - NET_ADMIN
-          - SYS_MODULE
-      # All variables specified here will be added to the vpn sidecar container
-    # See the documentation of the VPN image for all config values
-    env: {}
-    # TZ: UTC
-
-    # Provide a customized vpn configuration file to be used by the VPN.
-    configFile:  # |-
-      # Some Example Config
-      # remote greatvpnhost.com 8888
-      # auth-user-pass
-      # Cipher AES
-
-    # Provide custom up/down scripts that can be used by the vpnConf
-#    scripts:
-#      up:  # |-
-#        # #!/bin/bash
-#        # echo "connected" > /shared/vpnstatus
-#      down:  # |-
-#        # #!/bin/bash
-#        # echo "disconnected" > /shared/vpnstatus
-
-#    additionalVolumeMounts: []
-
+    enabled: false
