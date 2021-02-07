@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: xbackbone
-        image: pe46dro/xbackbone-docker:3.1.4
+        image: pe46dro/xbackbone-docker:3.3.3
         ports:
           - containerPort: 80
         envFrom:
@@ -28,6 +28,18 @@ spec:
           - mountPath: /app/resources/database
             subPath: database
             name: xbackbone
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          failureThreshold: 60
       volumes:
         - name: xbackbone
           persistentVolumeClaim:
