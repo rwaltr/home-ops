@@ -34,6 +34,19 @@ spec:
           limits:
             memory: "8Gi"
             cpu: 4
+        livenessProbe:
+          httpGet:
+            path: /System/info/public
+            port: 8096
+          periodSeconds: 5
+          initialDelaySeconds: 5
+        startupProbe:
+          httpGet:
+            path: /System/info/public
+            port: 8096
+          periodSeconds: 5
+          initialDelaySeconds: 15
+          failureThreshold: 10
       volumes:
         - name: config
           persistentVolumeClaim:
