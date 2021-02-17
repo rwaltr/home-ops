@@ -33,9 +33,24 @@ spec:
               name: rtorrent-data-volume
             - mountPath: /downloads
               name: rtorrent-media-volume
+          readinessProbe:
+            httpGet:
+              port: 9080
+              path: /
+          startupProbe:
+            httpGet:
+              port: 9080
+              path: /
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 500M
+              memory: 1G
       volumes:
         - name: rtorrent-data-volume
-          emptyDir: {}
+          hostPath:
+            path: /srv/rtorrent/config
         - name: rtorrent-media-volume
           nfs:
             server: 10.10.0.8

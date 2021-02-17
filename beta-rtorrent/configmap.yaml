@@ -10,7 +10,7 @@ data:
   TZ: "America/Chicago"
   PHP_TZ: "America/Chicago"
   VPN_ENABLED: "no"
-  DEBUG: "false"
+  DEBUG: "true"
   ENABLE_AUTODL_IRSSI: "no"
   ENABLE_RPC2: "yes"
   ENABLE_RPC2_AUTH: "no"
