@@ -5,7 +5,7 @@ metadata:
   annotations:
     # add an annotation indicating the issuer to use.
     cert-manager.io/cluster-issuer: le-prod
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
   namespace: media
   name: jellyfin
   labels:
