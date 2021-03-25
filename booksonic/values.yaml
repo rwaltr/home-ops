@@ -43,31 +43,7 @@ persistence:
   config:
     enabled: true
     emptyDir: false
-    storageClass: "nfs-client"
 
-  audiobooks:
-    enabled: false
-    emptyDir: false
-    mountPath: /audiobooks
-    ## Persistent Volume Storage Class
-    ## If defined, storageClassName: <storageClass>
-    ## If set to "-", storageClassName: "", which disables dynamic provisioning
-    ## If undefined (the default) or set to null, no storageClassName spec is
-    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-    ##   GKE, AWS & OpenStack)
-    storageClass: "nfs-client"
-    # accessMode: ReadWriteOnce
-    # size: 1Gi
-    ## Do not delete the pvc upon helm uninstall
-    # skipuninstall: false
-  podcasts:
-    enabled: false
-    emptyDir: false
-    mountPath: /podcasts
-  othermedia:
-    enabled: false
-    emptyDir: false
-    mountPath: /othermedia
 additionalVolumeMounts:
   - name: audiobooks
     mountPath: /audiobooks
