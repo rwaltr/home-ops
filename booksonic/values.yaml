@@ -24,9 +24,9 @@ service:
     port: 4040
 
 ingress:
-  #enabled: true
+  enabled: true
   annotations:
-    cert-manger.io/cluster-issuer: le-prod
+    cert-manager.io/cluster-issuer: le-prod
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
   hosts:
     - host: booksonic.waltr.tech
@@ -43,12 +43,13 @@ persistence:
   config:
     enabled: true
     emptyDir: false
+    storageClass: "nfs-client"
 
 additionalVolumeMounts:
   - name: audiobooks
     mountPath: /audiobooks
   - name: podcasts
-    mountPath: podcasts
+    mountPath: /podcasts
     
 additionalVolumes:
   - name: audiobooks
@@ -57,5 +58,5 @@ additionalVolumes:
       server: 10.10.0.8
   - name: podcasts
     nfs:
-      path: /tank/nas/library/audiobooks
+      path: /tank/nas/library/podcasts
       server: 10.10.0.8
