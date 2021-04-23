@@ -28,7 +28,7 @@ ingress:
     cert-manager.io/cluster-issuer: le-prod
     traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
   hosts:
-    - host: image.waltr.tech
+    - host: images.waltr.tech
       paths:
         - path: /
           pathType: Prefix
