@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rtorrent
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rtorrent
+  serviceName: rtorrent
+  template:
+    metadata:
+      labels:
+        app: rtorrent
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node1.k8s.home.waltr.tech
+      restartPolicy: Always
+      containers:
+        - name: rtorrent
+          image: binhex/arch-rtorrentvpn:v3.10-01
+          ports:
+            - containerPort: 9080
+              name: web
+            - containerPort: 53442
+              name: seed
+          envFrom:
+            - configMapRef:
+                name: rtorrent-env
+          volumeMounts:
+            - mountPath: /config
+              name: rtorrent-data-volume
+            - mountPath: /downloads
+              name: rtorrent-media-volume
+          # readinessProbe:
+          #   httpGet:
+          #     port: 9080
+          #     path: /
+          # startupProbe:
+          #   httpGet:
+          #     port: 9080
+          #     path: /
+          #   initialDelaySeconds: 60
+          #   periodSeconds: 20
+          # resources:
+          #   requests:
+          #     cpu: 500M
+          #     memory: 1G
+      volumes:
+        - name: rtorrent-data-volume
+          persistentVolumeClaim:
+            claimName: rtorrent-config
+        - name: rtorrent-media-volume
+          nfs:
+            server: 10.10.0.8
+            path: /tank/nas/library/downloads

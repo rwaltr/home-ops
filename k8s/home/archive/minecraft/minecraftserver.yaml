@@ -1,0 +1,113 @@
+---
+# Source: minecraft/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minecraft-minecraft
+  labels:
+    app: minecraft-minecraft
+    chart: "minecraft-2.1.2"
+    release: "minecraft"
+    heritage: "Helm"
+type: Opaque
+data:
+  rcon-password: "Q0hBTkdFTUUh"
+---
+# Source: minecraft/templates/minecraft-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minecraft-minecraft
+  labels:
+    app: minecraft-minecraft
+    chart: "minecraft-2.1.2"
+    release: "minecraft"
+    heritage: "Helm"
+  annotations:
+        {}
+spec:
+  type: ClusterIP
+  ports:
+  - name: minecraft
+    port: 25565
+    targetPort: minecraft
+    protocol: TCP
+  selector:
+    app: minecraft-minecraft
+  externalIPs:
+    - "172.30.0.50"
+---
+# Source: minecraft/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-minecraft
+  labels:
+    app: minecraft-minecraft
+    chart: "minecraft-2.1.2"
+    release: "minecraft"
+    heritage: "Helm"
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: minecraft-minecraft
+  template:
+    metadata:
+      labels:
+        app: minecraft-minecraft
+    spec:
+      containers:
+      - name: minecraft-minecraft
+        image: "itzg/minecraft-server:latest"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          tcpSocket:
+            port: 25565
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        livenessProbe:
+          tcpSocket:
+            port: 25565
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        startupProbe:
+          tcpSocket:
+            port: 25565
+          initialDelaySeconds: 120
+          periodSeconds: 5
+          failureThreshold: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        env:
+        - name: EULA
+          value: "TRUE"
+        - name: TYPE
+          value: "CURSEFORGE"
+        - name: OPS
+          value: "blackphidora"
+        - name: CF_SERVER_MOD
+          value: "http://downloads.gtnewhorizons.com/ServerPacks/GTNewHorizonsServer-1.7.10-2.1.0.0.zip"
+        ports:
+        - name: minecraft
+          containerPort: 25565
+          protocol: TCP
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+      volumes:
+      - name: datadir
+        persistentVolumeClaim:
+          claimName: minecraft-datadir
+          

@@ -1,0 +1,17 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: deluge-config
+  namespace: media
+  labels:
+    app.kubernetes.io/name: deluge
+    app.kubernetes.io/instance: deluge
+    app.kubernetes.io/version: "v2.0.3-2201906121747"
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "1Gi"
+  storageClassName: "nfs-client"

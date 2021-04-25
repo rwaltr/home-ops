@@ -1,0 +1,28 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    # add an annotation indicating the issuer to use.
+    cert-manager.io/cluster-issuer: le-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+  namespace: media
+  name: ombi
+  labels:
+    app: ombi
+spec:
+  rules:
+    - host: ombi.waltr.tech
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ombi
+                port:
+                  number: 3579
+  tls: # < placing a host in the TLS config will indicate a certificate should be created
+    - hosts:
+      - ombi.waltr.tech
+      secretName: ombiwaltrtech-cert # < cert-manager will store the created certificate in this secret

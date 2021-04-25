@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ombi
+  name: ombi
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ombi
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: ombi
+    spec:
+      containers:
+      - image: ghcr.io/linuxserver/ombi
+        name: ombi
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /config
+            name: config
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: 500m
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: ombi-config
+

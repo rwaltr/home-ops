@@ -1,0 +1,52 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: leonvtt
+  name: leonvtt
+  namespace: jgleon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: leonvtt
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: leonvtt
+    spec:
+      containers:
+      - image: felddy/foundryvtt:release
+        name: leonvtt
+        volumeMounts:
+          - mountPath: /data
+            name: data
+        env:
+          - name: FOUNDRY_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: leonvtt-secret
+                key: username
+          - name: FOUNDRY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: leonvtt-secret
+                key: password
+          - name: FOUNDRY_ADMIN_KEY
+            value: Garrett42
+          - name: FOUNDRY_HOSTNAME
+            value: leonvtt.waltr.tech
+          - name: FOUNDRY_PROXY_SSL
+            value: "true"
+        livenessProbe:
+          tcpSocket:
+            port: 30000
+          initialDelaySeconds: 5
+          periodSeconds: 30000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+              claimName: leonvtt-data

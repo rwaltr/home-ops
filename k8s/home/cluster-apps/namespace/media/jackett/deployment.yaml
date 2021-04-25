@@ -1,0 +1,34 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jackett
+  name: jackett
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jackett
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: jackett
+    spec:
+      containers:
+      - image: ghcr.io/linuxserver/jackett
+        name: jackett
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /config
+            name: config
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: 1
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: jackett-config

@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: leonvtt
+  name: leonvtt
+  namespace: jgleon
+spec:
+  ports:
+  - name: "web"
+    port: 80
+    protocol: TCP
+    targetPort: 30000
+  selector:
+    app: leonvtt
+  type: ClusterIP

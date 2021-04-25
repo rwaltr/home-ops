@@ -1,0 +1,39 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grocy
+  name: grocy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grocy
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: grocy
+    spec:
+      containers:
+      - image: ghcr.io/linuxserver/grocy
+        name: grocy
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /config
+            name: config
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: 500m
+        env:
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: grocy-config
+
