@@ -32,4 +32,3 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: ombi-config
-

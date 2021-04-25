@@ -23,7 +23,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /media
-            name: media 
+            name: media
             readOnly: true
           - mountPath: /config
             name: config
@@ -55,4 +55,3 @@ spec:
           nfs:
             server: 10.10.0.8
             path: /tank/nas/library
-

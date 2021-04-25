@@ -37,4 +37,3 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: grocy-config-gpzeke
-

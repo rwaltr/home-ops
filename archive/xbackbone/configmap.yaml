@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: xbb-env
-data:
-  APP_NAME: "images.waltr.tech"
-  URL: "https://images.waltr.tech"
-  PHP_UPLOAD_MAX_FILESIZE: "25G"

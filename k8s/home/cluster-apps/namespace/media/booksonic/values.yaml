@@ -36,7 +36,7 @@ ingress:
   tls:
     - hosts:
       - booksonic.waltr.tech
-      secretName: booksonicwaltrtech-cert  
+      secretName: booksonicwaltrtech-cert
 
 
 persistence:
@@ -50,7 +50,7 @@ additionalVolumeMounts:
     mountPath: /audiobooks
   - name: podcasts
     mountPath: /podcasts
-    
+
 additionalVolumes:
   - name: audiobooks
     nfs:

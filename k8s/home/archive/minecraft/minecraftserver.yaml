@@ -110,4 +110,3 @@ spec:
       - name: datadir
         persistentVolumeClaim:
           claimName: minecraft-datadir
-          
