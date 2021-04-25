@@ -7,9 +7,9 @@ passwd:
         - docker
         - wheel
         - sudo
-      password_hash: <replace-this>
       ssh_authorized_keys:
-        - <replace-this>
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDyFKJXF37y8R2lGAfzCd5aeDIWRGYaiXrqcW3GL3EnrM1rkZvJNWb+K7LssbKUd5yTOOi5pSElfJXtSrATfcNyVpir/4Mzxj0p0KAjRFbM6R23cOYVXU0nLN2BS2rpO6svCWuTvqs7C4yNe4DGnfexSas6y/Aeay8p5H5DKkz/Ab71En8xDYig0nIRqPDI/2wCm8WbKhZWFL34eLgOm1YIjHMCbUQ7z5D7w0Ysjk6gFlaiv+1HsgWo9zRo669jOEG5pr0tb+FN4ciX+asC10Nymu0c50i5Ne1IXHHB8eEqlpdkwglGu2elMYE0RKpWcun0BeH9jMIgCjEjRAxHwRif blackphidora@fsteel"
+      password_hash: $y$j9T$B4T2a6IkirIRG1kg4CIST1$toUJ1RGEtwg8yRPfuiI5iI0c5TE/zM5YKmnWfyLuo38
 storage:
   files:
     - path: /etc/sysctl.d/20-silence-audit.conf
@@ -31,3 +31,14 @@ storage:
                 repo_gpgcheck=1
                 gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
                 exclude=kube*
+systemd:
+  units:
+    - name: serial-getty@ttyS0.service
+      dropins:
+      - name: autologin-core.conf
+        contents: |
+          [Service]
+          # Override Execstart in main unit
+          ExecStart=
+          # Add new Execstart with `-` prefix to ignore failure`
+          ExecStart=-/usr/sbin/agetty --autologin core --noclear %I $TERM
