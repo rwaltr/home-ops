@@ -6,6 +6,8 @@ metadata:
     # add an annotation indicating the issuer to use.
     cert-manager.io/cluster-issuer: le-prod
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    forecastle.stakater.com/expose: "true"
+    forecastle.stakater.com/icon: "https://avatars.githubusercontent.com/u/45698031"
   namespace: media
   name: jellyfin
   labels:
