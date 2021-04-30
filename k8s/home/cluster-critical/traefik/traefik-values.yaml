@@ -1,13 +1,18 @@
+#image: 
+#  name: traefik
+#  tag: 2.4.8
+
+service:
+  externalIPs: 
+    - 172.30.0.10
+
 additionalArguments:
-  - "--certificatesresolvers.letsencrypt.acme.email=ryan@blackphidora.com"
-  - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
-  - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
-  - "--certificatesResolvers.letsencrypt.acme.dnschallenge=true"
-  - "--certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
   - "--api.insecure=true"
   - "--accesslog=true"
   - "--log.level=INFO"
-  - "--providers.kubernetesingress.ingressclass=traefik"
+  #- "--providers.kubernetesingress.ingressclass=traefik"
+  - "--providers.kubernetesingress.ingressendpoint.hostname=traefik.home.waltr.tech"
+  - "--serverstransport.insecureskipverify=true"
   - "--entryPoints.websecure.http.tls=true"
 env:
   - name: CF_DNS_API_TOKEN
@@ -15,3 +20,25 @@ env:
       secretKeyRef:
         name: cloudflare
         key: dns-token
+
+ports:
+  web:
+    redirectTo: websecure
+  websecure:
+    tls:
+      enabled: true
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  fallbackApiVersion: v1
+
+logs:
+  general:
+    level: INFO
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
