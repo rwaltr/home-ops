@@ -18,7 +18,7 @@ strategy:
 env:
   STORAGE_FILEPATH: "/config"
   STORAGE_TYPE: "file"
-
+  STORAGE_EXPIRE_SECONDS: 259200
 service:
   port:
     port: 7777
@@ -42,4 +42,6 @@ ingress:
 persistence:
   config:
     enabled: true
+    emptydir:
+      enabled: true
 #    size: 1Gi
