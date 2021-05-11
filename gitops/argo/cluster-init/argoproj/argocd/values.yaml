@@ -104,7 +104,6 @@ argo-cd:
         g, rwalt@pm.me, role:admin
     ingress:
       enabled: true
-      ingressClassName: traefik
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
@@ -117,7 +116,7 @@ argo-cd:
     metrics:
       enabled: false
       serviceMonitor:
-        enabled: true
+        enabled: false
     resources:
       requests:
         cpu: 100m
@@ -145,7 +144,7 @@ argo-cd:
     metrics:
       enabled: true
       serviceMonitor:
-        enabled: true
+        enabled: false
     env:
       - name: "ARGOCD_EXEC_TIMEOUT"
         value: "5m"
