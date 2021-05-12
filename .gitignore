@@ -13,3 +13,7 @@ flux
 
 # Sops
 .decrypted~*.yaml
+
+# Helm
+*Chart.lock
+charts/
