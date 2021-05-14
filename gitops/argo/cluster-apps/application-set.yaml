@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: cluster-core
+  name: cluster-apps
 spec:
   generators:
     - git:
         repoURL: https://gitlab.com/rwaltr/infra.git
         revision: HEAD
         files:
-          - path: "gitops/argo/cluster-core/**/config.json"
+          - path: "gitops/argo/cluster-apps/**/gen-config.json"
   template:
     metadata:
       name: '{{ name }}'
