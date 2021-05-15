@@ -3,7 +3,7 @@
     "name": "bash-org-funny",
     "cluster": "kyz",
     "namespace": "default",
-    "path": "cluster-apps/bash-org-funny",
+    "path": "gitops/argo/cluster-apps/bash-org-funny",
     "valueFile": ""
   }
 ]
