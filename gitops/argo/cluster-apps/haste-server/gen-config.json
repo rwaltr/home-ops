@@ -1,9 +1,9 @@
 [
   {
-    "name": "bash-org-funny",
+    "name": "haste-server",
     "cluster": "kyz",
-    "namespace": "default",
-    "path": "gitops/argo/cluster-apps/bash-org-funny",
+    "namespace": "utility",
+    "path": "gitops/argo/cluster-apps/haste-server",
     "valueFile": ""
   }
 ]
