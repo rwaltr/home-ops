@@ -1,0 +1,9 @@
+[
+  {
+    "name": "bash-org-funny",
+    "cluster": "kyz",
+    "namespace": "default",
+    "path": "gitops/argo/cluster-apps/bash-org-funny",
+    "valueFile": ""
+  }
+]
