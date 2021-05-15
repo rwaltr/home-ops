@@ -43,5 +43,5 @@ haste-server:
   persistence:
     config:
       enabled: true
-      emptydir:
+      emptyDir:
         enabled: true
