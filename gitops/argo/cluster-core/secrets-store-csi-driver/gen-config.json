@@ -1,0 +1,9 @@
+[
+  {
+    "name": "secrets-store-csi-driver-home",
+    "cluster": "kyz",
+    "namespace": "utility",
+    "path": "gitops/argo/cluster-core/secrets-store-csi-drivers",
+    "valueFile": ""
+  }
+]
