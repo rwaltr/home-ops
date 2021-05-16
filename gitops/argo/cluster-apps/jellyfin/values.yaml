@@ -1,0 +1,121 @@
+jellyfin:
+  #
+  # IMPORTANT NOTE
+  #
+  # This chart inherits from our common library chart. You can check the default values/options here:
+  # https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
+  #
+  
+  image:
+    repository: jellyfin/jellyfin
+    pullPolicy: IfNotPresent
+    tag: 10.7.5
+  
+  strategy:
+    type: Recreate
+  
+  service:
+    port:
+      port: 8096
+  
+  ingress:
+    enabled: false
+    domainName: "jellyfin.waltr.tech"
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.priority: "10"
+      cert-manager.io/cluster-issuer: le-prod
+    hosts:
+      - hostTpl: '{{ .Values.ingress.domainName }}'
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hostsTpl: ['{{ .Values.ingress.domainName }}']
+        secretNameTpl: '{{ .Values.ingress.domainName | replace "." "-" }}'
+  
+  persistence:
+    config:
+      enabled: true
+      emptyDir:
+        enabled: false
+      existingClaim: jellyfin-config
+  
+    # Cache does NOT contain temporary transcoding data.
+    cache:
+      enabled: true
+      emptyDir:
+        enabled: false
+      mountPath: /cache
+      accessMode: RWO
+      size: 1G
+      ## Persistent Volume Storage Class
+      ## If defined, storageClassName: <storageClass>
+      ## If set to "-", storageClassName: "", which disables dynamic provisioning
+      ## If undefined (the default) or set to null, no storageClassName spec is
+      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+      ##   GKE, AWS & OpenStack)
+      # storageClass: "-"
+      # accessMode: ReadWriteOnce
+      # size: 1Gi
+      ## Do not delete the pvc upon helm uninstall
+      # skipuninstall: false
+      # existingClaim: ""
+  
+    # media:
+    #   enabled: false
+    #   emptyDir:
+    #     enabled: false
+    #   mountPath: /media
+    #   ## Persistent Volume Storage Class
+      ## If defined, storageClassName: <storageClass>
+      ## If set to "-", storageClassName: "", which disables dynamic provisioning
+      ## If undefined (the default) or set to null, no storageClassName spec is
+      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+      ##   GKE, AWS & OpenStack)
+      # storageClass: "-"
+      # accessMode: ReadWriteOnce
+      # size: 1Gi
+      ## Do not delete the pvc upon helm uninstall
+      # skipuninstall: false
+      # existingClaim: ""
+  additionalVolumes:
+    - name: media
+      nfs:
+        server: 10.10.0.8
+        path: /tank/nas/library
+  additionalVolumeMounts:
+    - name: media
+      mountpath: /media
+      readOnly: true
+
+      
+
+
+  # podSecurityContext:
+  #   runAsUser: 568
+  #   runAsGroup: 568
+  #   fsGroup: 568
+  #   # Hardware acceleration using an Intel iGPU w/ QuickSync
+  #   # These IDs below should be matched to your `video` and `render` group on the host
+  #   # To obtain those IDs run the following grep statement on the host:
+  #   # $ cat /etc/group | grep "video\|render"
+  #   # video:x:44:
+  #   # render:x:109:
+  #   supplementalGroups:
+  #   - 44
+  #   - 109
+  
+  # resources:
+  #   requests:
+  #     # Hardware acceleration using an Intel iGPU w/ QuickSync and
+  #     # using intel-gpu-plugin (https://github.com/intel/intel-device-plugins-for-kubernetes)
+  #     gpu.intel.com/i915: 1
+  #     cpu: 200m
+  #     memory: 256Mi
+  #   limits:
+  #     # Hardware acceleration using an Intel iGPU w/ QuickSync and
+  #     # using intel-gpu-plugin (https://github.com/intel/intel-device-plugins-for-kubernetes)
+  #     gpu.intel.com/i915: 1
+  #     memory: 4096Mi
+  
