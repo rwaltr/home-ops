@@ -19,7 +19,7 @@ spec:
         app: leonvtt
     spec:
       containers:
-      - image: felddy/foundryvtt:release
+      - image: felddy/foundryvtt:0.8.3
         name: leonvtt
         volumeMounts:
           - mountPath: /data
