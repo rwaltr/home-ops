@@ -1,0 +1,34 @@
+unpackerr:
+#
+# IMPORTANT NOTE
+#
+# This chart inherits from our common library chart. You can check the default values/options here:
+# https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
+#
+  
+  image:
+    repository: golift/unpackerr
+    pullPolicy: IfNotPresent
+    tag: 0.7.2
+  
+  strategy:
+    type: Recreate
+  
+  # # See more environment variables in the unpackerr documentation
+  # https://github.com/davidnewhall/unpackerr#docker-env-variables
+  env: 
+    UN_SONARR_0_URL: http://sonarr:8989
+  
+    UN_RADARR_0_URL: http://radarr:7878
+  
+    # TZ: UTC
+  
+  additionalVolumes:
+    - name: downloads
+      nfs:
+        server: 10.10.0.8
+        path: /tank/nas/library/downloads/completed
+      
+  additionalVolumeMounts:
+    - name: downloads
+      mountPath: /downloads
