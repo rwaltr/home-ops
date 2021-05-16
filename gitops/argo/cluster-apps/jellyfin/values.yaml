@@ -47,7 +47,7 @@ jellyfin:
       emptyDir:
         enabled: false
       mountPath: /cache
-      accessMode: RWO
+      accessMode: ReadWriteOnce
       size: 1G
       ## Persistent Volume Storage Class
       ## If defined, storageClassName: <storageClass>
