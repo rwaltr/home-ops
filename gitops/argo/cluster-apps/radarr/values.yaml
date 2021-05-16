@@ -14,10 +14,9 @@ radarr:
   strategy:
     type: Recreate
   
-  env: {}
-    # TZ: UTC
-    # PUID: 1001
-    # PGID: 1001
+  env:
+    PUID: 1000
+    GUID: 1000
   
   service:
     port:

@@ -14,8 +14,9 @@ sonarr:
   strategy:
     type: Recreate
   
-  env: {}
-    # TZ: UTC
+  env:
+    PUID: 1000
+    GUID: 1000
   
   service:
     port:
