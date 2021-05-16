@@ -86,7 +86,7 @@ jellyfin:
         path: /tank/nas/library
   additionalVolumeMounts:
     - name: media
-      mountpath: /media
+      mountPath: /media
       readOnly: true
 
       
