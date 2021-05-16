@@ -15,8 +15,6 @@ sonarr:
     type: Recreate
   
   env:
-    PUID: 1000
-    GUID: 1000
   
   service:
     port:
@@ -50,5 +48,10 @@ sonarr:
     - name: downloads
       mountPath: /downloads
       readOnly: true
+
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+
 
 

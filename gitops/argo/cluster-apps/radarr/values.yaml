@@ -15,8 +15,6 @@ radarr:
     type: Recreate
   
   env:
-    PUID: 1000
-    GUID: 1000
   
   service:
     port:
@@ -49,6 +47,10 @@ radarr:
     - name: downloads
       mountPath: /downloads
       readOnly: true
+
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
 
   # Enable gathering Prometheus metrics
   # prometheus:
