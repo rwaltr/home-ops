@@ -19,7 +19,7 @@ jellyfin:
       port: 8096
   
   ingress:
-    enabled: false
+    enabled: true
     domainName: "jellyfin.waltr.tech"
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
