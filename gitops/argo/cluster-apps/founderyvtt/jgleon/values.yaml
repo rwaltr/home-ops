@@ -56,4 +56,4 @@ foundryvtt:
         enabled: false
       mountPath: /data
       size: 10G
-      accessMode: readWriteOnce
+      accessMode: ReadWriteOnce
