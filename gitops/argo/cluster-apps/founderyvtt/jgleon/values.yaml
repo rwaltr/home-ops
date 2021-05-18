@@ -55,5 +55,5 @@ foundryvtt:
       emptyDir:
         enabled: false
       mountPath: /data
-      size: 10GB
+      size: 10G
       accessMode: readWriteOnce
