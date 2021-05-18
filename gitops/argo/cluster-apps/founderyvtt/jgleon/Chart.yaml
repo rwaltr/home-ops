@@ -1,7 +1,7 @@
-name: founderyvtt
+name: Foundry
 apiVersion: v2
 version: 1.0.0
 dependencies:
-  - name: founderyvtt
+  - name: foundryvtt
     version: 0.8.3
     repository: https://k8s-at-home.com/charts
