@@ -3,7 +3,7 @@ traefik:
   #image: 
   #  name: traefik
   #  tag: 2.4.8
-  fullnameOveride: traefik
+  fullnameOverride: traefik
   additionalArguments:
     - "--api.insecure=true"
     - "--accesslog=true"
