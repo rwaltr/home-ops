@@ -21,3 +21,7 @@ vault:
     storageClass: nfs-client
   ui:
     enabled: true
+  csi:
+    enabled: true
+  injector: 
+    enabled: true
