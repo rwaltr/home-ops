@@ -2,7 +2,7 @@
   {
     "name": "vault",
     "cluster": "kyz",
-    "namespace": "utility",
+    "namespace": "default",
     "path": "gitops/argo/cluster-core/vault",
     "valueFile": ""
   }
