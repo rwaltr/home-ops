@@ -1,0 +1,36 @@
+traefik:
+
+  #image: 
+  #  name: traefik
+  #  tag: 2.4.8
+  
+  
+  additionalArguments:
+    - "--api.insecure=true"
+    - "--accesslog=true"
+    - "--log.level=INFO"
+    #- "--providers.kubernetesingress.ingressclass=traefik"
+    - "--serverstransport.insecureskipverify=true"
+    - "--entryPoints.websecure.http.tls=true"
+  
+  ports:
+    web:
+      redirectTo: websecure
+    websecure:
+      tls:
+        enabled: true
+  
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+    fallbackApiVersion: v1
+  
+  logs:
+    general:
+      level: INFO
+  
+  providers:
+    kubernetesCRD:
+      enabled: true
+    kubernetesIngress:
+      enabled: true
