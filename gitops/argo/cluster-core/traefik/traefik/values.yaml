@@ -5,12 +5,8 @@ traefik:
   #  tag: 2.4.8
   fullnameOverride: traefik
   additionalArguments:
-    - "--api.insecure=true"
-    - "--accesslog=true"
-    - "--log.level=INFO"
     #- "--providers.kubernetesingress.ingressclass=traefik"
     - "--serverstransport.insecureskipverify=true"
-    - "--entryPoints.websecure.http.tls=true"
   
   ports:
     web:
