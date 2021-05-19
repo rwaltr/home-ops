@@ -1,5 +1,6 @@
 traefik:
 
+  fullnameOveride: traefik
   #image: 
   #  name: traefik
   #  tag: 2.4.8
