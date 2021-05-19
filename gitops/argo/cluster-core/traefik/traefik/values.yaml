@@ -4,6 +4,8 @@ traefik:
   #  name: traefik
   #  tag: 2.4.8
   fullnameOverride: traefik
+
+  
   additionalArguments:
     #- "--providers.kubernetesingress.ingressclass=traefik"
     - "--serverstransport.insecureskipverify=true"
