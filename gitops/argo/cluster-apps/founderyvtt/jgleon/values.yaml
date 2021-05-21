@@ -18,7 +18,7 @@ foundryvtt:
   # https://github.com/felddy/foundryvtt-docker#environment-variables
   
   env: 
-    FOUNDRY_HOSTNAME: "jgelon.vtt.waltr.tech"
+    FOUNDRY_HOSTNAME: "jgleon.vtt.waltr.tech"
     # TZ:
   
   
