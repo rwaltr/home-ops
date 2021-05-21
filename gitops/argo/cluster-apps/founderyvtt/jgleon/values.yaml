@@ -33,7 +33,7 @@ foundryvtt:
  
   ingress:
     enabled: true
-    domainName: "jgelon.vtt.waltr.tech"
+    domainName: "jgleon.vtt.waltr.tech"
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
       traefik.ingress.kubernetes.io/router.priority: "10"
