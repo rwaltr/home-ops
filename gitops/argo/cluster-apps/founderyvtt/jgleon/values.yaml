@@ -18,7 +18,7 @@ foundryvtt:
   # https://github.com/felddy/foundryvtt-docker#environment-variables
   
   env: 
-    FOUNDRY_HOSTNAME: "jgelon.vtt.waltr.tech"
+    FOUNDRY_HOSTNAME: "jgleon.vtt.waltr.tech"
     # TZ:
   
   
@@ -33,7 +33,7 @@ foundryvtt:
  
   ingress:
     enabled: true
-    domainName: "jgelon.vtt.waltr.tech"
+    domainName: "jgleon.vtt.waltr.tech"
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
       traefik.ingress.kubernetes.io/router.priority: "10"
