@@ -19,6 +19,10 @@ env:
   SERVER_NAME: testserver
   ADMIN_PASSWORD: notatallatest
 
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+
 service:
   enabled: true
   externalIPs: 
