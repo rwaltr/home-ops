@@ -14,6 +14,11 @@ persistence:
     size: 5Gi
     accessMode: ReadWriteOnce
     mountPath: /server-data
+  files:
+    enabled: true
+    emptyDir:
+      enabled: true
+    mountPath: /server-files
 
 env:
   SERVER_NAME: testserver
