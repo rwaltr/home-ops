@@ -11,14 +11,9 @@ strategy:
 persistence:
   data:
     enabled: true
-    size: 5Gi
+    size: 10Gi
     accessMode: ReadWriteOnce
-    mountPath: /server-data
-  files:
-    enabled: true
-    emptyDir:
-      enabled: true
-    mountPath: /server-files
+    mountPath: /home/
 
 env:
   SERVER_NAME: testserver
