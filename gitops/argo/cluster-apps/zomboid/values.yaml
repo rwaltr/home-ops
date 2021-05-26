@@ -1,8 +1,8 @@
 
 
 image:
-  repository: ghcr.io/cyrale/project-zomboid
-  tag: 0.2.2
+  repository: turzam/zomboid
+  tag: latest
 
 strategy:
   type: Recreate
@@ -21,8 +21,8 @@ persistence:
     mountPath: /server-files
 
 env:
-  SERVER_NAME: testserver
-  ADMIN_PASSWORD: notatallatest
+  SERVERNAME: testserver
+  ADMINPASSWORD: notatallatest
 
 securityContext:
   runAsUser: 1000
