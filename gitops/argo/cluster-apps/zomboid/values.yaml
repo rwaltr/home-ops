@@ -16,8 +16,8 @@ persistence:
     mountPath: /server-data
   files:
     enabled: true
-    emptyDir:
-      enabled: true
+    size: 5Gi
+    accessMode: ReadWriteOnce
     mountPath: /server-files
 
 env:
