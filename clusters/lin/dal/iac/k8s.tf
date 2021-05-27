@@ -6,6 +6,10 @@ terraform {
       vault = {
           source = "hashicorp/vault"
       }
+      cloudflare = {
+          source = "cloudflare/cloudflare"
+      }
+
   }
 }
 
@@ -17,9 +21,40 @@ data "vault_generic_secret" "linode" {
     path = "apikeys/linode"
 }
 
+data "vault_generic_secret" "cloudflare" {
+    path = "apikeys/cloudflare"
+}
+
+
+data "vault_generic_secret" "generic" {
+    path = "apikeys/generic"
+}
 
 provider "linode" {
     token = "${data.vault_generic_secret.linode.data["api_token"]}"
+}
+
+provider "cloudflare" {
+    api_token = "${data.vault_generic_secret.cloudflare.data["api_token"]}"
+}
+
+
+# Zomboid Server
+
+resource "linode_instance" "zomboid" {
+  label = "zomboid"
+  image = "linode/centos7"
+  region = "us-south"
+  type = "g6-nanode-1"
+  root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
+}
+
+resource "cloudflare_record" "zomboid-dns" {
+    name = "zomboid.games.lin"
+    zone_id = "${data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]}"
+    type = "A"
+    value = linode_instance.zomboid.ip_address
+  
 }
 
 # resource "linode_lke_cluster" "dal" {
