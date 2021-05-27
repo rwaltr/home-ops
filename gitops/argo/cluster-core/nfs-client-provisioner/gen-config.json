@@ -1,0 +1,9 @@
+[
+  {
+    "name": "nfs-client-provisioner",
+    "cluster": "kyz",
+    "namespace": "nfs-client",
+    "path": "gitops/argo/cluster-core/nfs-client-provisioner",
+    "valueFile": ""
+  }
+]
