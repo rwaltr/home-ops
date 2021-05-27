@@ -17,3 +17,4 @@ flux
 # Helm
 *Chart.lock
 charts/
+*/.terraform.lock.hcl
