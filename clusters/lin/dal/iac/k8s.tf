@@ -47,6 +47,20 @@ provider "cloudflare" {
 #   region = "us-central"
 #   type = "g6-standard-1"
 #   root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
+
+#   provisioner "remote-exec" {
+#     inline = [
+#       "sudo apt-get update -y",
+#       "sudo apt-get upgrade -y",
+#       "sudo apt-get install steamcmd -y"
+#    ]
+#     connection {
+#         type = "ssh"
+#         host = self.ip_address
+#         user = "root"
+#         password = "${data.vault_generic_secret.generic.data["root_pass"]}"
+#     }
+#   }
 # }
 
 # resource "cloudflare_record" "zomboid-dns" {
