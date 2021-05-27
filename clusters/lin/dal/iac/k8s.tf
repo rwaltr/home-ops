@@ -43,7 +43,7 @@ provider "cloudflare" {
 
 resource "linode_instance" "zomboid" {
   label = "zomboid"
-  image = "linode/centos7"
+  image = "linode/ubuntu21.04"
   region = "us-south"
   type = "g6-nanode-1"
   root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
