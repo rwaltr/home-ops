@@ -39,23 +39,23 @@ provider "cloudflare" {
 }
 
 
-# Zomboid Server
+# # Zomboid Server
 
-resource "linode_instance" "zomboid" {
-  label = "zomboid"
-  image = "linode/ubuntu21.04"
-  region = "us-south"
-  type = "g6-nanode-1"
-  root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
-}
+# resource "linode_instance" "zomboid" {
+#   label = "zomboid"
+#   image = "linode/ubuntu21.04"
+#   region = "us-central"
+#   type = "g6-standard-1"
+#   root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
+# }
 
-resource "cloudflare_record" "zomboid-dns" {
-    name = "zomboid.games.lin"
-    zone_id = "${data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]}"
-    type = "A"
-    value = linode_instance.zomboid.ip_address
+# resource "cloudflare_record" "zomboid-dns" {
+#     name = "zomboid.games.lin"
+#     zone_id = "${data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]}"
+#     type = "A"
+#     value = linode_instance.zomboid.ip_address
   
-}
+# }
 
 # resource "linode_lke_cluster" "dal" {
 #   label = "k8s.dal.waltr.tech"
