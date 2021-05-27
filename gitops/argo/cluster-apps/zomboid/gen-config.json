@@ -1,9 +1,0 @@
-[
-  {
-    "name": "zomboid",
-    "cluster": "kyz",
-    "namespace": "obl",
-    "path": "gitops/argo/cluster-apps/zomboid",
-    "valueFile": ""
-  }
-]
