@@ -1,44 +1,5 @@
-terraform {
-  required_providers {
-      linode = {
-          source = "linode/linode"
-      }
-      vault = {
-          source = "hashicorp/vault"
-      }
-      cloudflare = {
-          source = "cloudflare/cloudflare"
-      }
 
-  }
-}
-
-provider "vault" {
-    address = "https://vault.waltr.tech"
-}
-
-data "vault_generic_secret" "linode" {
-    path = "apikeys/linode"
-}
-
-data "vault_generic_secret" "cloudflare" {
-    path = "apikeys/cloudflare"
-}
-
-
-data "vault_generic_secret" "generic" {
-    path = "apikeys/generic"
-}
-
-provider "linode" {
-    token = "${data.vault_generic_secret.linode.data["api_token"]}"
-}
-
-provider "cloudflare" {
-    api_token = "${data.vault_generic_secret.cloudflare.data["api_token"]}"
-}
-
-
+# Zomboid Server
 resource "linode_instance" "zomboid" {
   label = "zomboid"
   image = "linode/fedora34"
@@ -50,8 +11,9 @@ resource "linode_instance" "zomboid" {
     inline = [
       "sudo dnf update -y",
       "sudo dnf install podman -y",
+      "setenforce 0",
       "mkdir /opt/zomboid/data /opt/zomboid/config -p",
-      "podman run --network host -v /opt/zomboid/data:/data -v /opt/zomboid/config:/config registry.gitlab.com/rwaltr/container-images/zomboid-server:0.0.1"
+      "podman run -d --network host -v /opt/zomboid/data:/data -v /opt/zomboid/config:/config registry.gitlab.com/rwaltr/container-images/zomboid-server:0.0.1"
    ]
     connection {
         type = "ssh"
@@ -63,7 +25,7 @@ resource "linode_instance" "zomboid" {
 }
 
 resource "cloudflare_record" "zomboid-dns" {
-    name = "zomboid.games.lin"
+    name = "zomboid."
     zone_id = "${data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]}"
     type = "A"
     value = linode_instance.zomboid.ip_address
