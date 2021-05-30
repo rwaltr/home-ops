@@ -4,7 +4,7 @@ resource "linode_instance" "zomboid" {
   label = "zomboid"
   image = "linode/fedora34"
   region = "us-central"
-  type = "g6-standard-1"
+  type = "g6-standard-2"
   root_pass = "${data.vault_generic_secret.generic.data["root_pass"]}"
 
   provisioner "remote-exec" {
