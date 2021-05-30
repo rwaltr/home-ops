@@ -13,9 +13,10 @@ resource "linode_instance" "zomboid" {
       "sudo dnf install podman -y",
       "setenforce 0",
       "mkdir /opt/zomboid/data /opt/zomboid/config -p",
-      "podman run -d --network host -v /opt/zomboid/data:/data -v /opt/zomboid/config:/config registry.gitlab.com/rwaltr/container-images/zomboid-server:0.0.1"
+      "podman run -d --network host -v /opt/zomboid/data:/data -v /opt/zomboid/config:/config registry.gitlab.com/rwaltr/container-images/zomboid-server:0.0.1",
+      "systemctl stop firewalld"
    ]
-    connection {
+    connection { 
         type = "ssh"
         host = self.ip_address
         user = "root"
