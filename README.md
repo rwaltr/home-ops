@@ -20,3 +20,8 @@ Documentation is included along the folders of the environment
 ## Ideology 
 
 Git as config, pushing is applying, push often, click less.
+
+## Contributors
+
+- rwaltr (Main Developer)
+- gpzeke (accident-prone-documentation)
