@@ -16,6 +16,7 @@ external-dns:
   cloudflare:
     proxied: false
     secretName: cloudflareexternaldns
+    email: ryan@blackphidora.com
 
 
 
