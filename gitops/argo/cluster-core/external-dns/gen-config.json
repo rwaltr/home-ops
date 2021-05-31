@@ -1,0 +1,9 @@
+[
+  {
+    "name": "external-dns",
+    "cluster": "kyz",
+    "namespace": "default",
+    "path": "gitops/argo/cluster-core/external-dns",
+    "valueFile": "home.yaml"
+  }
+]
