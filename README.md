@@ -11,12 +11,11 @@ Using a combination of Argo, Terraform, Vault and Kubernetes. 90% of all the con
 
 **cluster** contains the IAC and terraform config to provision and maintain a cluster
 
-**Documentation** contains the documentation to interact and manage the clusters
-
 **legacy** old code from the old age
 
-**.archive** the app graveyard
+## Documentation
 
+Documentation is included along the folders of the environment
 
 ## Ideology 
 
