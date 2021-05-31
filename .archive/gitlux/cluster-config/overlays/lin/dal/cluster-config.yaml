@@ -1,9 +1,0 @@
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: flux-system
-  name: dal-lin-cluster-config
-data:
-  CLUSTER_NAME: "dal.lin"
-  INGRESS_ENDPOINT_HOSTNAME: "traefik.k8s.dal.lin.waltr.tech"
