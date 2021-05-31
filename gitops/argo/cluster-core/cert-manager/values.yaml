@@ -1,0 +1,3 @@
+cert-manager:
+  fullnameOverride: cert-manager
+  installCRDs: true
