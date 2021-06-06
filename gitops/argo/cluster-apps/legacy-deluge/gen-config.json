@@ -1,0 +1,9 @@
+[
+  {
+    "name": "legacy-deluge",
+    "cluster": "kyz",
+    "namespace": "media",
+    "path": "gitops/argo/cluster-apps/legacy-deluge",
+    "valueFile": ""
+  }
+]
