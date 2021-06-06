@@ -1,0 +1,28 @@
+ombi:
+
+  image:
+  repository: linuxserver/ombi
+  pullPolicy: IfNotPresent
+  tag: version-v4.0.681
+
+
+
+  ingress:
+    enabled: false
+    domainName: "ombi.waltr.tech"
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.priority: "10"
+      cert-manager.io/cluster-issuer: le-prod
+    hosts:
+      - hostTpl: '{{ .Values.ingress.domainName }}'
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hostsTpl: ['{{ .Values.ingress.domainName }}']
+        secretNameTpl: '{{ .Values.ingress.domainName | replace "." "-" }}'
+
+  persistence:
+    config:
+      enabled: true
