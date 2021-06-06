@@ -11,6 +11,16 @@ include:
 .secret-analyzer:
   stage: 💨 smoke test
 
+.validate: &validate
+  stage: 💨 smoke test
+  rules:
+    - changes:
+        - clusters/lin/dal/iac/**/*
+  parallel:
+    matrix:
+      - TF_ROOT: ["clusters/lin/dal/iac"]
+
+
 
 .tf_lint: &tf_lint
   rules:
