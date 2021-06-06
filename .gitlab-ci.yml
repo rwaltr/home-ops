@@ -22,7 +22,7 @@ include:
 
 stages:
   - 💨 smoke test
-  - 🛠️ prep
+#  - 🛠️ prep
   - ✨ lint
-  - 👀 plan
-  - 🚀 deploy
+#  - 👀 plan
+#  - 🚀 deploy
