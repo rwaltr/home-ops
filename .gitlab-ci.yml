@@ -45,9 +45,8 @@ include:
 .build: &build
   stage: 👀 plan
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - clusters/lin/dal/iac/**/*
+    - changes:
+      - clusters/lin/dal/iac/**/*
   artifacts:
     public: true
     reports:
