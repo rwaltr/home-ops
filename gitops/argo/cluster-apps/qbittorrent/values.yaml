@@ -23,7 +23,10 @@ qbittorrent:
     additionalServices:
     - enabled: true
       nameSuffix: bittorrent
-      type: ClusterIP
+      type: LoadBalancer
+      externalTrafficPolicy: Local
+      externalIPs:
+          - 172.30.0.24
       port:
         port: 53443
         name: bittorrent
