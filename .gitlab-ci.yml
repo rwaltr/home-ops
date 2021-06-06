@@ -11,6 +11,18 @@ include:
 .secret-analyzer:
   stage: 💨 smoke test
 
+
+.init: &init
+  stage: 🛠️ prep
+  rules:
+    - changes:
+        - clusters/lin/dal/iac/**/*
+  parallel:
+    matrix:
+      - TF_ROOT: ["clusters/lin/dal/iac"]
+
+
+
 .validate: &validate
   stage: 💨 smoke test
   rules:
@@ -32,7 +44,7 @@ include:
 
 stages:
   - 💨 smoke test
-#  - 🛠️ prep
+  - 🛠️ prep
   - ✨ lint
 #  - 👀 plan
 #  - 🚀 deploy
