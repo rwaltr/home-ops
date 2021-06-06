@@ -1,7 +1,7 @@
 ombi:
 
   ingress:
-    enabled: false
+    enabled: true
     domainName: "ombi.waltr.tech"
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
