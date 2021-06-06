@@ -42,9 +42,46 @@ include:
   script: terraform fmt -diff -check
 
 
+.build: &build
+  stage: 👀 plan
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - clusters/lin/dal/iac/**/*
+  artifacts:
+    public: true
+    reports:
+      terraform: ${TF_ROOT}/plan.json
+    paths:
+      - ${TF_ROOT}/plan.json
+  parallel:
+    matrix:
+      - TF_ROOT: ["clusters/lin/dal/iac"]
+
+.tf_lint_pr: &tf_lint_pr
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - clusters/lin/dal/iac/**/*
+  stage: ✨ lint
+  script: terraform fmt -diff -check
+
+.deploy: &deploy
+  only:
+    variables:
+      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    changes:
+        - clusters/lin/dal/iac/**/*
+  stage: 🚀 deploy
+  when: on_success
+  parallel:
+    matrix:
+      - TF_ROOT: ["clusters/lin/dal/iac"]
+
+
 stages:
   - 💨 smoke test
   - 🛠️ prep
   - ✨ lint
-#  - 👀 plan
-#  - 🚀 deploy
+  - 👀 plan
+  - 🚀 deploy
