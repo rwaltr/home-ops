@@ -1,12 +1,5 @@
 ombi:
 
-  image:
-  repository: linuxserver/ombi
-  pullPolicy: IfNotPresent
-  tag: version-v4.0.681
-
-
-
   ingress:
     enabled: false
     domainName: "ombi.waltr.tech"
