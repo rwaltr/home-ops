@@ -48,7 +48,7 @@ include:
     - changes:
       - clusters/lin/dal/iac/**/*
   artifacts:
-    public: true
+    public: false
     reports:
       terraform: ${TF_ROOT}/plan.json
     paths:
