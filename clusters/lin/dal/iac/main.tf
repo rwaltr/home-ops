@@ -46,10 +46,3 @@ provider "linode" {
 provider "cloudflare" {
   api_token = data.vault_generic_secret.cloudflare.data["api_token"]
 }
-
-resource "cloudflare_record" "cannary-dns" {
-  name    = "carrary."
-  zone_id = data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]
-  type    = "A"
-  value   = "127.0.0.1"
-}
