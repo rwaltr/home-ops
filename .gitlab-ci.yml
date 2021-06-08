@@ -72,7 +72,12 @@ include:
     changes:
         - clusters/lin/dal/iac/**/*
   stage: 🚀 deploy
-  when: on_success
+  when: manual
+  script:
+    - cd ${TF_ROOT}
+    - gitlab-terraform init
+    - gitlab-terraform -chdir=$PWD apply -input=false -auto-approve
+
   parallel:
     matrix:
       - TF_ROOT: ["clusters/lin/dal/iac"]
