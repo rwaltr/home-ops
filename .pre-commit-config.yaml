@@ -1,0 +1,28 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+---
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-added-large-files
+  - id: check-merge-conflict
+  - id: detect-private-key
+  - id: end-of-file-fixer
+- repo: https://github.com/adrienverge/yamllint.git
+  rev: v1.26.1
+  hooks:
+  - args:
+    - -c
+    - .github/yamllint.config.yaml
+    id: yamllint
+- repo: https://gitlab.com/devopshq/gitlab-ci-linter
+  rev: v1.0.3
+  hooks:
+  - id: gitlab-ci-linter
+- repo: https://github.com/sirosen/fix-smartquotes
+  rev: 0.2.0
+  hooks:
+  - id: fix-smartquotes
