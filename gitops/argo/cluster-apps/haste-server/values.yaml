@@ -19,11 +19,7 @@ haste-server:
     RATELIMITS_NORMAL_EVERY_MILLISECONDS: "60000"
     RATELIMITS_WHITELIST: ""
     RATELIMITS_BLACKLIST: ""
-    # STORAGE_TYPE: "redis"
     STORAGE_EXPIRE_SECONDS: "604800"
-    # STORAGE_HOST: redis-haste-server.cajun-pro.svc
-    # STORAGE_PORT: "6379"
-    # STORAGE_DB: "2"
   ingress:
     enabled: true
     domainName: "bin.waltr.tech"

@@ -36,6 +36,4 @@ repos:
   hooks:
   - id: kube-linter-docker
     files: ^gitops/*
-    args:
-    - --config
-    - .github/kube-linter.yaml
+    entry: stackrox/kube-linter:latest lint
