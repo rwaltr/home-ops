@@ -1,4 +1,4 @@
-name: rennovate
+name: renovate
 apiVersion: v2
 version: 1.0.0
 dependencies:
