@@ -35,5 +35,5 @@ repos:
   rev: 0.2.2
   hooks:
   - id: kube-linter-docker
-    files: ^gitops/*
     entry: stackrox/kube-linter:latest lint
+    files: gitops

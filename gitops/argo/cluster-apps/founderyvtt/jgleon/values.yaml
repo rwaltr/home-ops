@@ -1,36 +1,35 @@
-foundryvtt:  
+foundryvtt:
   #
   # IMPORTANT NOTE
   #
   # This chart inherits from our common library chart. You can check the default values/options here:
   # https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
   #
-  
+
   image:
     repository: felddy/foundryvtt
     pullPolicy: IfNotPresent
     tag: 0.8.3
-  
+
   strategy:
     type: Recreate
-  
   # See more environment variables in the foundryvtt documentation
   # https://github.com/felddy/foundryvtt-docker#environment-variables
-  
-  env: 
+
+  env:
     FOUNDRY_HOSTNAME: "jgleon.vtt.waltr.tech"
     # TZ:
-  
-  
-  envFrom: 
-    - secretRef: 
+
+
+  envFrom:
+    - secretRef:
         name: leonvtt-secret
-  
-  
+
+
   service:
     port:
       port: 30000
- 
+
   ingress:
     enabled: true
     domainName: "jgleon.vtt.waltr.tech"
@@ -46,8 +45,8 @@ foundryvtt:
     tls:
       - hostsTpl: ['{{ .Values.ingress.domainName }}']
         secretNameTpl: '{{ .Values.ingress.domainName | replace "." "-" }}'
-  
-  
+
+
   # Founderyvtt is hardcoded to use /data for its persistance for config and
   persistence:
     data:
