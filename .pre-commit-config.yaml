@@ -31,3 +31,11 @@ repos:
   hooks:
   - id: remove-crlf
   - id: remove-tabs
+# Cannot read helm releases well
+# - repo: https://github.com/stackrox/kube-linter
+#   rev: 0.2.2
+#   hooks:
+#   - id: kube-linter-docker
+#     args:
+#     - lint
+#     - "gitops/"
