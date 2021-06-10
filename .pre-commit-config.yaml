@@ -31,9 +31,3 @@ repos:
   hooks:
   - id: remove-crlf
   - id: remove-tabs
-- repo: https://github.com/stackrox/kube-linter
-  rev: 0.2.2
-  hooks:
-  - id: kube-linter-docker
-    entry: stackrox/kube-linter:latest lint
-    files: gitops
