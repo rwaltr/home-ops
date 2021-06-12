@@ -1,25 +1,14 @@
-global:
-  cluster: "kyz"
-addons:
-  spc:
-    enabled: true
-    defaultObjectPath: k8s/renovate
-    secretObjects: true
-    objects:
-      - name: GITHUB_COM_TOKEN
-      - name: RENOVATE_TOKEN
-
 renovate:
-  cronjob:
-    # At 01:00 every day
-    schedule: '0/5 * * * *'
-    annotations: {}
-    labels: {}
-    concurrencyPolicy: ''
-    failedJobsHistoryLimit: ''
-    successfulJobsHistoryLimit: ''
-    jobRestartPolicy: Never
-    jobBackoffLimit: ''
+  # cronjob:
+  #   # At 01:00 every day
+  #   schedule: '0 1 * * *'
+  #   annotations: {}
+  #   labels: {}
+  #   concurrencyPolicy: ''
+  #   failedJobsHistoryLimit: ''
+  #   successfulJobsHistoryLimit: ''
+  #   jobRestartPolicy: Never
+  #   jobBackoffLimit: ''
 
   # pod:
   #   annotations: {}
@@ -44,8 +33,7 @@ renovate:
         "logLevel": "debug"
       }
 
-  existingSecret: ''
-
+  existingSecret: 'renovate'
 
   resources:
     {}
