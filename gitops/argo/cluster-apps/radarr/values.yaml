@@ -29,7 +29,7 @@ radarr:
   persistence:
     config:
       enabled: true
-      existingClaim: sonarr-config
+      existingClaim: radarr-config
     media:
       enabled: true
       type: custom
