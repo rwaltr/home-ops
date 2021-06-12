@@ -6,7 +6,8 @@ include:
 # - template: Security/License-Scanning.gitlab-ci.yml
 - template: Terraform.latest.gitlab-ci.yml
 - project: 'renovate-bot/renovate-runner'
-  file: '/templates/renovate-dind.gitlab-ci.yml'
+  file: '/templates/renovate.gitlab-ci.yml'
+
 
 renovate:
   only:
