@@ -5,48 +5,48 @@ radarr:
 # This chart inherits from our common library chart. You can check the default values/options here:
 # https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
 #
-  
+
   image:
     repository: ghcr.io/k8s-at-home/radarr
     pullPolicy: IfNotPresent
-    tag: v3.0.2.4552
-  
+    tag: v3.2.2.5080
+
   strategy:
     type: Recreate
-  
+
   env:
-  
+
   service:
-    port:
-      port: 7878
-  
+    main:
+      ports:
+        http:
+          port: 7878
+
   ingress:
-    enabled: false
-    
+    main:
+      enabled: false
+
   persistence:
     config:
       enabled: true
-      emptyDir:
-        enabled: false
-      existingClaim: radarr-config
-
-  additionalVolumes:
-    - name: media
-      nfs:
-        server: 10.10.0.8
-        path: /tank/nas/library
-    - name: downloads
-      nfs:
-        server: 10.10.0.8
-        path: /tank/nas/library/downloads/completed
-
-  additionalVolumeMounts:
-    - name: media
+      existingClaim: sonarr-config
+    media:
+      enabled: true
+      type: custom
       mountPath: /media
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library
+    downloads:
+      enabled: true
+      type: custom
       readOnly: true
-    - name: downloads
       mountPath: /downloads
-      readOnly: true
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/downloads/completed
 
   podSecurityContext:
     runAsUser: 1000
@@ -59,7 +59,7 @@ radarr:
   #     interval: 3m
   #     scrapeTimeout: 1m
   #     additionalLabels: {}
-  
+
   # # When using the prometheus.podMonitor the following
   # # container is required
   # additionalContainers:
