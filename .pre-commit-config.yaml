@@ -18,10 +18,10 @@ repos:
     - -c
     - .github/yamllint.config.yaml
     id: yamllint
-- repo: https://gitlab.com/devopshq/gitlab-ci-linter
-  rev: v1.0.3
-  hooks:
-  - id: gitlab-ci-linter
+# - repo: https://gitlab.com/devopshq/gitlab-ci-linter
+#   rev: v1.0.3
+#   hooks:
+#   - id: gitlab-ci-linter
 - repo: https://github.com/sirosen/fix-smartquotes
   rev: 0.2.0
   hooks:
