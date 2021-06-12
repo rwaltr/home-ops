@@ -17,10 +17,10 @@ sonarr:
   env:
 
   service:
-  main:
-    ports:
-      http:
-        port: 8989
+    main:
+      ports:
+        http:
+          port: 8989
 
   ingress:
     main:
