@@ -40,7 +40,7 @@ qbittorrent:
         http:
           port: 8080
     bittorrent:
-      enabled: false
+      enabled: true
       type: LoadBalancer
       externalIPs:
         - 172.30.0.24
