@@ -14,6 +14,9 @@ jellyfin:
   strategy:
     type: Recreate
 
+  env:
+    TZ: America/Chicago
+
   ingress:
     main:
       enabled: true
@@ -47,6 +50,7 @@ jellyfin:
       enabled: true
       type: custom
       mountPath: /media
+      readOnly: true
       volumeSpec:
         nfs:
           server: 10.10.0.8
