@@ -51,6 +51,9 @@ qbittorrent:
           protocol: TCP
           targetPort: 53443
 
+  settings:
+    automaticPortSetup: true
+
   ingress:
     main:
       enabled: false
