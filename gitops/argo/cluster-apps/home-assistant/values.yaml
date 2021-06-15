@@ -1,0 +1,40 @@
+home-assistant:
+  image:
+    # -- image repository
+    repository: homeassistant/home-assistant
+    # -- image tag
+    tag: 2021.6.3
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+
+  # -- environment variables.
+  # @default -- See below
+  env:
+    # -- Set the container timezone
+    TZ: America/Chicago
+
+  # -- Configures service settings for the chart. Normally this does not need to be modified.
+  # @default -- See values.yaml
+  service:
+    main:
+      ports:
+        http:
+          port: 8123
+
+  ingress:
+    # -- Enable and configure ingress settings for the chart under this key.
+    # @default -- See values.yaml
+    main:
+      enabled: false
+
+  # -- Enable devices to be discoverable
+  # hostNetwork: true
+
+  # -- When hostNetwork is true set dnsPolicy to ClusterFirstWithHostNet
+  # dnsPolicy: ClusterFirstWithHostNet
+
+  # -- Configure persistence settings for the chart under this key.
+  # @default -- See values.yaml
+  persistence:
+    config:
+      enabled: true
