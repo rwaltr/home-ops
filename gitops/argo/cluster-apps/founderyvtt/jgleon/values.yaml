@@ -24,6 +24,14 @@ foundryvtt:
     - secretRef:
         name: leonvtt-secret
 
+  service:
+    main:
+      nameOveride: jgleon
+      ports:
+        http:
+          port: 30000
+
+
   ingress:
     main:
       enabled: true
