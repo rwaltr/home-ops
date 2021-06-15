@@ -26,7 +26,6 @@ foundryvtt:
 
   service:
     main:
-      nameOveride: jgleon
       ports:
         http:
           port: 30000
