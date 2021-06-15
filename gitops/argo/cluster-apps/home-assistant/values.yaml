@@ -3,7 +3,7 @@ home-assistant:
     # -- image repository
     repository: homeassistant/home-assistant
     # -- image tag
-    tag: 2021.6.4
+    tag: 2021.6.5
     # -- image pull policy
     pullPolicy: IfNotPresent
 
