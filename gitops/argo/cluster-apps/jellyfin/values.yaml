@@ -58,4 +58,4 @@ jellyfin:
     transcode:
       enabled: true
       type: emptyDir
-      mountPath: /config/transcode
+      mountPath: /config/transcodes
