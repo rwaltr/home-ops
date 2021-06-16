@@ -55,3 +55,7 @@ jellyfin:
         nfs:
           server: 10.10.0.8
           path: /tank/nas/library
+    transcode:
+      enabled: true
+      type: emptyDir
+      mountPath: /config/transcode
