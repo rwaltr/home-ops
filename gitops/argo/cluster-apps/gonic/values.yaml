@@ -32,10 +32,21 @@ gonic:
           port: 80
 
   ingress:
-    # -- Enable and configure ingress settings for the chart under this key.
-    # @default -- See values.yaml
     main:
-      enabled: false
+      enabled: true
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.priority: "10"
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+        - host: "gonic.waltr.tech"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: gonic-waltr-tech
+          hosts:
+            - gonic.waltr.tech
 
   # -- Configure persistence settings for the chart under this key.
   # @default -- See values.yaml
