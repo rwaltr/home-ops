@@ -1,4 +1,5 @@
 ombi:
+  env: {}
 
   ingress:
     main:
