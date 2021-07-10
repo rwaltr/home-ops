@@ -40,8 +40,8 @@ minecraft:
     successThreshold: 1
     timeoutSeconds: 1
   startupProbe:
-    enabled: false
-    failureThreshold: 30
+    enabled: true
+    failureThreshold: 100
     periodSeconds: 10
 
   # initContainers:
