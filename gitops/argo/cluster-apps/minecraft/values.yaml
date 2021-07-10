@@ -77,7 +77,7 @@ minecraft:
     # This can be one of "VANILLA", "FORGE", "SPIGOT", "BUKKIT", "PAPER", "FTBA", "SPONGEVANILLA", "CURSEFORGE"
     type: "CURSEFORGE"
     # If type is set to CURSEFORGE, this sets the server mod to run. Can also provide url to curseforge package.
-    cfServerMod: "https://www.curseforge.com/minecraft/modpacks/valhelsia-3/download/3367534/file"
+    cfServerMod: "https://github.com/rwaltr/infra/blob/master/gitops/argo/cluster-apps/minecraft/Valhelsia.zip?raw=true"
     # One of: peaceful, easy, normal, and hard
     difficulty: normal
     # A comma-separated list of player names to whitelist.
