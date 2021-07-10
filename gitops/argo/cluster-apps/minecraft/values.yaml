@@ -9,7 +9,7 @@ minecraft:
   ##
   resources:
     requests:
-      memory: 512Mi
+      memory: 4096Mi
       cpu: 500m
 
   # upgrade strategy type (e.g. Recreate or RollingUpdate)
@@ -73,17 +73,17 @@ minecraft:
     # This must be overridden, since we can't accept this for the user.
     eula: "TRUE"
     # One of: LATEST, SNAPSHOT, or a specific version (ie: "1.7.9").
-    version: "LATEST"
+    version: "1.16.5"
     # This can be one of "VANILLA", "FORGE", "SPIGOT", "BUKKIT", "PAPER", "FTBA", "SPONGEVANILLA", "CURSEFORGE"
-    type: "FORGE"
-    # If type is set to FORGE, this sets the URL to download the Forge installer
-    forgeInstallerUrl: "https://www.curseforge.com/minecraft/modpacks/valhelsia-3/download/3367534/file"
+    type: "CURSEFORGE"
+    # If type is set to CURSEFORGE, this sets the server mod to run. Can also provide url to curseforge package.
+    cfServerMod: "https://www.curseforge.com/minecraft/modpacks/valhelsia-3/files/3367534"
     # One of: peaceful, easy, normal, and hard
     difficulty: normal
     # A comma-separated list of player names to whitelist.
     whitelist:
     # A comma-separated list of player names who should be admins.
-    ops: blackphidora
+    ops: "blackphidora"
     # A server icon URL for server listings. Auto-scaled and transcoded.
     icon:
     # Max connected players.
@@ -115,7 +115,7 @@ minecraft:
     # Max view distance (in chunks).
     viewDistance: 10
     # Define this if you want a specific map generation seed.
-    levelSeed: "notaseed"
+    levelSeed: notaseed
     # One of: creative, survival, adventure, spectator
     gameMode: survival
     # Message of the Day
@@ -131,12 +131,16 @@ minecraft:
     # Check accounts against Minecraft account service.
     onlineMode: true
     # If you adjust this, you may need to adjust resources.requests above to match.
-    memory: 4089M
+    memory: 4096M
     # General JVM options to be passed to the Minecraft server invocation
     jvmOpts: ""
     # Options like -X that need to proceed general JVM options
     jvmXXOpts: ""
+    # DEPRECATED: use top-level rconServiceAnnotations instead
+    serviceAnnotations: {}
     serviceType: ClusterIP
+    ## Set the port used if the serviceType is NodePort
+    nodePort:
     # Set the external port of the service, usefull when using the LoadBalancer service type
     servicePort: 25565
     loadBalancerIP:
@@ -220,4 +224,4 @@ minecraft:
 
   serviceAnnotations: {}
 
-  rconServiceAnnotations: {}
+rconServiceAnnotations: {}
