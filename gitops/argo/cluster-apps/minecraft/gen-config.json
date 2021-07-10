@@ -1,0 +1,9 @@
+[
+  {
+    "name": "minecraft",
+    "cluster": "kyz",
+    "namespace": "default",
+    "path": "gitops/argo/cluster-apps/minecraft",
+    "valueFile": ""
+  }
+]
