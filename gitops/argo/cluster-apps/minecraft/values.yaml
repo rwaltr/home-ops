@@ -1,7 +1,7 @@
 minecraft:
   # ref: https://hub.docker.com/r/itzg/minecraft-server/
   image: itzg/minecraft-server
-  imageTag: latest
+  imageTag: java8
   imagePullSecret: ""
 
   ## Configure resource requests and limits
@@ -10,7 +10,7 @@ minecraft:
   resources:
     requests:
       memory: 4096Mi
-      cpu: 500m
+      cpu: 2000m
 
   # upgrade strategy type (e.g. Recreate or RollingUpdate)
   strategyType: Recreate
