@@ -123,7 +123,7 @@ minecraft:
     # If true, enable player-vs-player damage.
     pvp: false
     # One of: DEFAULT, FLAT, LARGEBIOMES, AMPLIFIED, CUSTOMIZED
-    levelType: DEFAULT
+    levelType: biomesoplenty
     # When levelType == FLAT or CUSTOMIZED, this can be used to further customize map generation.
     # ref: https://hub.docker.com/r/itzg/minecraft-server/
     generatorSettings:
