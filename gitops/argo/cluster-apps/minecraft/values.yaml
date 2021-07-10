@@ -115,7 +115,7 @@ minecraft:
     # Max view distance (in chunks).
     viewDistance: 10
     # Define this if you want a specific map generation seed.
-    levelSeed: notaseed
+    #levelSeed: randomword
     # One of: creative, survival, adventure, spectator
     gameMode: survival
     # Message of the Day
