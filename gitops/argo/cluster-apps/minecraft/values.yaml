@@ -217,7 +217,7 @@ minecraft:
       # Set this to false if you don't care to persist state between restarts.
       enabled: true
       # existingClaim: nil
-      Size: 1Gi
+      Size: 10Gi
 
   podAnnotations: {}
 
