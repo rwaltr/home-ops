@@ -83,7 +83,7 @@ minecraft:
     # A comma-separated list of player names to whitelist.
     whitelist:
     # A comma-separated list of player names who should be admins.
-    ops: "blackphidora"
+    ops: "blackphidora,space_ed_boy"
     # A server icon URL for server listings. Auto-scaled and transcoded.
     icon:
     # Max connected players.
