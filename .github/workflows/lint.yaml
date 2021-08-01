@@ -12,12 +12,4 @@ jobs:
       - name: yamllint
         uses: reviewdog/action-yamllint@v1
         with:
-          yamllint_flags: "-c .github/lint/.yamllint.yaml ./gitops"
- markdownlint:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - name: markdownlint
-        uses: reviewdog/action-markdownlint@v0.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          yamllint_flags: "-c .github/lint/.yamllint.yaml"
