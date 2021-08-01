@@ -1,0 +1,11 @@
+---
+version: "3"
+
+vars:
+  PROJECT_DIR:
+    sh: "git rev-parse --show-toplevel"
+  CLUSTER_DIR: "{{.PROJECT_DIR}}/cluster"
+
+includes:
+  lint: .taskfiles/lint.yml
+  pre-commit: .taskfiles/pre-commit.yml
