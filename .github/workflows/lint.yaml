@@ -13,6 +13,7 @@ jobs:
         uses: reviewdog/action-yamllint@v1
         with:
           yamllint_flags: "-c .github/lint/.yamllint.yaml"
+
  markdownlint:
     runs-on: ubuntu-20.04
     steps:
