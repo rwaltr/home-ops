@@ -12,6 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: yamllint
-        uses: reviewdog/action-yamllint@v1
+        uses: ibiqlik/action-yamllint@v3
         with:
-          yamllint_flags: "-c .github/lint/.yamllint.yaml"
+          config_file: .github/lint/.yamllint.yaml
