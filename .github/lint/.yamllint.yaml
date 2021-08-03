@@ -6,6 +6,9 @@ ignore: |
     *.sops.yaml
     *.sops.yml
     *-crds.yaml
+    /gitops/argo/cluster-init/
+    /legacy/
+
 extends: default
 rules:
   truthy:
