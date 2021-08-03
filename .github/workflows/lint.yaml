@@ -1,9 +1,11 @@
 ---
-name: Lint
+name: YamlLint
 
 on: # yamllint disable-line rule:truthy
-  pull_request:
-
+  push:
+    paths:
+      - '**.yaml'
+      - '**.yml'
 jobs:
   yamllint:
     runs-on: ubuntu-20.04
