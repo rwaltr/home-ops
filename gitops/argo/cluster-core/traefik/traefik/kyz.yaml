@@ -1,17 +1,16 @@
 traefik:
 
-  #image: 
+  #image:
   #  name: traefik
   #  tag: 2.4.8
-  
+
   service:
-    externalIPs: 
+    externalIPs:
       - 172.30.0.10
 
   deployment:
     replicas: 2
-  
+
   additionalArguments:
     #- "--providers.kubernetesingress.ingressclass=traefik"
     - "--providers.kubernetesingress.ingressendpoint.hostname=traefik.home.waltr.tech"
-  

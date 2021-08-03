@@ -23,5 +23,5 @@ vault:
     enabled: true
   csi:
     enabled: true
-  injector: 
+  injector:
     enabled: true

@@ -18,13 +18,8 @@ external-dns:
     secretName: cloudflareexternaldns
     email: ryan@blackphidora.com
 
-
-
   interval: "1m"
   replicas: 1
 
   crd:
     create: true
-
-    
- 
