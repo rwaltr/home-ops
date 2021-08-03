@@ -4,7 +4,6 @@ nfs-subdir-external-provisioner:
     defaultClass: true
     create: false
     name: nfs-client
-    defaultClass: true
 
   nfs:
     server: storage2.waltr.lab
