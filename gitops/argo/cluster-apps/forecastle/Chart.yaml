@@ -1,0 +1,7 @@
+name: forecastle
+apiVersion: v2
+version: 1.0.0
+dependencies:
+  - name: forecastle
+    version: v1.0.63
+    repository: https://stakater.github.io/stakater-charts

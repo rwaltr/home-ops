@@ -1,0 +1,19 @@
+---
+forecastle:
+  forecastle:
+    config:
+      title: Waltr.Tech
+      namespaceSelector:
+        matchNames:
+          - media
+    ingress:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+        - host: "forecastle.waltr.tech"
+          paths:
+            - "/"
+      tls:
+        - hosts:
+            - "forecastle.waltr.tech"
