@@ -15,7 +15,7 @@ Using a combination of Argo, Terraform, Vault and Kubernetes. 90% of all the con
 
 ## Documentation
 
-Documentation is included along the folders of the environment
+TODO
 
 ## Ideology
 
