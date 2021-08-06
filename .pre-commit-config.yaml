@@ -36,3 +36,7 @@ repos:
   hooks:
   - id: terraform_fmt
     #  - id: terraform_validate
+- repo: git://github.com/terraform-linters/tflint
+  rev: master
+  hooks:
+  - id: tflint
