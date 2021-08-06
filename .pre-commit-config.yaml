@@ -12,7 +12,7 @@ repos:
   - id: detect-private-key
   - id: end-of-file-fixer
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.26.1
+  rev: v1.26.2
   hooks:
   - args:
     - -c
@@ -37,6 +37,6 @@ repos:
   - id: terraform_fmt
     #  - id: terraform_validate
 - repo: git://github.com/terraform-linters/tflint
-  rev: master
+  rev: v0.30.0
   hooks:
   - id: tflint
