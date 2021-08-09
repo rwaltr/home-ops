@@ -20,7 +20,7 @@ mealie:
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
       hosts:
-        - host: "recipies.waltr.tech"
+        - host: "recipes.waltr.tech"
           paths:
             - path: /
               pathType: Prefix
