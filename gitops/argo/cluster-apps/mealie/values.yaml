@@ -1,0 +1,30 @@
+mealie:
+  image:
+    repository: hkotel/mealie
+    tag: v0.5.1
+    pullPolicy: IfNotPresent
+  env:
+    TZ: America/Chicago
+    DB_TYPE: sqlite
+
+  persistence:
+    config:
+      enabled: true
+      mountPath: /app/data
+
+  ingress:
+    main:
+      enabled: true
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.priority: "10"
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+        - host: "recipies.waltr.tech"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: recipies-waltr.tech
+          hosts:
+            - recipies.waltr.tech

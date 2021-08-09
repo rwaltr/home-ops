@@ -1,0 +1,7 @@
+name: mealie
+apiVersion: v2
+version: 1.0.0
+dependencies:
+  - name: mealie
+    version: 2.3.0
+    repository: https://k8s-at-home.com/charts
