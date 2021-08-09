@@ -25,6 +25,6 @@ mealie:
             - path: /
               pathType: Prefix
       tls:
-        - secretName: recipies-waltr.tech
+        - secretName: recipes-waltr-tech
           hosts:
-            - recipies.waltr.tech
+            - recipes.waltr.tech
