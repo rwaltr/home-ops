@@ -1,0 +1,9 @@
+[
+  {
+    "name": "owncloud",
+    "cluster": "kyz",
+    "namespace": "media",
+    "path": "gitops/argo/cluster-apps/ocis",
+    "valueFile": ""
+  }
+]
