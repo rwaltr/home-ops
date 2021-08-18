@@ -1,0 +1,37 @@
+littlelink-server:
+  image:
+    repository: ghcr.io/techno-tim/littlelink-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  env:
+    TZ: America/Chicago
+    META_TITLE: Rwaltr
+    META_DESCRIPTION: Rwaltr Link page
+    META_AUTHOR: Ryan Walter
+    THEME: Dark
+    FAVICON_URL: https://avatars.githubusercontent.com/u/11428125?v=4
+    AVATAR_URL: https://avatars.githubusercontent.com/u/11428125?v=4
+    AVATAR_2X_URL: https://avatars.githubusercontent.com/u/11428125?v=4
+    AVATAR_ALT: Rwaltr Profile Pic
+    NAME: Rwaltr
+    BIO: Hey! Just a place where you can connect with me!
+    GITHUB: https://github.com/rwaltr
+    YOUTUBE: https://www.youtube.com/channel/UCqGyEORUSu4D59LKCCjgPhw
+    EMAIL: rwaltr@pm.me
+    FOOTER: Thanks for stopping by!
+  ingress:
+    main:
+      enabled: true
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.priority: "10"
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+        - host: "links.waltr.tech"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: links-waltr-tech
+          hosts:
+            - links.waltr.tech
