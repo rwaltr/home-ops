@@ -28,6 +28,7 @@ haste-server:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
+        hajimari.io/enable: true
       hosts:
         - host: bin.waltr.tech
           paths:
