@@ -11,7 +11,7 @@ hajimari:
   hajimari:
     # -- The name of this instance, this allows running multiple
     # instances of Hajimari on the same cluster
-    instanceName: kyz
+    instanceName: null
     # -- Set to true to show all discovered applications by default.
     defaultEnable: true
     # -- Namespace selector to use for discovering applications
