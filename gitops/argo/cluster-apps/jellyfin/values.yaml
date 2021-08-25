@@ -25,8 +25,8 @@ jellyfin:
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
         hajimari.io/enable: true
-        hajimari.io/icon: video-outline
-        hajimari.io/group: media
+        hajimari.io/icon: "video-outline"
+        hajimari.io/group: "media"
       hosts:
         - host: "jellyfin.waltr.tech"
           paths:
