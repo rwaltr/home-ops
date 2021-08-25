@@ -1,0 +1,76 @@
+hajimari:
+  image:
+    repository: ghcr.io/toboshii/hajimari
+    pullPolicy: IfNotPresent
+    tag: v0.1.0
+
+  env:
+    TZ: America/Chicago
+
+  # -- Configures Hajimari settings for this instance.
+  hajimari:
+    # -- The name of this instance, this allows running multiple
+    # instances of Hajimari on the same cluster
+    instanceName: kyz
+    # -- Set to true to show all discovered applications by default.
+    defaultEnable: false
+    # -- Namespace selector to use for discovering applications
+    namespaceSelector:
+      matchNames:
+      - media
+      - utility
+      - default
+    # -- Override the title of the Hajimari pages
+    title: Waltr.Tech
+    # -- Default name for welcome message
+    name: "You"
+    # -- Add custom applications to the discovered application list
+    customApps: []
+    # - name: Test
+    #   url: https://example.com
+    #   icon: test-tube
+
+    # -- Set default bookmarks
+    groups: []
+    # - name: Communicate
+    #   links:
+    #   - name: Discord
+    #     url: 'https://discord.com'
+    #   - name: Gmail
+    #     url: 'http://gmail.com'
+    #   - name: Slack
+    #     url: 'https://slack.com/signin'
+
+
+  service:
+    main:
+      ports:
+        http:
+          port: 3000
+
+  serviceAccount:
+    # -- Create service account
+    create: true
+
+  ingress:
+    main:
+      enabled: true
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.priority: "10"
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+      - host: hajimari.waltr.tech
+        paths:
+        - path: /
+      tls:
+      - secretName: hasjimari-waltr-tech
+        hosts:
+        - hajimari.waltr.tech
+  # -- Configure persistence settings for the chart under this key.
+  # @default -- See values.yaml
+  persistence:
+    data:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 1Gi
