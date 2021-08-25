@@ -31,16 +31,31 @@ hajimari:
     #   icon: test-tube
 
     # -- Set default bookmarks
-    groups: []
-    # - name: Communicate
-    #   links:
-    #   - name: Discord
-    #     url: 'https://discord.com'
-    #   - name: Gmail
-    #     url: 'http://gmail.com'
-    #   - name: Slack
-    #     url: 'https://slack.com/signin'
-
+    groups:
+    - name: Communicate
+      links:
+      - name: "Discord"
+        url: "https://discord.com"
+      - name: "Element"
+        url: "https://https://app.element.io"
+    - name: Cloud
+      links:
+      - name: Google
+        url: "https://google.com"
+      - name: Linode
+        url: "https://linode.com"
+    - name: Dev
+      links:
+      - name: Github
+        url: "https://github.com"
+      - name: Devdocs
+        url: "https://devdocs.io"
+      - name: Devhints
+        url: "https://devhints.io"
+    - name: Media
+      links:
+      - name: Youtube
+        url: "https://youtube.com/feed/subscriptions"
 
   service:
     main:
