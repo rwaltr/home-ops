@@ -29,6 +29,8 @@ haste-server:
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
         hajimari.io/enable: "true"
+        hajimari.io/appName: "Text Sharing"
+        hajimari.io/icon: "clipboard-text"
       hosts:
         - host: bin.waltr.tech
           paths:

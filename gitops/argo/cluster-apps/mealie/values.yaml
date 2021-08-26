@@ -19,6 +19,9 @@ mealie:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
+        hajimari.io/enable: "true"
+        hajimari.io/appName: "Recipes"
+        hajimari.io/icon: "pasta"
       hosts:
         - host: "recipes.waltr.tech"
           paths:

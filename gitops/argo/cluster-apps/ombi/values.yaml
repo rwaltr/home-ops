@@ -8,6 +8,9 @@ ombi:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
         cert-manager.io/cluster-issuer: le-prod
+        hajimari.io/enable: "true"
+        hajimari.io/appName: "Ombi"
+        hajimari.io/icon: "receipt"
       hosts:
         - host: "ombi.waltr.tech"
           paths:

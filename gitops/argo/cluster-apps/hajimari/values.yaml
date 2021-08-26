@@ -13,7 +13,7 @@ hajimari:
     # instances of Hajimari on the same cluster
     instanceName: null
     # -- Set to true to show all discovered applications by default.
-    defaultEnable: true
+    defaultEnable: false
     # -- Namespace selector to use for discovering applications
     namespaceSelector:
       matchNames:
