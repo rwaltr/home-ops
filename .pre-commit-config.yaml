@@ -1,5 +1,3 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
 ---
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -18,10 +16,11 @@ repos:
     - -c
     - .github/lint/.yamllint.yaml
     id: yamllint
-# - repo: https://gitlab.com/devopshq/gitlab-ci-linter
-#   rev: v1.0.3
-#   hooks:
-#   - id: gitlab-ci-linter
+- repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+  rev: 0.0.11     # or specific tag
+  hooks:
+  - id: yamlfmt
+    args: [--mapping, '2', --sequence, '2', --offset, '0', --colons]
 - repo: https://github.com/sirosen/fix-smartquotes
   rev: 0.2.0
   hooks:
