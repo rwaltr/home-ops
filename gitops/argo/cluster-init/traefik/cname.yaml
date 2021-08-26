@@ -1,0 +1,11 @@
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: traefikincomming
+spec:
+  endpoints:
+    - dnsName: traefik.home.waltr.tech
+      recordTTL: 180
+      recordType: CNAME
+      targets:
+        - home.waltr.tech
