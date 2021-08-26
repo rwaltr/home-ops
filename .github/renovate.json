@@ -8,7 +8,7 @@
   "labels": ["renovate"],
   "packageRules": [
     {
-      "matchUpdateTypes": ["patch", "minor"],
+      "matchUpdateTypes": ["patch"],
       "automerge": true
     }
   ]
