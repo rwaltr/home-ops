@@ -25,10 +25,10 @@ hajimari:
     # -- Default name for welcome message
     name: "You"
     # -- Add custom applications to the discovered application list
-    customApps: []
-    # - name: Test
-    #   url: https://example.com
-    #   icon: test-tube
+    customApps:
+    - name: Status
+      url: https://stats.uptimerobot.com/MWOr5U58gE
+      icon: list-status
 
     # -- Set default bookmarks
     groups:
