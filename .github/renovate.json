@@ -1,12 +1,15 @@
 {
-  "extends": [
-    "config:base",
-    ":disableRateLimiting"
-  ],
+  "extends": ["config:base", ":disableRateLimiting"],
   "timezone": "America/Chicago",
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate Dashboard",
   "rebaseWhen": "conflicted",
   "fetchReleaseNotes": true,
-  "labels": ["renovate"]
+  "labels": ["renovate"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    }
+  ]
 }
