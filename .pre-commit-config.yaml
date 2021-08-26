@@ -16,9 +16,8 @@ repos:
     - -c
     - .github/lint/.yamllint.yaml
     id: yamllint
-  #YamlFmt
 - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-  rev: 0.0.11     # or specific tag
+  rev: 0.0.11
   hooks:
   - id: yamlfmt
     args: [--mapping, '2', --sequence, '2', --offset, '0', --colons]
