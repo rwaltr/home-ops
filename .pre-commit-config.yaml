@@ -20,7 +20,7 @@ repos:
   rev: 0.0.11
   hooks:
   - id: yamlfmt
-    args: [--mapping, '2', --sequence, '2', --offset, '0', --colons]
+    args: [--mapping, '2', --sequence, '2', --offset, '0']
 - repo: https://github.com/sirosen/fix-smartquotes
   rev: 0.2.0
   hooks:
