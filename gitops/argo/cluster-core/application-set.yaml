@@ -11,23 +11,23 @@ spec:
           - path: "gitops/argo/cluster-core/**/gen-config.json"
   template:
     metadata:
-      name: '{{ name }}'
+      name: "{{ name }}"
       annotations:
-        argocd.argoproj.io/manifest-generate-paths: '/{{ path }}'
+        argocd.argoproj.io/manifest-generate-paths: "/{{ path }}"
         argocd.argoproj.io/sync-options: Prune=false
     spec:
       project: cluster-core
       source:
-        path: '{{ path }}'
+        path: "{{ path }}"
         targetRevision: HEAD
         repoURL: https://github.com/rwaltr/infra.git
         helm:
           valueFiles:
             - values.yaml
-            - '{{ valueFile }}'
+            - "{{ valueFile }}"
       destination:
-        namespace: '{{ namespace }}'
-        name: '{{ cluster }}'
+        namespace: "{{ namespace }}"
+        name: "{{ cluster }}"
       syncPolicy:
         #  automated: {}
         syncOptions:

@@ -1,5 +1,4 @@
 vault:
-
   server:
     image:
       repository: "vault"

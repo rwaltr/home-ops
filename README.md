@@ -6,7 +6,6 @@ Using a combination of Argo, Terraform, Vault and Kubernetes. 90% of all the con
 
 ## Dir use
 
-
 **gitops** contains the Kubernetes code required for each k8s cluster application
 
 **cluster** contains the IAC and terraform config to provision and maintain a cluster

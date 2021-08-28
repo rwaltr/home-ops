@@ -20,10 +20,10 @@ ingress:
     traefik.ingress.kubernetes.io/router.priority: "10"
     cert-manager.io/cluster-issuer: le-prod
   hosts:
-    - hostTpl: '{{ .Values.ingress.domainName }}'
+    - hostTpl: "{{ .Values.ingress.domainName }}"
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - hostsTpl: ['{{ .Values.ingress.domainName }}']
+    - hostsTpl: ["{{ .Values.ingress.domainName }}"]
       secretNameTpl: '{{ .Values.ingress.domainName | replace "." "-" }}'

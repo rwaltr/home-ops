@@ -37,7 +37,6 @@ jellyfin:
           hosts:
             - jellyfin.waltr.tech
 
-
   persistence:
     config:
       enabled: true

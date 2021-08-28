@@ -9,9 +9,9 @@ spec:
     privateKeySecretRef:
       name: le-prod
     solvers:
-    - dns01:
-        cloudflare:
-          email: ryan@blackphidora.com
-          apiTokenSecretRef:
-            name: cloudflareapikey
-            key: API_KEY
+      - dns01:
+          cloudflare:
+            email: ryan@blackphidora.com
+            apiTokenSecretRef:
+              name: cloudflareapikey
+              key: API_KEY

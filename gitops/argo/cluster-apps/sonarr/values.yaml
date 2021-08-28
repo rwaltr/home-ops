@@ -26,7 +26,6 @@ sonarr:
     main:
       enabled: false
 
-
   persistence:
     config:
       enabled: true

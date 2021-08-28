@@ -1,9 +1,9 @@
 [
-    {
-      "name": "founderyvtt-jgleon",
-      "cluster": "kyz",
-      "namespace": "jgleon",
-      "path": "gitops/argo/cluster-apps/founderyvtt/jgleon",
-      "valueFile": ""
-    }
-  ]
+  {
+    "name": "founderyvtt-jgleon",
+    "cluster": "kyz",
+    "namespace": "jgleon",
+    "path": "gitops/argo/cluster-apps/founderyvtt/jgleon",
+    "valueFile": ""
+  }
+]

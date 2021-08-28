@@ -1,18 +1,18 @@
 ignore: |
-    .yamllint.yml
-    .github/
-    .secrets/
-    *.encrypted.yaml
-    *.sops.yaml
-    *.sops.yml
-    *-crds.yaml
-    /gitops/argo/cluster-init/
-    /legacy/
+  .yamllint.yml
+  .github/
+  .secrets/
+  *.encrypted.yaml
+  *.sops.yaml
+  *.sops.yml
+  *-crds.yaml
+  /gitops/argo/cluster-init/
+  /legacy/
 
 extends: default
 rules:
   truthy:
-    allowed-values: ['true', 'false', 'on', 'yes']
+    allowed-values: ["true", "false", "on", "yes"]
   comments:
     min-spaces-from-content: 1
   line-length: disable

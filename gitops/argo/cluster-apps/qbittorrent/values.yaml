@@ -33,7 +33,6 @@ qbittorrent:
   #       protocol: TCP
   #       targetPort: 53443
 
-
   service:
     main:
       ports:

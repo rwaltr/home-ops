@@ -99,7 +99,7 @@ argo-cd:
             return hs
     rbacConfig:
       policy.default: role:readonly
-      scopes: '[email, group]'
+      scopes: "[email, group]"
       policy.csv: |
         g, rwalt@pm.me, role:admin
     ingress:

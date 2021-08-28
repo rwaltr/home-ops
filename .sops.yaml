@@ -1,6 +1,6 @@
 ---
 creation_rules:
-- encrypted_regex: '((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))'
-  pgp: >-
-    43A697C7D3B8377EB8A0E7C127DDBC18CC4F3E04
-  hc_vault_transit_uri: "https://vault.waltr.tech/v1/sops/keys/mainkey"
+  - encrypted_regex: "((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))"
+    pgp: >-
+      43A697C7D3B8377EB8A0E7C127DDBC18CC4F3E04
+    hc_vault_transit_uri: "https://vault.waltr.tech/v1/sops/keys/mainkey"
