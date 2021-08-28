@@ -40,7 +40,7 @@ readarr:
     audiobooks:
       enabled: true
       type: custom
-      mountPath: /books
+      mountPath: /audiobooks
       volumeSpec:
         nfs:
           server: 10.10.0.8
