@@ -1,1 +1,2 @@
 gitops/argo/cluster-init/calico/*
+addons/*
