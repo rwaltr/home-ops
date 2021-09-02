@@ -18,17 +18,26 @@ unpackerr:
   # https://github.com/davidnewhall/unpackerr#docker-env-variables
   env:
     UN_SONARR_0_URL: http://sonarr:8989
+    UN_SONARR_0_API_Key:
+      envFrom:
+        - secretREf:
+            name: unpackerr-secret
 
     UN_RADARR_0_URL: http://radarr:7878
 
-    # TZ: UTC
+    UN_RADARR_0_API_Key:
+      envFrom:
+        - secretREf:
+            name: unpackerr-secret
 
-  additionalVolumes:
-    - name: downloads
-      nfs:
-        server: 10.10.0.8
-        path: /tank/nas/library/downloads/completed
-
-  additionalVolumeMounts:
-    - name: downloads
+  persistence:
+    config:
+      enabled: false
+    downloads:
+      enabled: true
       mountPath: /downloads
+      type: custom
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/downloads/seeding
