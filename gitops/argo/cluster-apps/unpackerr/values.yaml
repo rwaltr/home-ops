@@ -18,17 +18,11 @@ unpackerr:
   # https://github.com/davidnewhall/unpackerr#docker-env-variables
   env:
     UN_SONARR_0_URL: http://sonarr:8989
-    UN_SONARR_0_API_Key:
-      envFrom:
-        - secretRef:
-            name: unpackerr-secret
-
     UN_RADARR_0_URL: http://radarr:7878
 
-    UN_RADARR_0_API_Key:
-      envFrom:
-        - secretRef:
-            name: unpackerr-secret
+  envFrom:
+    - secretRef:
+        name: unpackerr-secret
 
   persistence:
     config:
