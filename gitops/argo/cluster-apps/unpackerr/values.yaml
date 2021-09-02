@@ -20,14 +20,14 @@ unpackerr:
     UN_SONARR_0_URL: http://sonarr:8989
     UN_SONARR_0_API_Key:
       envFrom:
-        - secretREf:
+        - secretRef:
             name: unpackerr-secret
 
     UN_RADARR_0_URL: http://radarr:7878
 
     UN_RADARR_0_API_Key:
       envFrom:
-        - secretREf:
+        - secretRef:
             name: unpackerr-secret
 
   persistence:
