@@ -7,11 +7,11 @@ resource "uptimerobot_monitor" "blog" {
 
 }
 
-resource "uptimerobot_monitor" "home" {
-  friendly_name = "home"
-  type          = "ping"
-  url           = "home.waltr.tech"
-  # pro allows 60 seconds
-  interval = 300
+#resource "uptimerobot_monitor" "home" {
+#friendly_name = "home"
+#type          = "ping"
+#url           = "home.waltr.tech"
+## pro allows 60 seconds
+#interval = 300
 
-}
+#}
