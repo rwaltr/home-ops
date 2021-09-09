@@ -6,8 +6,6 @@ librespeed:
     tag: version-5.2.4
     # -- image pull policy
     pullPolicy: IfNotPresent
-  env: {}
-
     main:
       enabled: true
       annotations:
