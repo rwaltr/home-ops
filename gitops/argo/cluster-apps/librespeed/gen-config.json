@@ -1,9 +1,0 @@
-[
-  {
-    "name": "librespeed",
-    "cluster": "kyz",
-    "namespace": "utility",
-    "path": "gitops/argo/cluster-apps/librespeed",
-    "valueFile": ""
-  }
-]
