@@ -6,6 +6,7 @@ librespeed:
     tag: version-5.2.4
     # -- image pull policy
     pullPolicy: IfNotPresent
+  ingress:  
     main:
       enabled: true
       annotations:
