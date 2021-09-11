@@ -34,8 +34,8 @@ repos:
     rev: v2.1.2
     hooks:
       - id: terraform_fmt
-        #  - id: terraform_validate
-  - repo: git://github.com/terraform-linters/tflint
-    rev: v0.31.0
-    hooks:
-      - id: tflint
+      - id: terraform_validate
+  #- repo: git://github.com/terraform-linters/tflint
+  #rev: v0.31.0
+  #hooks:
+  #- id: tflint
