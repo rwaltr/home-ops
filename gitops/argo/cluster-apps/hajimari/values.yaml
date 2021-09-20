@@ -20,6 +20,7 @@ hajimari:
         - media
         - utility
         - default
+        - jgleon
     # -- Override the title of the Hajimari pages
     title: Waltr.Tech
     # -- Default name for welcome message
