@@ -22,7 +22,7 @@ repos:
     hooks:
       - id: prettier
         args:
-          - --list-diffrent
+          - --list-different
           - --ignore-unknown
           - --write
   - repo: https://github.com/sirosen/fix-smartquotes

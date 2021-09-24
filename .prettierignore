@@ -1,2 +1,2 @@
 gitops/argo/cluster-init/calico/*
-addons/*
+gitops/charts/*
