@@ -21,6 +21,10 @@ repos:
     rev: "v2.3.2" # Use the sha / tag you want to point at
     hooks:
       - id: prettier
+        args:
+          - --list-diffrent
+          - --ignore-unknown
+          - --write
   - repo: https://github.com/sirosen/fix-smartquotes
     rev: 0.2.0
     hooks:
