@@ -69,5 +69,5 @@ jellyfin:
         httpGet:
           path: /health
           port: 8096
-        initalDelaySeconds: 10
+        initialDelaySeconds: 10
         periodSeconds: 5
