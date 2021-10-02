@@ -90,3 +90,5 @@ hajimari:
       enabled: true
       accessMode: ReadWriteOnce
       size: 1Gi
+  podAnnotations:
+    secret.reloader.stakater.com/reload: "hajimari-settings"
