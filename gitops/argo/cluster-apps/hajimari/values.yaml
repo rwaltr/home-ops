@@ -5,6 +5,10 @@ hajimari:
     pullPolicy: IfNotPresent
     tag: v0.1.0
 
+  strategy:
+    RollingUpdate:
+      surge: 1
+      unavailable: 0
   env:
     TZ: America/Chicago
 
@@ -94,4 +98,4 @@ hajimari:
       accessMode: ReadWriteOnce
       size: 1Gi
   podAnnotations:
-    secret.reloader.stakater.com/reload: "hajimari-settings"
+    configmap.reloader.stakater.com/reload: "hajimari-settings"
