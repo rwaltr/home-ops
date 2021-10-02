@@ -6,7 +6,7 @@ hajimari:
     tag: v0.1.0
 
   strategy:
-    RollingUpdate:
+    rollingUpdate:
       surge: 1
       unavailable: 0
   env:
