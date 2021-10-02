@@ -1,3 +1,4 @@
+---
 hajimari:
   image:
     repository: ghcr.io/toboshii/hajimari
@@ -45,6 +46,8 @@ hajimari:
             url: "https://google.com"
           - name: Linode
             url: "https://linode.com"
+          - name: Amazon
+            url: "https://aws.amazon.com/"
       - name: Dev
         links:
           - name: Github
