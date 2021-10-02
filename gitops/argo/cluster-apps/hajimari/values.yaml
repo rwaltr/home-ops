@@ -60,6 +60,8 @@ hajimari:
             url: "https://devdocs.io"
           - name: Devhints
             url: "https://devhints.io"
+          - name: Github
+            url: "https://github.com/rwaltr"
       - name: Media
         links:
           - name: Youtube
