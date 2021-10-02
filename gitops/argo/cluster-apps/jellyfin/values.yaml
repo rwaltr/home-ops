@@ -61,3 +61,13 @@ jellyfin:
       enabled: true
       type: emptyDir
       mountPath: /config/transcodes
+  probes:
+    readiness:
+      enabled: true
+      custom: true
+      spec:
+        httpGet:
+          path: /health
+          port: 8096
+        initalDelaySeconds: 10
+        periodSeconds: 5
