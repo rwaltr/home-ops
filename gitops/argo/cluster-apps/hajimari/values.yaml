@@ -4,8 +4,8 @@ hajimari:
     repository: ghcr.io/toboshii/hajimari
     pullPolicy: IfNotPresent
     tag: v0.1.0
-
-  strategy:
+  controller:
+    strategy: RollingUpdate
     rollingUpdate:
       surge: 1
       unavailable: 0
