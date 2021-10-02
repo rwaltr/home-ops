@@ -54,8 +54,6 @@ hajimari:
             url: "https://aws.amazon.com/"
       - name: Dev
         links:
-          - name: Github
-            url: "https://github.com"
           - name: Devdocs
             url: "https://devdocs.io"
           - name: Devhints
