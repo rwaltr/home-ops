@@ -52,6 +52,8 @@ hajimari:
             url: "https://linode.com"
           - name: Amazon
             url: "https://aws.amazon.com/"
+          - name: Digital Ocean
+            url: "https://digitalocean.com"
       - name: Dev
         links:
           - name: Devdocs
