@@ -12,7 +12,7 @@ gonic:
     # -- image pull policy
     pullPolicy: IfNotPresent
     # -- image tag
-    tag: v0.13.1
+    tag: v0.14.0
 
   # -- environment variables. See more environment variables in the [gonic documentation](https://github.com/sentriz/gonic#configuration-options)
   # @default -- See below
