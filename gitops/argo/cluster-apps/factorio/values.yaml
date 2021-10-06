@@ -32,17 +32,17 @@ persistence:
     enabled: true
     type: pvc
     mountPath: /factorio/config
-    accessMode: readWriteOnce
+    accessMode: ReadWriteOnce
     size: 1Gi
   mods:
     enabled: true
     type: pvc
     mountPath: /factorio/mods
-    accessMode: readWriteOnce
+    accessMode: ReadWriteOnce
     size: 5Gi
   saves:
     enabled: true
     type: pvc
     mountPath: /factorio/saves
-    accessMode: readWriteOnce
+    accessMode: ReadWriteOnce
     size: 10Gi
