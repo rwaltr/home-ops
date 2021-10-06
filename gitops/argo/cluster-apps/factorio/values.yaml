@@ -2,6 +2,9 @@ image:
   repository: factoriotools/factorio
   tag: 1.1.41
 
+controller:
+  replicas: 0
+
 service:
   main:
     externalIPs:
