@@ -1,0 +1,2 @@
+# prettier-ignore
+{{ include "common.all" . }}
