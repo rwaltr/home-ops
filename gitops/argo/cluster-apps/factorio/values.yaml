@@ -3,8 +3,10 @@ image:
   tag: 1.1.41
 
 controller:
-  replicas: 0
+  replicas: 1
 
+env:
+  SAVE_NAME: waltr
 service:
   main:
     externalIPs:
