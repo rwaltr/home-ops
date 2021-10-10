@@ -12,6 +12,12 @@ ULA
 
 - fc::/7
 
+## Global Net
+
+- Routernet
+  - 172.16.12.0/24
+  - fdfe:dc53:db00::/48
+
 ## KYZ
 
 ### Overview

@@ -8,13 +8,11 @@ Using a combination of Argo, Terraform, Vault and Kubernetes. 90% of all the con
 
 **gitops** contains the Kubernetes code required for each k8s cluster application
 
-**cluster** contains the IAC and terraform config to provision and maintain a cluster
-
-**legacy** old code from the old age
+**provision** contains the IAC and provision components needed to create and maintain a cluster
 
 ## Documentation
 
-TODO
+**docs** actually contains implementation details, not instructions on how to deploy this repo
 
 ## Ideology
 
