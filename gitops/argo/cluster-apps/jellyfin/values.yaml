@@ -61,6 +61,12 @@ jellyfin:
       enabled: true
       type: emptyDir
       mountPath: /config/transcodes
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 4000Mi
   probes:
     readiness:
       enabled: true
