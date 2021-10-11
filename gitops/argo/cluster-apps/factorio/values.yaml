@@ -1,6 +1,6 @@
 image:
   repository: factoriotools/factorio
-  tag: 1.1.41
+  tag: 1.1.42
 
 controller:
   replicas: 1
