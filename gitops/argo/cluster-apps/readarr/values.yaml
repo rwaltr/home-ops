@@ -9,7 +9,7 @@ readarr:
   image:
     repository: ghcr.io/k8s-at-home/readarr
     pullPolicy: IfNotPresent
-    tag: v0.1.0.991
+    tag: v0.1.0.997
 
   strategy:
     type: Recreate
