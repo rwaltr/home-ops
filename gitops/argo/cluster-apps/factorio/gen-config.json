@@ -1,9 +1,0 @@
-[
-  {
-    "name": "factorio",
-    "cluster": "kyz",
-    "namespace": "default",
-    "path": "gitops/argo/cluster-apps/factorio",
-    "valueFile": ""
-  }
-]
