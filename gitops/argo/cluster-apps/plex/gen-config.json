@@ -1,0 +1,9 @@
+[
+  {
+    "name": "plex",
+    "cluster": "kyz",
+    "namespace": "media",
+    "path": "gitops/argo/cluster-apps/plex",
+    "valueFile": ""
+  }
+]
