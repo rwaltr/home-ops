@@ -77,11 +77,13 @@ plex:
     config:
       enabled: true
       mountPath: /config
+      accessMode: ReadWriteOnce
 
     transcode:
       enabled: true
       mountPath: /transcode
-
+      accessMode: ReadWriteOnce
+      size: 10G
   # -- Configure the Security Context for the Pod
   podSecurityContext:
     runAsUser: 1000
