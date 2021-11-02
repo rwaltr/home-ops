@@ -89,7 +89,7 @@ plex:
     tv:
       enabled: true
       type: custom
-      mountPath: /media
+      mountPath: /media/tv
       readOnly: true
       volumeSpec:
         nfs:
@@ -99,7 +99,7 @@ plex:
     movies:
       enabled: true
       type: custom
-      mountPath: /media
+      mountPath: /media/movies
       readOnly: true
       volumeSpec:
         nfs:
@@ -109,7 +109,7 @@ plex:
     anime:
       enabled: true
       type: custom
-      mountPath: /media
+      mountPath: /media/anime
       readOnly: true
       volumeSpec:
         nfs:
