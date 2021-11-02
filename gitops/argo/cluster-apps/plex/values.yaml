@@ -84,6 +84,38 @@ plex:
       mountPath: /transcode
       accessMode: ReadWriteOnce
       size: 10G
+      type: emptyDir
+
+    tv:
+      enabled: true
+      type: custom
+      mountPath: /media
+      readOnly: true
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/tv
+
+    movies:
+      enabled: true
+      type: custom
+      mountPath: /media
+      readOnly: true
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/movies
+
+    anime:
+      enabled: true
+      type: custom
+      mountPath: /media
+      readOnly: true
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/anime
+
   # -- Configure the Security Context for the Pod
   podSecurityContext:
     runAsUser: 1000
