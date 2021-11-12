@@ -1,4 +1,7 @@
 all:
   hosts:
+    localhost:
     router.kyz.waltr.tech:
       ansible_host: 192.168.1.1
+    storage2.waltr.lab:
+      alias: storage2
