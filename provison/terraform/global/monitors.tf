@@ -16,11 +16,10 @@ resource "uptimerobot_monitor" "start" {
 }
 
 
-#resource "uptimerobot_monitor" "home" {
-#friendly_name = "home"
-#type          = "ping"
-#url           = "home.waltr.tech"
-## pro allows 60 seconds
-#interval = 300
+resource "uptimerobot_monitor" "kyz" {
+  friendly_name = "KYZ"
+  type          = "ping"
+  url           = "8308.waltr.tech"
+  interval      = 300
 
-#}
+}

@@ -48,11 +48,4 @@ resource "cloudflare_record" "ghpages-verify" {
   ttl     = 3600
 }
 
-resource "cloudflare_record" "factorio" {
-  name    = "factorio"
-  zone_id = data.vault_generic_secret.cloudflare.data["zone_id_waltrtech"]
-  value   = "home.waltr.tech"
-  type    = "CNAME"
-  ttl     = 3600
-}
-## SPFs?
+# SPFs?
