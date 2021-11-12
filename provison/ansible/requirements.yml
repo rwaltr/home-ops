@@ -1,0 +1,10 @@
+---
+collections:
+  - name: ansible.posix
+    version: "1.3.0"
+  - name: community.general
+  - name: community.sops
+  - name: vyos.vyos
+roles:
+  - src: https://github.com/bjw-s/ansible-role-vyos
+    version: v0.0.7
