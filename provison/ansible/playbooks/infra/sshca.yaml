@@ -11,7 +11,7 @@
     - name: Configure SSH for CA
       ansible.builtin.lineinfile:
         line: "TrustedUserCAKeys /etc/ssh/cakey.pem"
-        path: /etc/ssh/sshd_config
+        path: /etc/ssh/sshd_config.d/cakey.conf
         create: yes
       notify: Reload SSHD
 
