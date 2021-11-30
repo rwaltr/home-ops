@@ -4,6 +4,13 @@ vault:
       repository: "vault"
       tag: "1.8.5"
       pullPolicy: IfNotPresent
+    readinessProbe:
+      enabled: true
+      path: "/v1/sys/health?sealedcode=204&uninitcode=204"
+    livenessProbe:
+      enabled: true
+      path: "/v1/sys/health"
+      initalDelaySeconds: 60
     ingress:
       enabled: true
       annotations:
