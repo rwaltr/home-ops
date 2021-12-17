@@ -9,7 +9,7 @@ unpackerr:
   image:
     repository: golift/unpackerr
     pullPolicy: IfNotPresent
-    tag: 0.9.8
+    tag: 0.9.9
 
   strategy:
     type: Recreate
