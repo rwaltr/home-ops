@@ -89,7 +89,7 @@ hajimari:
           paths:
             - path: /
       tls:
-        - secretName: hasjimari-waltr-tech
+        - secretName: hajimari-waltr-tech
           hosts:
             - hajimari.waltr.tech
   # -- Configure persistence settings for the chart under this key.
