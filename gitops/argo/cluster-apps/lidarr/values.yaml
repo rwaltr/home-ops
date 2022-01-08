@@ -9,7 +9,7 @@ lidarr:
   image:
     repository: ghcr.io/k8s-at-home/lidarr
     pullPolicy: IfNotPresent
-    tag: v1.0.0.2414
+    tag: v1.0.0.2420
 
   strategy:
     type: Recreate
