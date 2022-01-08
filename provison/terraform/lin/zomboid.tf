@@ -1,7 +1,6 @@
-
 # Zomboid Server
-resource "linode_instance" "sshcatest" {
-  label     = "sshcatset"
+resource "linode_instance" "zomboid" {
+  label     = "zomboid"
   image     = "linode/fedora34"
   region    = "us-central"
   type      = "g6-standard-2"
@@ -9,13 +8,12 @@ resource "linode_instance" "sshcatest" {
 
   provisioner "remote-exec" {
     inline = [
-      #"sudo dnf update -y",
-      "sudo curl https://vault.waltr.tech/v1/sshca/public_key > /etc/ssh/cakey.pem",
-      "echo 'TrustedUserCAKeys /etc/ssh/cakey.pem' | sudo tee -a /etc/ssh/sshd_config",
-      "useradd blackphidora",
-      "usermod -aG sudo blackphidora",
-      "sudo systemctl restart sshd"
-
+      "sudo dnf update -y",
+      "sudo dnf install podman -y",
+      "setenforce 0",
+      "mkdir /opt/zomboid/data /opt/zomboid/config -p",
+      "podman run -d --network host -v /opt/zomboid/data:/data -v /opt/zomboid/config:/config registry.gitlab.com/rwaltr/container-images/zomboid-server:0.0.1",
+      "systemctl stop firewalld"
     ]
     connection {
       type     = "ssh"
@@ -26,10 +24,10 @@ resource "linode_instance" "sshcatest" {
   }
 }
 
-# resource "cloudflare_record" "zomboid-dns" {
-#   name    = "zomboid."
-#   zone_id = data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]
-#   type    = "A"
-#   value   = linode_instance.zomboid.ip_address
+resource "cloudflare_record" "zomboid-dns" {
+  name    = "zomboid."
+  zone_id = data.vault_generic_secret.cloudflare.data["zone_id_rwaltrpro"]
+  type    = "A"
+  value   = linode_instance.zomboid.ip_address
 
-# }
+}
