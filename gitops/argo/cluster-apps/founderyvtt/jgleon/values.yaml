@@ -11,7 +11,7 @@ foundryvtt:
   image:
     repository: felddy/foundryvtt
     pullPolicy: IfNotPresent
-    tag: 0.8.9
+    tag: 9.245.0
 
   strategy:
     type: Recreate
