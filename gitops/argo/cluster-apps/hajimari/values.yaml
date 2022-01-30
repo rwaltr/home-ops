@@ -3,7 +3,7 @@ hajimari:
   image:
     repository: ghcr.io/toboshii/hajimari
     pullPolicy: IfNotPresent
-    tag: v0.1.0
+    tag: v0.2.0
   controller:
     strategy: RollingUpdate
     rollingUpdate:
