@@ -14,7 +14,7 @@ repos:
     hooks:
       - args:
           - -c
-          - .github/lint/.yamllint.yaml
+          - .github/linters/yamllint.yaml
         id: yamllint
 
   - repo: https://github.com/pre-commit/mirrors-prettier
