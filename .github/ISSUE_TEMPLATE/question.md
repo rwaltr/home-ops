@@ -1,9 +1,11 @@
----
+## <!-- markdownlint-disable -->
+
 name: Question
 about: Ask a question to the maintainer
 title: ""
 labels: kind/question
 assignees: ""
+
 ---
 
 # Details

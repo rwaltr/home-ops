@@ -1,3 +1,5 @@
+<!-- markdownlint-disable -->
+
 **Description of the change**
 
 <!-- Describe the scope of your change - i.e. what the change does. -->
