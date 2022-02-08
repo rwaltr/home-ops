@@ -1,5 +1,5 @@
-## <!-- markdownlint-disable -->
-
+<!-- markdownlint-disable -->
+---
 name: Question
 about: Ask a question to the maintainer
 title: ""
