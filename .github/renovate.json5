@@ -1,0 +1,22 @@
+{
+  extends: [
+    "config:base",
+    ":disableRateLimiting",
+    ":enablePreCommit",
+    ":dependencyDashboard",
+    ":semanticCommits",
+  ],
+  timezone: "America/Chicago",
+  dependencyDashboard: true,
+  dependencyDashboardTitle: "Renovate Dashboard",
+  rebaseWhen: "conflicted",
+  fetchReleaseNotes: true,
+  suppressNotifications: ["prIgnoreNotification"],
+  labels: ["renovate"],
+  packageRules: [
+    {
+      matchUpdateTypes: ["patch"],
+      automerge: true,
+    },
+  ],
+}
