@@ -13,7 +13,7 @@
     /* "github>onedr0p/home-ops//.github/renovate/semanticCommits" */
   ],
   platform: "github",
-  username: "teletraan-x[bot]",
+  username: "Teletraan-X[bot]",
   repositories: ["rwaltr/infra"],
   onboarding: false,
   requireConfig: false,
