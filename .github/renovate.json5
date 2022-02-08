@@ -17,7 +17,7 @@
   repositories: ["rwaltr/infra"],
   onboarding: false,
   requireConfig: false,
-  /* "gitAuthor": "teletran-x ", */
+  gitAuthor: "99223764+teletraan-x[bot]@users.noreply.github.com",
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
   suppressNotifications: ["prIgnoreNotification"],
   rebaseWhen: "conflicted",
