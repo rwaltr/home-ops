@@ -36,4 +36,4 @@ jobs:
           MARKDOWN_CONFIG_FILE: markdownlint.yaml
           TERRAFORM_TFLINT_CONFIG_FILE: tflint.hcl
           YAML_CONFIG_FILE: yamllint.yaml
-          VALIDATE_KUBERENTES_KUBEVAL: false
+          VALIDATE_KUBERNETES_KUBEVAL: false
