@@ -18,7 +18,7 @@ on: # yamllint disable-line rule:truthy
     branches:
       - master
     paths:
-      - ".github/renovate.json"
+      - ".github/renovate.json5"
       - ".github/renovate/**.json"
 
 env:
