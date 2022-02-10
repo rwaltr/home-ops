@@ -2,13 +2,13 @@
 
 Usable Networks
 
-RFC1918
+### RFC1918
 
 - 192.168.0.0/16
 - 10.0.0.0/8
 - 172.16.0.0/12
 
-ULA
+### ULA
 
 - fc::/7
 
@@ -16,7 +16,17 @@ ULA
 
 - Routernet
   - 172.16.12.0/24
-  - fdfe:dc53:db00::/48
+  - fd76:feeb:d6e0::/48
+
+Waltr.Tech ASNs
+16 bit
+ - RFC5398
+   - 64512-65534
+
+32 bit
+rfc6996 4200000000-4294967294
+
+Waltr.Tech is AS4242421540
 
 ## KYZ
 
@@ -26,9 +36,9 @@ ULA
 
 - fdfe:dc53:db52::/48
 
-| Vlan | Network                  | Use         |
-| ---- | ------------------------ | ----------- |
-| 0    | 192.168.1.0/24           | Userland    |
-| 10   | 10.10.0.0/24             | RackNet     |
-| 0    | fdfe:dc53:db52:42ea::/64 | Userland-v6 |
-| 10   | fdfe:dc53:db52:1::/64    | Racknet-v6  |
+| Vlan | Network                     | Use         |
+| ---- | --------------------------- | ----------- |
+| 0    | 192.168.1.0/24              | Userland    |
+| 0    | fd76:feeb:d6e0:6900::/64    | Userland-v6 |
+| 10   | 10.10.0.0/24                | RackNet     |
+| 10   | fd76:feeb:d6e0:1100::/64    | Racknet-v6  |
