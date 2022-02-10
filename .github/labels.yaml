@@ -78,3 +78,5 @@
   color: "7B55D7"
 - name: question
   color: "cc317c"
+- name: hardware
+  color: "800080"
