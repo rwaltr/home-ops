@@ -1,0 +1,26 @@
+{
+    "data": "ENC[AES256_GCM,data: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,iv:EXv7n0eFGnQ2qXbLGrFT3U6x69330uZXIkba1ev5vAI=,tag:2djXx0JKDzNysVAfSQ2MYQ==,type:str]",
+    "sops": {
+        "kms": null,
+        "gcp_kms": null,
+        "azure_kv": null,
+        "hc_vault": null,
+        "age": [
+            {
+                "recipient": "age189npag0lz2hl425ldurk8czrpyv69tg4cgqgzl7wjh60w39sysesazu4u6",
+                "enc": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtWUlkQVJrSUY2YTlrVlhn\nRHJIcUFNT1BUcFZjSElrSTdYVTRmQ1RDVlJZCkdSYzR2cUN3RERVa2d6V29oZVAz\nOW5ZMUdqQzJVaGsydVFkUlVqWjdUWXMKLS0tIE1XZHk2d2J2dWw5WlUxakVhb0Jx\nbmE3bHpZOFhHMG9pSVpUYUxIOS9XUkUK52nwlg7vdtzBuY3PT5eMWVqYPM98dbYS\n2uEhi8etFrRfgsjuapGwYVoI5rmByTrq3+hKqQu2T+KBxiOvoxOklA==\n-----END AGE ENCRYPTED FILE-----\n"
+            }
+        ],
+        "lastmodified": "2022-02-21T21:17:49Z",
+        "mac": "ENC[AES256_GCM,data:9kD5EhHsFwjIcEq/ZNnDRJqdB0azOA6u7zY85km2JNQjJb2jVcuy1GsDkEpZbuK+P/Lh+trFAUF7+MtBMKrMvAUGf3z9fDZP/qfSHMIRpwVHrcKHN1Azh7MVeibTQqkXsd8kHxnS4FtTbwPpoYxt3sGLKXD+Pmc4FvboxbelxEA=,iv:I2dbJHPGr+AYAOMVLnMPgLARs85945J5C23I0r6qUVQ=,tag:9y49d43swUZpTu0bszgbWg==,type:str]",
+        "pgp": [
+            {
+                "created_at": "2022-02-21T21:17:49Z",
+                "enc": "-----BEGIN PGP MESSAGE-----\n\nwcBMA2CLnufVS/bWAQgAPBi5A90EHUCgFGN/QvI8EgzlyxldU5oXAEiNyQ4A5b3V\nfO2t2RBSCvdXOmnsGUMlwRyadjJ5KX9R+LMGy0O8f45ufJvgG38UIYJ3lVBcEf/I\no0sAhDAGYy+b+ILYhTi8oS9hl26HwOJCDT94T6qX5VGoPQGWXx9kj+xTrzX7F6qN\nKHIDGzm+e6faJXiRgFPk6vr9brnUQPZCupx9UTFiflwetRKtBNKtyJbiiEgV+nt4\nj7Oek0ikk0SV0TnJ6zAjNtJAGotlpdI+SqvTDf5ll2aPz2ElFZMjkFHk/520+Qze\n/iMjU1ly095qLLWThsTfGOz3QPmimrtW/3TZpKMmq9LmAYuBaBSC55Z7F9BNm6Zi\nesBMmC8cPY0gd2sfm9Jh4O934TtA5upXLB5KPg81TM2zUqAkQbDmfx8euj3HvORR\nv+T7OtpZdUrIsStZJU9u/Y9h4lmr6C4A\n=CqP3\n-----END PGP MESSAGE-----",
+                "fp": "43A697C7D3B8377EB8A0E7C127DDBC18CC4F3E04"
+            }
+        ],
+        "encrypted_regex": "((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))",
+        "version": "3.7.1"
+    }
+}
