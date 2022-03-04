@@ -1,0 +1,153 @@
+argo-cd:
+  fullnameOverride: argocd
+  installCRDs: false
+
+  global:
+    image:
+      repository: argoproj/argocd
+      tag: v2.2.5
+
+  controller:
+    replicas: 1
+    enableStatefulSet: true
+    extraArgs:
+      - --repo-server-timeout-seconds
+      - "500"
+    metrics:
+      enabled: false
+      serviceMonitor:
+        enabled: false
+      rules:
+        enabled: false
+        spec:
+          - alert: ArgoAppMissing
+            expr: |
+              absent(argocd_app_info)
+            for: 15m
+            labels:
+              severity: critical
+            annotations:
+              summary: "[ArgoCD] No reported applications"
+              description: >
+                ArgoCD has not reported any applications data for the past 15 minutes which
+                means that it must be down or not functioning properly.  This needs to be
+                resolved for this cloud to continue to maintain state.
+          - alert: ArgoAppNotSynced
+            expr: |
+              argocd_app_info{sync_status!="Synced"} == 1
+            for: 12h
+            labels:
+              severity: warning
+            annotations:
+              summary: "[{{`{{$labels.name}}`}}] Application not synchronized"
+              description: >
+                The application [{{`{{$labels.name}}`}} has not been synchronized for over
+                12 hours which means that the state of this cloud has drifted away from the
+                state inside Git.
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1.25Gi
+
+    # nodeSelector:
+    #   doks.digitalocean.com/node-pool: memory-optimized
+
+    # priorityClassName: high-priority
+
+  # dex:
+  #   enabled: false
+
+  server:
+    configEnabled: true
+    extraArgs:
+      - --insecure
+    config:
+      admin.enabled: "true"
+      url: https://argocd.waltr.tech
+      application.instanceLabelKey: argocd.argoproj.io/instance
+      # statusbadge.enabled: "true"
+      # ga.trackingid: "G-2KKZYB17DC"
+      # ga.anonymizeusers: "false"
+      # TODO: public access
+      # help.chatUrl: "https://discord.gg"
+      # help.chatText: "Discord"
+      # users.anonymous.enabled: "true"
+      # users.session.duration: "24h"
+      # statusbadge.enabled: "true"
+      resource.compareoptions: |
+        ignoreAggregatedRoles: true
+      resource.customizations: |
+        admissionregistration.k8s.io/MutatingWebhookConfiguration:
+          ignoreDifferences: |
+            jsonPointers:
+              - /webhooks/0/clientConfig/caBundle
+        apiregistration.k8s.io/APIService:
+          ignoreDifferences: |
+            jsonPointers:
+              - /spec/caBundle
+              - /metadata/annotations
+        Service:
+          health.lua: |
+            hs = {}
+            hs.status = "Healthy"
+            return hs
+        networking.k8s.io/Ingress:
+          health.lua: |
+            hs = {}
+            hs.status = "Healthy"
+            return hs
+    rbacConfig:
+      policy.default: role:readonly
+      scopes: "[email, group]"
+      policy.csv: |
+        g, rwalt@pm.me, role:admin
+    ingress:
+      enabled: false
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.priority: "10"
+        cert-manager.io/cluster-issuer: le-prod
+      hosts:
+        - argocd.waltr.tech
+      tls:
+        - secretName: argocd-waltr-tech
+          hosts: [argocd.waltr.tech]
+    metrics:
+      enabled: false
+      serviceMonitor:
+        enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+  repoServer:
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 75
+      targetMemoryUtilizationPercentage: 75
+    # affinity:
+    #   podAntiAffinity:
+    #     preferredDuringSchedulingIgnoredDuringExecution:
+    #       - podAffinityTerm:
+    #           labelSelector:
+    #             matchLabels:
+    #               app.kubernetes.io/name: argocd-repo-server
+    #           topologyKey: kubernetes.io/hostname
+    #         weight: 100
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+    env:
+      - name: "ARGOCD_EXEC_TIMEOUT"
+        value: "5m"
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

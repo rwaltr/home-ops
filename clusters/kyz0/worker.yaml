@@ -9,10 +9,10 @@ machine:
   # Defines the role of the machine within the cluster.
   type: worker
   # The `token` is used by a machine to join the PKI of the cluster.
-  token: ENC[AES256_GCM,data:YHQW4BqR0lgRqo/s3zU7ynovbuQGaLM=,iv:8zNynpPeGhABpdOV5FNLBX1Mj+t3LTT328W22VJ59ZA=,tag:Z4WqKRKGplaiApC7/DlC6w==,type:str]
+  token: ENC[AES256_GCM,data:Ui18yaASxI2zcbnL69GYg2yPCypO1tM=,iv:hc4NfOpVRUrxWzROY4vn0bulIWMKirqXVZRfiX/d6sk=,tag:2efvA4eBn/Vb+dDjmGUTBg==,type:str]
   # The root certificate authority of the PKI.
   ca:
-    crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQakNCOGFBREFnRUNBaEJzUWhmOUVralVpOSt6dnZrVXIyL2FNQVVHQXl0bGNEQVFNUTR3REFZRFZRUUsKRXdWMFlXeHZjekFlRncweU1qQXlNVGt4TnpNeE1qQmFGdzB6TWpBeU1UY3hOek14TWpCYU1CQXhEakFNQmdOVgpCQW9UQlhSaGJHOXpNQ293QlFZREsyVndBeUVBZFdQUDhmZGFjbk9lazA0QVhBKzBFUm1wVHE3NkNiRHhDZHVVCk5UTG96anVqWVRCZk1BNEdBMVVkRHdFQi93UUVBd0lDaERBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGQlFjREFRWUkKS3dZQkJRVUhBd0l3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFkQmdOVkhRNEVGZ1FVSEE5YlRIMmpaTFYzbHB2bApQeUJVVzRiQzNVMHdCUVlESzJWd0EwRUFXQ1NpSzZYSXNrbUdNZURqSVRDZWFteHg2c05BUjVrcklYakRYUlVWCmdqRmVabWFsOWUzRUtxR1lrTmVlRU9tMjJqbG5jcmRhUjZTYWphaWNON3pMRHc9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+    crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQekNCOHFBREFnRUNBaEVBempXWG1OSXR4K3I3NDhrdTJSdTFYREFGQmdNclpYQXdFREVPTUF3R0ExVUUKQ2hNRmRHRnNiM013SGhjTk1qSXdNakkyTWpBek56TTNXaGNOTXpJd01qSTBNakF6TnpNM1dqQVFNUTR3REFZRApWUVFLRXdWMFlXeHZjekFxTUFVR0F5dGxjQU1oQUcrSW1oUHF4VUJrUUdIMEZTa0FvWVNaUXNROGNpc3NVYUZGCnpMd1FuSnV4bzJFd1h6QU9CZ05WSFE4QkFmOEVCQU1DQW9Rd0hRWURWUjBsQkJZd0ZBWUlLd1lCQlFVSEF3RUcKQ0NzR0FRVUZCd01DTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3SFFZRFZSME9CQllFRkRIbVhuY08yd2Y3OXQzdwpaVVdhdFZkOS9wclJNQVVHQXl0bGNBTkJBTWhxcXZmbVRlblIySlliaVIvSzQ3dndEV1JYSFdOOUVlcWNqNnlPCkVPY2dUNm9pZTRWVzV1ckt2SmFUbWh1U0JvMGpxeE5uZkQ2dXNKVmZpL0hON2d3PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
     key: ""
   # Extra certificate subject alternative names for the machine's certificate.
   certSANs: []
@@ -248,9 +248,9 @@ machine:
 # Provides cluster specific configuration options.
 cluster:
   # Globally unique identifier for this cluster (base64 encoded random 32 bytes).
-  id: SwRM0iNEAKKldaZrQKm9AcpZMoIOBWYa67n7Mr3tv3g=
+  id: q6MiJqspNjyutEmm3WMK0uZ59w9twWGgPvI9EF1n2j8=
   # Shared secret of cluster (base64 encoded random 32 bytes).
-  secret: ENC[AES256_GCM,data:i4oH0ZXj1FeCGl9aO1EMd0r7AZr0exBDwuOXAi9NWCMHGwTz/vcCtCt9oks=,iv:RxlBiYSs1vBmygKUHD6jPZ/wb9DeW20MpMlRKkRaNHE=,tag:DZmeWXFARE3U3qmCaA/d5g==,type:str]
+  secret: ENC[AES256_GCM,data:RuFygyw8++Q4hZMzkyfHa4V8NPiWF01OLZ+0T6pfPKixMU4w1YZNwV53nSY=,iv:39NlBETGfTrcI6NgCZ3DBl0mIm2S0accJpPq4PWTzb4=,tag:73xEVHFRxB5RR/oza0tBWQ==,type:str]
   # Provides control plane specific configuration options.
   controlPlane:
     # Endpoint is the canonical controlplane endpoint, which can be an IP address or a DNS hostname.
@@ -272,14 +272,14 @@ cluster:
       #     urls:
       #         - https://raw.githubusercontent.com/cilium/cilium/v1.8/install/kubernetes/quick-install.yaml
   # The [bootstrap token](https://kubernetes.io/docs/reference/access-authn-authz/bootstrap-tokens/) used to join the cluster.
-  token: ENC[AES256_GCM,data:c8LQqHLAOMzV8mISWe2AXH8PPflk10A=,iv:PADkzUUgOzX3iB36r5kgG6ikLd22648VogKu/P9VL94=,tag:q36zbnVXiW2/l9TP8k0FVQ==,type:str]
+  token: ENC[AES256_GCM,data:CdpVk8jUjczraosHMW0MvxvcqbExigk=,iv:w143poc3+fQ+86KJ2lUStoCwju0pfK6os8qbnbeAi20=,tag:jrlSYvaCV6ZOV2nRgNIomw==,type:str]
   # The key used for the [encryption of secret data at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
   aescbcEncryptionSecret: ""
   #   # Decryption secret example (do not use in production!).
   #   z01mye6j16bspJYtTB/5SFX8j7Ph4JXxM2Xuu4vsBPM=
   # The base64 encoded root certificate authority used by Kubernetes.
   ca:
-    crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJpRENDQVMrZ0F3SUJBZ0lRQ1k2c3MyUzV2dk5jTk1PWlA0Y1EvakFLQmdncWhrak9QUVFEQWpBVk1STXcKRVFZRFZRUUtFd3ByZFdKbGNtNWxkR1Z6TUI0WERUSXlNREl4T1RFM016RXlNRm9YRFRNeU1ESXhOekUzTXpFeQpNRm93RlRFVE1CRUdBMVVFQ2hNS2EzVmlaWEp1WlhSbGN6QlpNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VICkEwSUFCQ0F6aUNhSEZZcnJwV0hTYzZXK2NMVmRucDh1S2hja0M2QnBMdi9xTzc5c1k1aVhQZFhNUmlheUZwWTYKMUhCenNzS2FaTnYycFBmSDNvM2VtV3ZaREY2allUQmZNQTRHQTFVZER3RUIvd1FFQXdJQ2hEQWRCZ05WSFNVRQpGakFVQmdnckJnRUZCUWNEQVFZSUt3WUJCUVVIQXdJd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFCkZnUVVHWmhIWTlSSTlIRlY0dUhLOVI4eFpQYzduYjR3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnYUpZellaR0gKZFhsVnpvc1dJZVROVjAyOXFadVNZLzRBYzZFWE1NdmUxODBDSUM1dWxLRUhVeUg5M1l1WUhmUVJwNFlDajlvLwpWZjQxSWRheWdUbnMyUHRvCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJpekNDQVRDZ0F3SUJBZ0lSQU83Rm9TWTc1eWNNOE5GWk5LajV6N293Q2dZSUtvWkl6ajBFQXdJd0ZURVQKTUJFR0ExVUVDaE1LYTNWaVpYSnVaWFJsY3pBZUZ3MHlNakF5TWpZeU1ETTNNemRhRncwek1qQXlNalF5TURNMwpNemRhTUJVeEV6QVJCZ05WQkFvVENtdDFZbVZ5Ym1WMFpYTXdXVEFUQmdjcWhrak9QUUlCQmdncWhrak9QUU1CCkJ3TkNBQVNZNEN0UEdXUGl2eEdvZk42cCtTcGYrL1ZGZ1JEenVZVGtJeEFJbGFESnp3NU53M3dnZnFxTG5XNlcKTmZKdGFaNVJqMHhhOVVRd25OMlRUbDBNSW9lem8yRXdYekFPQmdOVkhROEJBZjhFQkFNQ0FvUXdIUVlEVlIwbApCQll3RkFZSUt3WUJCUVVIQXdFR0NDc0dBUVVGQndNQ01BOEdBMVVkRXdFQi93UUZNQU1CQWY4d0hRWURWUjBPCkJCWUVGR2ZNRjJzVElKSEs1N20wbGFSTk5rcTRXRmZrTUFvR0NDcUdTTTQ5QkFNQ0Ewa0FNRVlDSVFDRE54MmIKRnZhR3ZvR0Rnc2JiVEVPZDZwTE0veUcvVXBBOU9WdFpYTmxCd1FJaEFLd1NWb0RxdTNLZzBCWHZhbW82OFZhOQpuSjlqZUhmOGZBSzA5dGRzY1FCYgotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
     key: ""
   # Configures cluster member discovery.
   discovery:
@@ -381,28 +381,28 @@ sops:
     - recipient: age189npag0lz2hl425ldurk8czrpyv69tg4cgqgzl7wjh60w39sysesazu4u6
       enc: |
         -----BEGIN AGE ENCRYPTED FILE-----
-        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnVzJsejdCcEl6U0VydGUr
-        M1o3NkpmN1hVLzN6R3I2c0dQdlFka1JxYUVjCm1SR0s1b05LUU1PaDJsZ0ZlS0dC
-        WFRLVER1djVMVDhoa0lwN3B6cFViRWsKLS0tIDFMU1I0Z2JjTmw3bUtDSmE5dnRa
-        VCtlQng2M0dwTEs0c3hRenAvcnB4eTAKZOidhqgxSoUBvtdCzWhVluuRYe3nK7FC
-        t4ugSAmuZ2mjnBZ3nqipNX71bxR/TG6io4w5f24GyF6IzvaXxOQXFg==
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOZ0dVSGJ3eDdQUnAyUFlm
+        dEpBUHhRVXFlZzFlSTRNSXhjZEJVV0JSdWxRCkg4ZlBoRm53WURISDVXVlhDazJB
+        YncwYmd3cm0rRUJTdnRwa2RQQVJDNlkKLS0tIE5RZTJUdjJlTjZkcUdpQ3pYYUNS
+        d2U4MUJoYlZNeHRyOG13NDk4azRSTGcKiZ8x1glPZ3wr5E/0BbtqkfN6lErqZ+s1
+        Us4saRhSbQJMXnr9+YOCWrjVeQz96hcZeXEVXTPc9xo4JGjOLFjxCg==
         -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2022-02-21T21:17:55Z"
-  mac: ENC[AES256_GCM,data:vbxN7Ljpwt+PvLEZpHOVOwJhiJGkxYjM/e4SrZtyI+T/k1zsU+78r03l1Vuco5aqadrexDY/4elILKjg28A+d2vofe0ERWM0C6zXzVGAD0G2GZRZI7ECfoZim+QnJCXnZNkx8ItqSUpCNXwHBjte5I1GhK9BJ49cR5tZW6Lz6TY=,iv:zWP7XMqbzFfVSIXleqaex/tN0wtislyrOSHH8hNoaEE=,tag:qlc+8q6Y+ToqiOVkJZpcLQ==,type:str]
+  lastmodified: "2022-03-04T04:17:40Z"
+  mac: ENC[AES256_GCM,data:/lJ3V+J1bwSeH83x8qQ35JyhGrPhmUPGJZEALNXLRMfwv3+nVIz81bpEH13L4daP36n00IdO7eLOvKtLLd7UzUGu1cvXZgxQzomFGBFYHfoK9J0t/cPKkqOiKZ5pC/NUI7929/Vfjnczh5q094KtdXRxTKzSto4vf4OOLDjYuLo=,iv:AOoLuCb+lTF8+2kTXdjfqWdzB6+J1xvvIoHpzQLn9Ew=,tag:ZTUimi3WrncNGqJqQpuwzQ==,type:str]
   pgp:
-    - created_at: "2022-02-21T21:17:55Z"
+    - created_at: "2022-03-04T04:17:40Z"
       enc: |-
         -----BEGIN PGP MESSAGE-----
 
-        wcBMA2CLnufVS/bWAQgAfeypHns9NdY5C9rE7PAfNFGU0/N/7wjqY9iOsCw678nj
-        ZzhTd9bcUn6gF5tqzMLOGXFdC+db10n+qxIi8/zwxYRmPq9do219gOtrDQLXgY3n
-        UNqSGENVWEVWSosIIH90RNuFoHRiwP1gHfdryWwX+3r3QnADJzrxJsTItFNZE/fs
-        r0GfBIUisPYe9C8PLcOViM1vcWiHYGG1SElYn3EAuVyFFxyw+uULUwmk96NAvZr5
-        NNnTX0CzZAlrZzGKZBBF+o/0OyUoemlR2iH8b8xo+35myL6GYlRU7OO36+5y2lfY
-        To7PoeG+sVfTtDnRaricSiWj1pHne8R/InwA7xYI39LmAet8TcgIQ5ZWxe/i+7Ko
-        WnkGaa7XPxENRG3BLw6wJeNzqRdWRHXyB71c993eeVZjSHoD3rhxIl0gBnVni6po
-        LeTp7YJRI1sE+/IWGJi3nJ654j3nX1wA
-        =Ebg8
+        wcBMA2CLnufVS/bWAQgAqlrtWY1ERRc7UtQnHLho6tMo5eBwhVlJq4m7ye3H8vS0
+        q6IsvRrIBrWngPu8HT6NHF6REmU5ahnC70jhuBRT5gO+Hqh/HZObJONM+6/5WxVs
+        LQnHmZlEEhORtlaZcWL1rhChkbq6DdrCW2I6DLKJZpnXQDU/UUYvCNlAqT4DXrxf
+        1h/WPJ5O7D5CHG9LSVqpFYfAFhDwbgSOprNALjgGcrJsrif9/Ojm0JE3ZfoYWH5W
+        NmW2gyqS2Z0ho3G+s5yke2uZtVmBzCEA0IvHqW5e3CgskVl2RRvsRs1CXl6I6G4V
+        8dDZfHjo1oyTle3vPISlZ1JxzHbX5Gzb9HbsRFqat9LmAe4pCXeZBWk6H9KDj+vB
+        1Fbj51V/ZsLRFxAk6OorsEA3gbTMu9d7KdPfT31g56OWyIQ2+OROV1i5Tt6/6pOa
+        E+QE5vhZMpgpxqPb+QyX9trv4jJDX/wA
+        =rbbH
         -----END PGP MESSAGE-----
       fp: 43A697C7D3B8377EB8A0E7C127DDBC18CC4F3E04
   encrypted_regex: ((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))

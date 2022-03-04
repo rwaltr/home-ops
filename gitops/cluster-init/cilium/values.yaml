@@ -1,0 +1,9 @@
+cilium:
+  bgp:
+    enabled: false
+    announce:
+      loadbalancerIP: true
+  hubble:
+    tls:
+      auto:
+        method: helm
