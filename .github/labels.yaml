@@ -80,3 +80,9 @@
   color: "cc317c"
 - name: hardware
   color: "800080"
+- name: argocd
+  color: "800080"
+- name: vault
+  color: "800080"
+- name: sidero
+  color: "800080"
