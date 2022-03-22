@@ -7,4 +7,4 @@ collections:
   - name: vyos.vyos
 roles:
   - src: https://github.com/bjw-s/ansible-role-vyos
-    version: v0.1.1
+    version: v0.2.0
