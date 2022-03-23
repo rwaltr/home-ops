@@ -18,7 +18,7 @@ applicationset:
     debug: false
     dryRun: false
 
-  installCRDs: false
+  installCRDs: true
 
   podSecurityContext:
     {}
