@@ -1,4 +1,6 @@
 cilium:
+  operator:
+    replicas: 1
   bgp:
     enabled: false
     announce:
