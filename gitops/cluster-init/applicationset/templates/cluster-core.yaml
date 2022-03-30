@@ -8,7 +8,7 @@ spec:
         repoURL: https://github.com/rwaltr/infra.git
         revision: HEAD
         files:
-          - path: "gitops/argo/cluster-core/**/gen-config.json"
+          - path: "gitops/cluster-core/**/gen-helm-config.json"
   template:
     metadata:
       name: "{{ name }}"
