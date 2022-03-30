@@ -125,7 +125,7 @@ machine:
     # The disk used for installations.
     disk: /dev/sda
     # Allows for supplying the image used to perform the installation.
-    image: ghcr.io/talos-systems/installer:v0.14.2
+    image: ghcr.io/sideolabs/installer:v1.0.0
     # Indicates if a bootloader should be installed.
     bootloader: true
     # Indicates if the installation disk should be wiped at installation time.
@@ -379,8 +379,8 @@ sops:
         VGp1UnF5OEJjSEtuTDhUODJxKzhTVzQKBGh/DbtlbZLwrwyT4TAsOsHEpt8MahPH
         jr38X7C1nxv0ucLJwvbyckOLGD5Kc+9kJyCdzip5+5+/XZw81PJenA==
         -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2022-03-04T04:17:34Z"
-  mac: ENC[AES256_GCM,data:342sYfLIS0drgMIgtRq+K5xpshtHMgiuvNrK8sPMtWwisrw+FBIPIM3y6VNh+B2dseWtw7VJfqT7po59IDUlTD70+QSU53ENTcZYrOwcV2dLGZq1FhIG0SHSqxf/5ODLaZYzXXNDAZmnxlOZMCO19CEhIXW5Jm/lNTk4mPmgSBo=,iv:YxiWOnsmWChJop4WjgepgwQRJPZ5BOiFzvY+ZJNICmI=,tag:gcxG+2ojr083HmFWvHGBnA==,type:str]
+  lastmodified: "2022-03-30T01:55:03Z"
+  mac: ENC[AES256_GCM,data:9s625pDIDS3TOcdpf2NyZ1t8X/eiFGL0G8rgIQdLQ3JKEqmlFynlDhPm1YB6gMS7//AeAKiyQVeHDlbCmVukJGDAvARQnGrluMLNK5vsW76fWEAnAYlQ+X0jFZwZLcm63w4G3VOKbrKmAMRTnv2XdB21Xl6ShW3dm5OY1HeAOE0=,iv:rbxeelc/bPuF5T3oBEDUcfsYuMsRSOJOfZYo9l+wO6w=,tag:Eg77CZd9G5h086xypYTFkA==,type:str]
   pgp:
     - created_at: "2022-03-04T04:17:34Z"
       enc: |-
@@ -398,4 +398,4 @@ sops:
         -----END PGP MESSAGE-----
       fp: 43A697C7D3B8377EB8A0E7C127DDBC18CC4F3E04
   encrypted_regex: ((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))
-  version: 3.7.1
+  version: 3.7.2
