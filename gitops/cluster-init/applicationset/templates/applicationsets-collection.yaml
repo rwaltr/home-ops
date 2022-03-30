@@ -1,0 +1,12 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+spec:
+  destination:
+    namespace: argocd
+    name: in-cluster
+  project: rwaltr
+  source:
+    path: gitops/cluster-init/applicationsets
+    repoURL: https://github.com/rwaltr/infra
