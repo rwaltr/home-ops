@@ -1,6 +1,6 @@
 argo-cd:
   fullnameOverride: argocd
-  installCRDs: false
+  installCRDs: true
 
   global:
     image:
@@ -124,7 +124,7 @@ argo-cd:
   repoServer:
     autoscaling:
       enabled: true
-      minReplicas: 2
+      minReplicas: 1
       maxReplicas: 5
       targetCPUUtilizationPercentage: 75
       targetMemoryUtilizationPercentage: 75
