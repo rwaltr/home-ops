@@ -1,6 +1,6 @@
 argo-cd:
   fullnameOverride: argocd
-  installCRDs: true
+  installCRDs: false
 
   global:
     image:
