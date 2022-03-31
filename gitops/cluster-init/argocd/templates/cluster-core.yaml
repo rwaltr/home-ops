@@ -8,7 +8,7 @@ spec:
         repoURL: https://github.com/rwaltr/infra.git
         revision: HEAD
         files:
-          - path: "gitops/cluster-core/**/gen-helm-config.json"
+          - path: "gitops/cluster-core/**/gen-helm.json"
   template:
     metadata:
       name: "{{ name }}"
@@ -16,7 +16,7 @@ spec:
         argocd.argoproj.io/manifest-generate-paths: "/{{ path }}"
         argocd.argoproj.io/sync-options: Prune=false
     spec:
-      project: cluster-core
+      project: rwaltr
       source:
         path: "{{ path }}"
         targetRevision: HEAD
