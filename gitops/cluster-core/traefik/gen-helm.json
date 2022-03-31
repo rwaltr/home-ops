@@ -3,7 +3,7 @@
     "name": "traefik-kyz",
     "cluster": "in-cluster",
     "namespace": "traefik-ingress",
-    "helmpath": "gitops/cluster-core/traefik/traefik/",
+    "path": "gitops/cluster-core/traefik/traefik",
     "valueFile": "kyz.yaml"
   }
 ]
