@@ -16,5 +16,5 @@ flux
 
 # Helm
 *Chart.lock
-gitops/argo/**/charts/
+gitops/**/charts/
 terraform.tfstate*

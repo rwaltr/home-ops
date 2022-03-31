@@ -148,6 +148,10 @@ argo-cd:
     env:
       - name: "ARGOCD_EXEC_TIMEOUT"
         value: "5m"
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
+
+  applicationset:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: quay.io/argoproj/argocd-applicationset
+      tag: "v.0.4.1"
