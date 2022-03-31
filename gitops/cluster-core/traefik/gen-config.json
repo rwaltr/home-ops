@@ -1,0 +1,9 @@
+[
+  {
+    "name": "traefik-kyz",
+    "cluster": "in-cluster",
+    "namespace": "traefik-ingress",
+    "path": "gitops/cluster-core/traefik/traefik",
+    "valueFile": "kyz.yaml"
+  }
+]

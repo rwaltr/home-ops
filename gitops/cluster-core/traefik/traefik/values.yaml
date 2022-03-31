@@ -1,0 +1,37 @@
+traefik:
+  image:
+    name: traefik
+    tag: 2.4.8
+
+  fullnameOverride: traefik
+
+  globalArguments:
+    - "--providers.kubernetesingress.ingressclass=traefik"
+    - "--serverstransport.insecureskipverify=true"
+    - "--global.checknewversion"
+
+  ports:
+    web:
+      redirectTo: websecure
+    websecure:
+      tls:
+        enabled: true
+
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+    fallbackApiVersion: v1
+
+  logs:
+    general:
+      level: INFO
+
+  providers:
+    kubernetesCRD:
+      enabled: true
+    kubernetesIngress:
+      enabled: true
+
+  ingressRoute:
+    dashboard:
+      enabled: false
