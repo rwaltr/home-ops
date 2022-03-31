@@ -3,9 +3,9 @@ traefik:
   #  name: traefik
   #  tag: 2.4.8
 
-  service:
-    externalIPs:
-      - 172.30.0.10
+  # service:
+  #   externalIPs:
+  #     - 172.30.0.10
 
   deployment:
     replicas: 2
