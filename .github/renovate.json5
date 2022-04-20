@@ -23,5 +23,5 @@
   rebaseWhen: "conflicted",
   // set up ignored deps
   // ignoreDeps: [],
-  ignorePaths: ["legacy/**"]
+  ignorePaths: ["legacy/**". "docs/**"]
 }
