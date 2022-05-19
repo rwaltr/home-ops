@@ -1,5 +1,0 @@
-all:
-  hosts:
-    localhost:
-    storage2.waltr.lab:
-      alias: storage2
