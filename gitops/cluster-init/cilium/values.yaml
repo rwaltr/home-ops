@@ -8,7 +8,7 @@ cilium:
   operator:
     replicas: 1
   bgp:
-    enabled: false
+    enabled: true
     announce:
       loadbalancerIP: true
       podCIDR: true
