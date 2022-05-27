@@ -1,0 +1,26 @@
+{
+    "data": "ENC[AES256_GCM,data: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,iv:STLx8kjTaFcd5BDl6n0Wn7vyDh82/3jFgDi+juaKQhU=,tag:Ru3YU7uladfZM2+iY/EU1w==,type:str]",
+    "sops": {
+        "kms": null,
+        "gcp_kms": null,
+        "azure_kv": null,
+        "hc_vault": null,
+        "age": [
+            {
+                "recipient": "age189npag0lz2hl425ldurk8czrpyv69tg4cgqgzl7wjh60w39sysesazu4u6",
+                "enc": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmOUovMDcvQjJBUmJPaG5G\naGlVejZ5VmZkazROcWQzaHUxSjZxcWZPSFRZClVYcmduYy9ZdUMrODRkbXZ2eXNl\nZzlnMUptOG9qTURnSVZhVndpWjZ1MzgKLS0tIEtLTDhHT3pXampuMEVPRlpUSWov\nUW9kbkFrekswTEJhR3BkcXVnTDQrNTQK9XvpQl/ulIqtvpHLmivnTPHNLZyp2xTr\n0iIqOH+3PzAhIkigeFUOcxwxav3C2wLHTOAKVONvVTF+h0hDirUA7Q==\n-----END AGE ENCRYPTED FILE-----\n"
+            }
+        ],
+        "lastmodified": "2022-05-27T23:21:36Z",
+        "mac": "ENC[AES256_GCM,data:XmpvJuuyg9ImLUgEGxMf5EKvwF09fs10S5Y6+MGAwFdejfLGQTPEUoLNmk7jkFyJDqe9gX5JAv9bc37eh+NbrhB5vmDLBFvm+ASN63hAJZnt4ovyg1stSKoR/FAaLbTuTNVfUQ/8LF3T9A+cyIpoq+v0y0NtJlSxUWgY9CoY1fE=,iv:aRPPqZHLn3voJEgXXDUrcxZi2Iuc9lGp4S3kTGumPQY=,tag:o9uVO2u+XCKMmb6kTIH6qA==,type:str]",
+        "pgp": [
+            {
+                "created_at": "2022-05-27T23:21:35Z",
+                "enc": "-----BEGIN PGP MESSAGE-----\n\nhQEMA1nCbZ66Iz0yAQf/cBX8ubvzCuE5conVZyswL5UropRRxuCFn4nvLhe2T66Y\nPLoA3SYTzmyKG5uoxHQtIGw4u0Bbjood7nR37DgHhPqVKtOS0prwJKyCeUatIF4y\nAv/FIVik0+uCEwkOBVhC4iaXLVRkKIYUL/lQ2lq1RiiCVKscZB49TR29tTmJDX1L\nlHEssmpY9n6SbS304WRUe2bykLM5+4nYuRTNXfIKnhi9jRl6l+WcFJEqzIfrzXln\nNiRIFLKzSRynU3zc1lISrNihhlIPUIYkx8aZp/yQiZoNtROj+1vx2NqhJHQnVTFv\nPx/vikMNOUcYjb51FcJVocC2Am0EG48OgchzipaEttRmAQkCEA6lp8eewaJnPmfG\nW2EjS+0+VzgVW/wM71G/kXUFDXyECqz8gAbjXFGkVancrQ24Gy1XJuTIp35DpRsR\nU3t1JQQwgagkSO4HAI3FlECtVknJKFCLJFABIPtd16iYAgT7dMm6\n=vfTk\n-----END PGP MESSAGE-----\n",
+                "fp": "4186BF653F777F6190DAF3C469977470B0541C75"
+            }
+        ],
+        "encrypted_regex": "((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))",
+        "version": "3.7.2"
+    }
+}
