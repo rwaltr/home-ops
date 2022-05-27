@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: applicationsets
+spec:
+  destination:
+    name: in-cluster
+  project: rwaltr
+  source:
+    path: gitops/cluster-init/applicationsets
+    repoURL: https://github.com/rwaltr/infra.git
