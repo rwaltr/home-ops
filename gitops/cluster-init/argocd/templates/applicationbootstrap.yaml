@@ -11,3 +11,8 @@ spec:
   source:
     path: gitops/cluster-init/applicationsets
     repoURL: https://github.com/rwaltr/infra.git
+  syncPolicy:
+    automatic: {}
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - PrunePropagationPolicy=orphan
