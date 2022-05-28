@@ -6,6 +6,7 @@ metadata:
 spec:
   destination:
     name: in-cluster
+    namespace: argocd
   project: rwaltr
   source:
     path: gitops/cluster-init/applicationsets
