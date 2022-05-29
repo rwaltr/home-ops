@@ -1,4 +1,9 @@
 nfs-client-provisioner:
+  fullnameOverride: "nfs-subdir-external-provisioner"
+  image:
+    repository: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner
+    tag: v4.0.2
+    pullPolicy: IfNotPresent
   storageClass:
     defaultClass: true
   nfs:
