@@ -23,3 +23,7 @@ external-dns:
 
   crd:
     create: true
+  domainFilters:
+    - "waltr.tech"
+    - "blackphidora.com"
+    - "rwaltr.pro"
