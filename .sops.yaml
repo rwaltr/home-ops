@@ -1,7 +1,7 @@
 ---
 creation_rules:
   - encrypted_regex: "((?i)(pass|secret($|[^N])|key|token|^data$|^stringData))"
-    age: >-
-      age189npag0lz2hl425ldurk8czrpyv69tg4cgqgzl7wjh60w39sysesazu4u6
-    pgp: "4186BF653F777F6190DAF3C469977470B0541C75"
+    # age: >-
+    pgp: >-
+      "4186BF653F777F6190DAF3C469977470B0541C75"
     # hc_vault_transit_uri: "https://vault.waltr.tech/v1/sops/keys/mainkey"
