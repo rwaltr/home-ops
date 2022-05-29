@@ -1,0 +1,8 @@
+[
+  {
+    "name": "cert-manager",
+    "cluster": "in-cluster",
+    "namespace": "cert-manager-system",
+    "valueFile": "kyz.yaml"
+  }
+]
