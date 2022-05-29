@@ -1,4 +1,4 @@
-nfs-client-provisioner:
+nfs-subdir-external-provisioner:
   fullnameOverride: "nfs-subdir-external-provisioner"
   image:
     repository: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner
