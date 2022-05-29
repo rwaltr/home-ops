@@ -7,5 +7,5 @@ nfs-subdir-external-provisioner:
   storageClass:
     defaultClass: true
   nfs:
-    server: "storage2.waltr.lab"
+    server: 10.10.0.8
     path: /tank/k8s
