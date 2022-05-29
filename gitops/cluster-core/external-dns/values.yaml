@@ -1,0 +1,25 @@
+external-dns:
+  fullnameOverride: external-dns
+
+  image:
+    registry: docker.io
+    repository: bitnami/external-dns
+    # renovatebot:alturl=https://github.com/bitnami/bitnami-docker-external-dns
+    tag: 0.10.2-debian-10-r9
+
+  sources:
+    - crd
+    - service
+    - ingress
+  provider: cloudflare
+
+  cloudflare:
+    proxied: false
+    secretName: cloudflareexternaldns
+    email: ryan@blackphidora.com
+
+  interval: "1m"
+  replicas: 1
+
+  crd:
+    create: true
