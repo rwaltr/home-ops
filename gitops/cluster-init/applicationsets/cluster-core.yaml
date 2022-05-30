@@ -33,3 +33,4 @@ spec:
         syncOptions:
           - ApplyOutOfSyncOnly=true
           - PrunePropagationPolicy=orphan
+          - CreateNamespace=true
