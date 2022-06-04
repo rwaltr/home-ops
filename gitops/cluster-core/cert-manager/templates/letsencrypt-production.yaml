@@ -4,14 +4,13 @@ metadata:
   name: le-prod
 spec:
   acme:
-    email: ryan@blackphidora.com
+    email: rwalt@pm.me
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: le-prod
     solvers:
       - dns01:
           cloudflare:
-            email: ryan@blackphidora.com
             apiTokenSecretRef:
-              name: cloudflareapikey
-              key: API_KEY
+              name: cloudflare-token
+              key: CF_API_TOKEN

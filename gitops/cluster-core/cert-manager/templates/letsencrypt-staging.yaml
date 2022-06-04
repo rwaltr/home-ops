@@ -4,7 +4,7 @@ metadata:
   name: le-staging
 spec:
   acme:
-    email: ryan@blackphidora.com
+    email: rwalt@pm.me
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: le-staging
