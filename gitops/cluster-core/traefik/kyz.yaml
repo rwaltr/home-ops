@@ -15,4 +15,4 @@ traefik:
       loadBalancerIP: 10.22.2.1
 
   additionalArguments:
-    - "--providers.kubernetesingress.ingressendpoint.hostname=traefik.waltr.tech"
+    - "--providers.kubernetesingress.ingressendpoint.hostname=traefik.kyz.waltr.tech"
