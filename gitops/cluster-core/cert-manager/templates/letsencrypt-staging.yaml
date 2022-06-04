@@ -13,5 +13,5 @@ spec:
           cloudflare:
             email: ryan@blackphidora.com
             apiTokenSecretRef:
-              name: cloudflareapikey
-              key: API_KEY
+              name: cloudflare-token
+              key: CF_API_KEY
