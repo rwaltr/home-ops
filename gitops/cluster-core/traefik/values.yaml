@@ -31,6 +31,8 @@ traefik:
       enabled: true
     kubernetesIngress:
       enabled: true
+      publishedService:
+        enabled: true
 
   ingressRoute:
     dashboard:
