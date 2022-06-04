@@ -9,7 +9,6 @@ external-dns:
 
   sources:
     - crd
-    - service
     - ingress
   provider: cloudflare
 
@@ -27,6 +26,6 @@ external-dns:
   crd:
     create: true
   domainFilters:
-    - "waltr.tech"
-    - "blackphidora.com"
-    - "rwaltr.pro"
+    - waltr.tech
+    - blackphidora.com
+    - rwaltr.pro
