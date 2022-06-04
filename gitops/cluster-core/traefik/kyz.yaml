@@ -11,6 +11,8 @@ traefik:
     replicas: 2
 
   service:
+    annotations:
+      external-dns.alpha.kubernetes.io/hostname: kyz.waltr.tech
     spec:
       loadBalancerIP: 10.22.2.1
 
