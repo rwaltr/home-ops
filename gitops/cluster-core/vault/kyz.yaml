@@ -13,7 +13,7 @@ vault:
       initalDelaySeconds: 60
     ingress:
       enabled: true
-      ingressClassName: "traefik"
+      ingressClassName: traefik
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
