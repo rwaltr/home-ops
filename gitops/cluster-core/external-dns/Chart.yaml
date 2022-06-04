@@ -3,9 +3,8 @@ apiVersion: v2
 version: 1.0.0
 dependencies:
   - name: external-dns
-    version: 6.5.1
-    # renovatebot:alturl=https://github.com/bitnami/charts/tree/master/bitnami/external-dns
-    repository: https://charts.bitnami.com/bitnami
+    version: 1.9.0
+    repository: https://kubernetes-sigs.github.io/external-dns/
   - name: addons
     version: 1.0.0
     repository: file://../../../charts/addons
