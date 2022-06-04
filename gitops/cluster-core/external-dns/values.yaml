@@ -13,10 +13,13 @@ external-dns:
     - ingress
   provider: cloudflare
 
-  cloudflare:
-    proxied: false
-    secretName: cloudflareexternaldns
-    email: ryan@blackphidora.com
+  env:
+    - name: CF_API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: cloudflare_token
+          key: CF_API_TOKEN
+          optional: false
 
   interval: "1m"
   replicas: 1
