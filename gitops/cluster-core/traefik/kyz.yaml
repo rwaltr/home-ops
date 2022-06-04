@@ -11,13 +11,8 @@ traefik:
     replicas: 2
 
   service:
-    externalIPs:
-      - 10.22.2.1
-    annotations:
-      external-dns.alpha.kubernetes.io/hostname: kyz.waltr.tech
     spec:
       loadBalancerIP: 10.22.2.1
 
   additionalArguments:
-    - "--providers.kubernetesingress.ingressclass=traefik"
-    - "--providers.kubernetesingress.ingressendpoint.hostname=kyz.waltr.tech"
+    - "--providers.kubernetesingress.ingressendpoint.hostname=traefik.waltr.tech"
