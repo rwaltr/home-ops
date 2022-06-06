@@ -32,7 +32,8 @@ traefik:
     kubernetesIngress:
       enabled: true
       publishedService:
-        enabled: true
+        # Prevents External-dns from generating Cnames instead of A Records
+        enabled: false
 
   ingressRoute:
     dashboard:
