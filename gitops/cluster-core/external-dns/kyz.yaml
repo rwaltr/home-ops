@@ -1,3 +1,4 @@
 external-dns:
-  txtPrefix: _.
   txtOwnerID: kyz
+  extraArgs:
+    - "--cloudflare-proxied"

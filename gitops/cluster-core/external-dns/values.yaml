@@ -29,3 +29,4 @@ external-dns:
     - "waltr.tech"
     - "blackphidora.com"
     - "rwaltr.pro"
+  txtPrefix: _.
