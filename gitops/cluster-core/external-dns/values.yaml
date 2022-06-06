@@ -3,12 +3,12 @@ external-dns:
 
   image:
     registry: docker.io
-    repository: bitnami/external-dns
-    # renovatebot:alturl=https://github.com/bitnami/bitnami-docker-external-dns
-    tag: 0.11.1-debian-10-r9
+    repository: k8s.gcr.io/external-dns/external-dns
+    tag: 0.11.0
 
   sources:
     - crd
+    - service
     - ingress
   provider: cloudflare
 
@@ -26,6 +26,6 @@ external-dns:
   crd:
     create: true
   domainFilters:
-    - waltr.tech
-    - blackphidora.com
-    - rwaltr.pro
+    - "waltr.tech"
+    - "blackphidora.com"
+    - "rwaltr.pro"
