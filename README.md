@@ -36,7 +36,7 @@ I use a toolset called `Talos Linux` to help abstract the hardware management of
 
 Talos is a OS that is configured by a YAML manifest. You can see this in `:/cluster`
 
-### Gitops
+### 🐧 Gitops
 
 Gitops generally means that your git repo is the state of your environment.
 
@@ -44,7 +44,7 @@ Here it is done with Argo and Terraform
 
 ### Networking
 
-## KYZ
+#### KYZ
 
 In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports 80 and 443 are forwarded to the Ingress manager
 
@@ -116,3 +116,5 @@ See [commit history](https://github.com/rwaltr/infra/commits/master)
 ## 🔏 License
 
 See [LICENSE](./LICENSE)
+
+---
