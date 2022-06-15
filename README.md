@@ -16,9 +16,13 @@
 [![Lines of code](https://img.shields.io/tokei/lines/github/rwaltr/infra?style=for-the-badge&color=brightgreen&label=lines&logo=codefactor&logoColor=white)](https://github.com/rwaltr/infra/graphs/contributors)
 [![100DaysofHomelab](https://img.shields.io/badge/100DaysOf-Homelab-blue?style=for-the-badge)](<https://twitter.com/search?f=top&q=(%23100DaysOfHomelab)%20(from%3Arwaltrtech)>)
 
-</div>
+## </div>
 
 <!-- Main Description -->
+
+## 📖 Overview
+
+## This is a Monorepo to manage my personal environment. This
 
 <!-- TODO items -->
 
@@ -26,6 +30,29 @@
 
 [Uses the `TODO:` format in line](https://github.com/rwaltr/infra/search?q=TODO%3A)
 
+---
+
+<!-- Tools -->
+
 <!-- Thanks -->
 
+## Thanks 🤟
+
+Thank you to the below for inspiration
+
+- onedr0p
+- anthr76
+- dirtycajunrice
+- danmanners
+
+---
+
 <!-- Communities -->
+
+## Communities
+
+---
+
+### K8s-at-Home
+
+[![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
