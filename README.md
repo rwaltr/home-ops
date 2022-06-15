@@ -22,7 +22,7 @@
 
 ## 📖 Overview
 
-## This is a Monorepo to manage my personal environment.
+This is a Monorepo to manage my personal environment.
 
 <!-- TODO items -->
 
@@ -36,8 +36,17 @@
 
 ## 🧰 Tools!
 
-- Argo
-- Talos
+| Tool         | Use                    | Active |
+| ------------ | ---------------------- | ------ |
+| Argo         | Gitops Operator        | ☑️     |
+| Talos        | Operating System       | ☑️     |
+| Traefik      | Ingress Management     | ☑️     |
+| Cert-manager | X509 Secrets manager   | ☑️     |
+| HashiVault   | Secrets store          | ⚠️     |
+| External-dns | Public DNS operator    | ☑️     |
+| SOPS         | inline secrets-manager | ☑️     |
+| pre-commit   | Commit checking        | ☑️     |
+| Cilium       | CNI                    | ☑️     |
 
 ---
 
