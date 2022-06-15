@@ -22,7 +22,31 @@
 
 ## 📖 Overview
 
-This is a Monorepo to manage my personal environment.
+This is a Monorepo to manage my personal environment. A combination of Talos, Terraform, and Argo allow this repo to provide most of the configuration required to manage this environment across regions/clouds.
+
+### ⛵ Kubernetes
+
+My homelab is Kubernetes based, meaning that I have a cluster of nodes running OCI (AKA. Docker) containers. Since my lab is mostly Kubernetes, I can use tools that focus on text manipulation and formatting, then use ArgoCD to actually feed these configs into my cluster.
+
+The result is that the text files here turn into actual running applications.
+
+I use a toolset called `Talos Linux` to help abstract the hardware management of Kubernetes.
+
+#### 🐦 Talos
+
+Talos is a OS that is configured by a YAML manifest. You can see this in `:/cluster`
+
+### Gitops
+
+Gitops generally means that your git repo is the state of your environment.
+
+Here it is done with Argo and Terraform
+
+### Networking
+
+## KYZ
+
+In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports 80 and 443 are forwarded to the Ingress manager
 
 <!-- TODO items -->
 
@@ -80,3 +104,15 @@ Thank you to the below for inspiration
 - Github Issues
 - Twitter DMs
 - Email
+
+---
+
+## 📜 Changelog
+
+See [commit history](https://github.com/rwaltr/infra/commits/master)
+
+---
+
+## 🔏 License
+
+See [LICENSE](./LICENSE)
