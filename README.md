@@ -22,17 +22,24 @@
 
 ## 📖 Overview
 
-## This is a Monorepo to manage my personal environment. This
+## This is a Monorepo to manage my personal environment.
 
 <!-- TODO items -->
 
-### Finding TODOS
+## 🖊️ Finding TODOS
 
 [Uses the `TODO:` format in line](https://github.com/rwaltr/infra/search?q=TODO%3A)
 
 ---
 
 <!-- Tools -->
+
+## 🧰 Tools!
+
+- Argo
+- Talos
+
+---
 
 <!-- Thanks -->
 
@@ -51,8 +58,8 @@ Thank you to the below for inspiration
 
 ## Communities
 
----
-
 ### K8s-at-Home
 
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
+
+---
