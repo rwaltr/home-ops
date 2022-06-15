@@ -1,24 +1,20 @@
-# Waltr.Tech Infra
+<!-- Header -->
+<div align="center">
 
-This repository contains the code and configuration used to manage the fleets of k8s and Terraform clusters managing the Waltr.Tech environment
+<img src="https://raw.githubusercontent.com/rwaltr/branding/master/vector/logoisolated.png" align="center" width="144px" height="144px"/>
 
-Using a combination of Argo, Terraform, Vault and Kubernetes. 90% of all the configuration required for application and cluster installation is contained within this repo, while secrets are contained elsewhere.
+# rwaltr/infra
 
-## Dir use
+</div>
 
-**gitops** contains the Kubernetes code required for each k8s cluster application
+<!-- Shields -->
+<div align="center">
 
-**provision** contains the IAC and provision components needed to create and maintain a cluster
+[![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
+[![talos](https://img.shields.io/badge/talos-enabled-brightgreen)](https://www.talos.dev/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
+[![Lines of code](https://img.shields.io/tokei/lines/github/rwaltr/infra?style=for-the-badge&color=brightgreen&label=lines&logo=codefactor&logoColor=white)](https://github.com/onedr0p/home-ops/graphs/contributors)
 
-## Documentation
+</div>
 
-**docs** actually contains implementation details, not instructions on how to deploy this repo
-
-## Ideology
-
-Git as config, pushing is applying, push often, click less.
-
-## Contributors
-
-- rwaltr (Main Developer)
-- gpzeke (accident-prone-documentation)
+<!-- Main Description -->
