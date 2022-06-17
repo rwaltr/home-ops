@@ -3,6 +3,6 @@
     "name": "jellyfin",
     "cluster": "in-cluster",
     "namespace": "media",
-    "valueFile": ""
+    "valueFile": "kyz.yaml"
   }
 ]
