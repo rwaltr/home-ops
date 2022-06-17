@@ -16,7 +16,7 @@ vault:
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
-        cert-manager.io/cluster-issuer: le-staging
+        cert-manager.io/cluster-issuer: le-prod
       hosts:
         - host: vault.waltr.tech
           paths: [/]
