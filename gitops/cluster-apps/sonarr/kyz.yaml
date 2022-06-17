@@ -29,7 +29,6 @@ sonarr:
   persistence:
     config:
       enabled: true
-      existingClaim: sonarr-config
     media:
       enabled: true
       type: custom
