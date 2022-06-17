@@ -19,7 +19,7 @@ jellyfin:
 
   ingress:
     main:
-      enabled: false
+      enabled: true
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.priority: "10"
