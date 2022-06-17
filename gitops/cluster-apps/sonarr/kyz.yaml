@@ -1,0 +1,53 @@
+sonarr:
+  #
+  # IMPORTANT NOTE
+  #
+  # This chart inherits from our common library chart. You can check the default values/options here:
+  # https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
+  #
+
+  image:
+    repository: ghcr.io/k8s-at-home/sonarr
+    pullPolicy: IfNotPresent
+    tag: v3.0.6.1342
+
+  strategy:
+    type: Recreate
+
+  env:
+
+  service:
+    main:
+      ports:
+        http:
+          port: 8989
+
+  ingress:
+    main:
+      enabled: false
+
+  persistence:
+    config:
+      enabled: true
+      existingClaim: sonarr-config
+    media:
+      enabled: true
+      type: custom
+      mountPath: /media
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library
+    downloads:
+      enabled: true
+      type: custom
+      readOnly: true
+      mountPath: /downloads
+      volumeSpec:
+        nfs:
+          server: 10.10.0.8
+          path: /tank/nas/library/downloads/completed
+
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
