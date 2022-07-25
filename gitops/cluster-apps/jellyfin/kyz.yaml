@@ -9,7 +9,7 @@ jellyfin:
   image:
     repository: jellyfin/jellyfin
     pullPolicy: IfNotPresent
-    tag: 10.8.0
+    tag: 10.8.1
 
   strategy:
     type: Recreate
