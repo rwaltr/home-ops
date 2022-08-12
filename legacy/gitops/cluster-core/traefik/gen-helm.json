@@ -1,8 +1,0 @@
-[
-  {
-    "name": "traefik-kyz",
-    "cluster": "in-cluster",
-    "namespace": "traefik-ingress",
-    "valueFile": "kyz.yaml"
-  }
-]

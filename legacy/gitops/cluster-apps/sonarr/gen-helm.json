@@ -1,8 +1,0 @@
-[
-  {
-    "name": "sonarr",
-    "cluster": "in-cluster",
-    "namespace": "media",
-    "valueFile": "kyz.yaml"
-  }
-]

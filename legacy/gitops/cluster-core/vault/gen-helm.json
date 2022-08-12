@@ -1,8 +1,0 @@
-[
-  {
-    "name": "vault",
-    "cluster": "in-cluster",
-    "namespace": "vault-system",
-    "valueFile": "kyz.yaml"
-  }
-]
