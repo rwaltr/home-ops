@@ -1,9 +1,0 @@
-[
-  {
-    "name": "jellyfin",
-    "cluster": "kyz",
-    "namespace": "media",
-    "path": "gitops/argo/cluster-apps/jellyfin",
-    "valueFile": ""
-  }
-]

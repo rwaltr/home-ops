@@ -1,9 +1,0 @@
-[
-  {
-    "name": "hajimari",
-    "cluster": "kyz",
-    "namespace": "utility",
-    "path": "gitops/argo/cluster-apps/hajimari",
-    "valueFile": ""
-  }
-]

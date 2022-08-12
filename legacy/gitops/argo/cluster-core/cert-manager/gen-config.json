@@ -1,9 +1,0 @@
-[
-  {
-    "name": "cert-manager",
-    "cluster": "kyz",
-    "namespace": "cert-manager",
-    "path": "gitops/argo/cluster-core/cert-manager",
-    "valueFile": ""
-  }
-]
