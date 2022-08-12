@@ -1,7 +1,0 @@
-name: jackett
-apiVersion: v2
-version: 1.0.0
-dependencies:
-  - name: jackett
-    version: 11.3.0
-    repository: https://k8s-at-home.com/charts

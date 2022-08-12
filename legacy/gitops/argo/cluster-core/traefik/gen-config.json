@@ -1,9 +1,0 @@
-[
-  {
-    "name": "traefik-kyz",
-    "cluster": "kyz",
-    "namespace": "traefik-ingress",
-    "path": "gitops/argo/cluster-core/traefik/traefik",
-    "valueFile": "kyz.yaml"
-  }
-]

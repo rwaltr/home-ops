@@ -1,9 +1,0 @@
-[
-  {
-    "name": "vault",
-    "cluster": "kyz",
-    "namespace": "default",
-    "path": "gitops/argo/cluster-core/vault",
-    "valueFile": ""
-  }
-]

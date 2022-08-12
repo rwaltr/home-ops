@@ -1,7 +1,0 @@
-name: hajimari
-apiVersion: v2
-version: 1.0.0
-dependencies:
-  - name: hajimari
-    version: 1.2.0
-    repository: https://hajimari.io

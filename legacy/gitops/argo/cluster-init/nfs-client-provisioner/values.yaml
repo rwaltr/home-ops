@@ -1,6 +1,0 @@
-nfs-client-provisioner:
-  storageClass:
-    defaultClass: true
-  nfs:
-    server: storage2.waltr.lab
-    path: /tank/k8s

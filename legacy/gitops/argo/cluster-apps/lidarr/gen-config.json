@@ -1,9 +1,0 @@
-[
-  {
-    "name": "lidarr",
-    "cluster": "kyz",
-    "namespace": "media",
-    "path": "gitops/argo/cluster-apps/lidarr",
-    "valueFile": ""
-  }
-]
