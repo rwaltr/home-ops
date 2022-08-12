@@ -1,8 +1,0 @@
-[
-  {
-    "name": "secrets-store-csi",
-    "cluster": "in-cluster",
-    "namespace": "vault-system",
-    "valueFile": "kyz.yaml"
-  }
-]

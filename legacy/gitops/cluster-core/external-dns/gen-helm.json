@@ -1,8 +1,0 @@
-[
-  {
-    "name": "external-dns",
-    "cluster": "in-cluster",
-    "namespace": "dns-system",
-    "valueFile": "kyz.yaml"
-  }
-]

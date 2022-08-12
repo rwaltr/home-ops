@@ -1,8 +1,0 @@
-[
-  {
-    "name": "nfs-kyz",
-    "cluster": "in-cluster",
-    "namespace": "nfsdir-system",
-    "valueFile": "kyz.yaml"
-  }
-]
