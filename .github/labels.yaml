@@ -1,25 +1,29 @@
 ---
 # Area
-- name: area/ansible
+- name: ansible
   color: "72ccf3"
   description: >-
     Changes made in the ansible directory
-- name: area/github
+- name: github
   color: "72ccf3"
   description: >-
     Changes made in the github directory
-- name: area/kubernetes
+- name: kubernetes
   color: "72ccf3"
   description: >-
     Changes made in the gitops directory
-- name: area/hack
+- name: hack
   color: "72ccf3"
   description: >-
     Changes made in the hack directory
-- name: area/terraform
+- name: terraform
   color: "72ccf3"
   description: >-
     Changes made in the terraform directory
+- name: talos
+  color: "72ccf3"
+  description: >-
+    Changes made in the Talos directory
 # Renovate
 - name: renovate/ansible
   color: "ffc300"
@@ -72,13 +76,15 @@
   color: "ee0701"
 - name: docs
   color: "F4D1B7"
+  description: >-
+    Documentation of how the public may want to use this
 - name: enhancement
   color: "84b6eb"
-- name: question
-  color: "cc317c"
 - name: hardware
   color: "800080"
-- name: "help-wanted"
+  description: >-
+    This requires a hardware change or install
+- name: "help wanted"
   color: "800080"
-- name: "good-first-issue"
+- name: "good first issue"
   color: "800080"
