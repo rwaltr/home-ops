@@ -8,5 +8,5 @@ metadata:
     argocd.argoproj.io/secret-type: repository
 stringData:
   type: git
-  url: https://github.com/rwaltr/infra
+  url: https://github.com/rwaltr/home-ops
   name: rwaltr

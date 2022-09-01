@@ -5,7 +5,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://github.com/rwaltr/infra.git
+        repoURL: https://github.com/rwaltr/home-ops.git
         revision: HEAD
         files:
           - path: "gitops/argo/cluster-core/**/gen-config.json"
@@ -20,7 +20,7 @@ spec:
       source:
         path: "{{ path }}"
         targetRevision: HEAD
-        repoURL: https://github.com/rwaltr/infra.git
+        repoURL: https://github.com/rwaltr/home-ops.git
         helm:
           valueFiles:
             - values.yaml

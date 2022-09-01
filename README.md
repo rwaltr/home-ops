@@ -3,7 +3,7 @@
 
 <img src="https://raw.githubusercontent.com/rwaltr/branding/master/vector/logoisolated.png" align="center" width="144px" height="144px"/>
 
-# rwaltr/infra
+# rwaltr/home-ops
 
 </div>
 
@@ -13,7 +13,7 @@
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
 [![talos](https://img.shields.io/badge/talos-installed-brightgreen?style=for-the-badge)](https://www.talos.dev/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
-[![Lines of code](https://img.shields.io/tokei/lines/github/rwaltr/infra?style=for-the-badge&color=brightgreen&label=lines&logo=codefactor&logoColor=white)](https://github.com/rwaltr/infra/graphs/contributors)
+[![Lines of code](https://img.shields.io/tokei/lines/github/rwaltr/home-ops?style=for-the-badge&color=brightgreen&label=lines&logo=codefactor&logoColor=white)](https://github.com/rwaltr/home-ops/graphs/contributors)
 [![100DaysofHomelab](https://img.shields.io/badge/100DaysOf-Homelab-blue?style=for-the-badge)](<https://twitter.com/search?f=top&q=(%23100DaysOfHomelab)%20(from%3Arwaltrtech)>)
 
 </div>
@@ -52,7 +52,7 @@ In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports
 
 ## 🖊️ Finding TODOS
 
-[Uses the `TODO:` format in line](https://github.com/rwaltr/infra/search?q=TODO%3A)
+[Uses the `TODO:` format in line](https://github.com/rwaltr/home-ops/search?q=TODO%3A)
 
 ---
 
@@ -109,7 +109,7 @@ Thank you to the below for inspiration
 
 ## 📜 Changelog
 
-See [commit history](https://github.com/rwaltr/infra/commits/master)
+See [commit history](https://github.com/rwaltr/home-ops/commits/master)
 
 ---
 
