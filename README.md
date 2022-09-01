@@ -22,11 +22,11 @@
 
 ## 📖 Overview
 
-This is a Monorepo to manage my personal environment. A combination of Talos, Terraform, and Argo allow this repo to provide most of the configuration required to manage this environment across regions/clouds.
+This is a Monorepo to manage my personal environment. A combination of Talos, Terraform, and flux allow this repo to provide most of the configuration required to manage this environment across regions/clouds.
 
 ### ⛵ Kubernetes
 
-My homelab is Kubernetes based, meaning that I have a cluster of nodes running OCI (AKA. Docker) containers. Since my lab is mostly Kubernetes, I can use tools that focus on text manipulation and formatting, then use ArgoCD to actually feed these configs into my cluster.
+My homelab is Kubernetes based, meaning that I have a cluster of nodes running OCI (AKA. Docker) containers. Since my lab is mostly Kubernetes, I can use tools that focus on text manipulation and formatting, then use Flux to actually feed these configs into my cluster.
 
 The result is that the text files here turn into actual running applications.
 
@@ -40,7 +40,7 @@ Talos is a OS that is configured by a YAML manifest. You can see this in `:/clus
 
 Gitops generally means that your git repo is the state of your environment.
 
-Here it is done with Argo and Terraform
+Here it is done with Flux and Terraform
 
 ### Networking
 
@@ -62,7 +62,7 @@ In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports
 
 | Tool         | Use                    | Active |
 | ------------ | ---------------------- | ------ |
-| Argo         | Gitops Operator        | ☑️     |
+| Flux         | Gitops Operator        | ☑️     |
 | Talos        | Operating System       | ☑️     |
 | Traefik      | Ingress Management     | ☑️     |
 | Cert-manager | X509 Secrets manager   | ☑️     |
