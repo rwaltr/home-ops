@@ -1,0 +1,57 @@
+clusterName: kyz
+talosVersion: v1.0.5
+kubernetesVersion: v1.23.6
+endpoint: https://10.10.0.9:6443
+domain: cluster.local
+allowSchedulingOnMasters: true
+clusterPodNets:
+  - 10.244.0.0/16
+clusterSvcNets:
+  - 10.96.0.0/12
+cniConfig:
+  name: none
+  # name: custom
+  # urls:
+  #   - https://raw.githubusercontent.com/bjw-s/home-ops/main/infrastructure/talos/cluster-0/cni/install.yaml
+nodes:
+  - hostname: kcp1
+    ipAddress: 10.10.0.9
+    controlPlane: true
+    installDisk: /dev/sda
+    disableSearchDomain: true
+    nameservers:
+      - 192.168.1.1
+      - 1.1.1.1
+    networkInterfaces:
+      - interface: eth0
+        addresses:
+          - 10.10.0.9/24
+        mtu: 1500
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 10.10.0.1
+    configPatches:
+      - op: add
+        path: /cluster/apiServer/certSANs
+        value:
+          - 10.10.0.9
+          - kmaster1
+          - k8s.kyz.waltr.tech
+controlPlane:
+  configPatches:
+    # - op: add
+    #   path: /machine/kubelet/extraArgs
+    #   value:
+    #     feature-gates: GracefulNodeShutdown=true,MixedProtocolLBService=true
+    #     rotate-server-certificates: "true"
+    # - op: add
+    #   path: /machine/install/extraKernelArgs
+    #   value:
+    #     - talos.logging.kernel=udp://10.45.0.2:6050/
+worker:
+  configPatches:
+    # - op: add
+    #   path: /machine/kubelet/extraArgs
+    #   value:
+    #     feature-gates: GracefulNodeShutdown=true,MixedProtocolLBService=true
+    #     rotate-server-certificates: "true"
