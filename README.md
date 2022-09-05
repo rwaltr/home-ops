@@ -34,7 +34,9 @@ I use a toolset called `Talos Linux` to help abstract the hardware management of
 
 #### 🐦 Talos
 
-Talos is a OS that is configured by a YAML manifest. You can see this in `:/cluster`
+Talos is a OS that is configured by a YAML manifest. You can see this in `:/infra/talos`
+
+I use `talhelper` to further abstract Talos's config for easy config file expandability
 
 ### 🐧 Gitops
 
@@ -51,6 +53,8 @@ In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports
 <!-- TODO items -->
 
 ## 🖊️ Finding TODOS
+
+<!-- prosemd: ignore -->
 
 [Uses the `TODO:` format in line](https://github.com/rwaltr/home-ops/search?q=TODO%3A)
 
@@ -102,7 +106,6 @@ Thank you to the below for inspiration
 ## 📬 Contact Me
 
 - Github Issues
-- Twitter DMs
 - Email
 
 ---
