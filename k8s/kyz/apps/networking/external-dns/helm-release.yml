@@ -5,7 +5,6 @@ metadata:
   name: external-dns
   namespace: networking
 spec:
-  Suspended: true
   interval: 15m
   chart:
     spec:
