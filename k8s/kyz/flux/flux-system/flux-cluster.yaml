@@ -8,7 +8,7 @@ spec:
   interval: 10m
   url: https://github.com/rwaltr/home-ops.git
   ref:
-    branch: fluxify
+    branch: master
   # secretRef:
   # name: github-deploy-key
 ---
