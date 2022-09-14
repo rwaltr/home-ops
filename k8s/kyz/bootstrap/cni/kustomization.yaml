@@ -13,5 +13,3 @@ commonAnnotations:
   meta.helm.sh/release-namespace: kube-system
 commonLabels:
   app.kubernetes.io/managed-by: Helm
-resources:
-  - github.com/fluxcd/flux2/manifests/install?ref=v0.32.0
