@@ -47,7 +47,7 @@ spec:
         enabled: false
     experimental:
       plugins:
-        # enabled: true
+        enabled: false
       kubernetesGateway:
         enabled: false
     pilot:
