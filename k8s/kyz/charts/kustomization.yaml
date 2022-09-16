@@ -5,6 +5,7 @@ resources:
   - aqua-charts.yaml
   - bitnami-charts.yaml
   - bjw-s-charts.yaml
+  - traefik-charts.yaml
   - cloudnative-pg-charts.yaml
   - cilium.yaml
   - csi-driver-nfs-charts.yaml
