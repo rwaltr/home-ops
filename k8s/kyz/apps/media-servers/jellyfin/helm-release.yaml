@@ -1,0 +1,74 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: jellyfin
+  namespace: default
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: app-template
+      version: 0.2.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s-charts
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 5
+  upgrade:
+    remediation:
+      retries: 5
+  dependsOn:
+    # - name: intel-gpu-plugin
+    #   namespace: default
+    # - name: node-feature-discovery
+    #   namespace: default
+  values:
+    image:
+      repository: ghcr.io/onedr0p/jellyfin
+      tag: 10.8.5@sha256:b6e93e1bf3c8917d0136034db1fbd6455a90812f7083946d9101d9fca8ea53d2
+    env:
+      TZ: "America/Chicago"
+    service:
+      main:
+        type: LoadBalancer
+        # externalIPs: ["${SVC_JELLYFIN_ADDR}"]
+        externalTrafficPolicy: Local
+        ports:
+          http:
+            port: 8096
+    ingress:
+      main:
+        enabled: false
+        # ingressClassName: "nginx"
+        # hosts:
+        #   - host: &host "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
+        #     paths:
+        #       - path: /
+        #         pathType: Prefix
+        # tls:
+        #   - hosts:
+        #       - *host
+    podSecurityContext:
+    persistence:
+      config:
+        enabled: true
+      media:
+        enabled: true
+        type: nfs
+        server: "storage2.waltr.lan"
+        path: /tank/nas/library
+        mountPath: /media
+        readOnly: true
+      transcode:
+        enabled: true
+        type: emptyDir
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1000Mi
+      limits:
+        memory: 6000Mi
