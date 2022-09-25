@@ -21,7 +21,7 @@ spec:
   upgrade:
     remediation:
       retries: 5
-  dependsOn:
+  # dependsOn:
     # - name: intel-gpu-plugin
     #   namespace: default
     # - name: node-feature-discovery
