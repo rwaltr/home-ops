@@ -55,6 +55,7 @@ spec:
     podSecurityContext:
     persistence:
       config:
+        storageClass: nfs-storage2
         enabled: true
       media:
         enabled: true
