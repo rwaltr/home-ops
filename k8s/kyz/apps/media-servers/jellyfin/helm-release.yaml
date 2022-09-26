@@ -63,7 +63,7 @@ spec:
       media:
         enabled: true
         type: nfs
-        server: "storage2.waltr.lan"
+        server: "10.10.0.8"
         path: /tank/nas/library
         mountPath: /media
         readOnly: true
