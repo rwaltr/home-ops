@@ -4,4 +4,4 @@ kind: Kustomization
 namespace: cert-manager
 resources:
   - letsencrypt.yaml
-  - secrets.sops.yaml
+  - secret.sops.yaml
