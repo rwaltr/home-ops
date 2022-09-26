@@ -55,6 +55,9 @@ spec:
     podSecurityContext:
     persistence:
       config:
+        type: pvc
+        size: 2G
+        accessMode: ReadWriteOnce
         storageClass: nfs-storage2
         enabled: true
       media:
