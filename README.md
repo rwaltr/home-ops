@@ -13,8 +13,6 @@
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
 [![talos](https://img.shields.io/badge/talos-installed-brightgreen?style=for-the-badge)](https://www.talos.dev/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
-[![Lines of code](https://img.shields.io/tokei/lines/github/rwaltr/home-ops?style=for-the-badge&color=brightgreen&label=lines&logo=codefactor&logoColor=white)](https://github.com/rwaltr/home-ops/graphs/contributors)
-[![100DaysofHomelab](https://img.shields.io/badge/100DaysOf-Homelab-blue?style=for-the-badge)](<https://twitter.com/search?f=top&q=(%23100DaysOfHomelab)%20(from%3Arwaltrtech)>)
 
 </div>
 
@@ -70,7 +68,7 @@ In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports
 | Talos        | Operating System       | ☑️     |
 | Traefik      | Ingress Management     | ☑️     |
 | Cert-manager | X509 Secrets manager   | ☑️     |
-| HashiVault   | Secrets store          | ⚠️     |
+| Age          | Secrets Encryption     | ☑️     |
 | External-dns | Public DNS operator    | ☑️     |
 | SOPS         | inline secrets-manager | ☑️     |
 | pre-commit   | Commit checking        | ☑️     |
