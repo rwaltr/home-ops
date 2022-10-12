@@ -12,7 +12,7 @@ spec:
     solvers:
       - dns01:
           cloudflare:
-            email: "rwalt@pm.me"
+            # email: "rwalt@pm.me"
             apiKeySecretRef:
               name: cloudflare-token-secret
               key: cloudflare-token
@@ -33,7 +33,7 @@ spec:
     solvers:
       - dns01:
           cloudflare:
-            email: "rwalt@pm.me"
+            # email: "rwalt@pm.me"
             apiKeySecretRef:
               name: cloudflare-token-secret
               key: cloudflare-token
