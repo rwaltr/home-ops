@@ -65,7 +65,7 @@ spec:
     tlsStore:
       default:
         defaultCertificate:
-          secretName: waltrtech-default-tls
+          secretName: waltrtech-tls
     resources:
       requests:
         memory: 100Mi
