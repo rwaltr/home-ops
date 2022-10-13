@@ -44,6 +44,8 @@ spec:
       main:
         enabled: true
         # ingressClassName: "nginx"
+        annotations:
+          external-dns.home.arpa/enabled: "true"
         hosts:
           - host: &host "{{ .Release.Name }}.waltr.tech"
             paths:
