@@ -13,7 +13,7 @@ spec:
       - dns01:
           cloudflare:
             # email: "rwalt@pm.me"
-            apiKeySecretRef:
+            apiTokenSecretRef:
               name: cloudflare-token-secret
               key: cloudflare-token
         selector:
@@ -34,7 +34,7 @@ spec:
       - dns01:
           cloudflare:
             # email: "rwalt@pm.me"
-            apiKeySecretRef:
+            apiTokenSecretRef:
               name: cloudflare-token-secret
               key: cloudflare-token
         selector:
