@@ -22,10 +22,10 @@ spec:
     remediation:
       retries: 5
   # dependsOn:
-    # - name: intel-gpu-plugin
-    #   namespace: default
-    # - name: node-feature-discovery
-    #   namespace: default
+  # - name: intel-gpu-plugin
+  #   namespace: default
+  # - name: node-feature-discovery
+  #   namespace: default
   values:
     image:
       repository: ghcr.io/onedr0p/jellyfin
@@ -42,16 +42,16 @@ spec:
             port: 8096
     ingress:
       main:
-        enabled: false
+        enabled: true
         # ingressClassName: "nginx"
-        # hosts:
-        #   - host: &host "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
-        #     paths:
-        #       - path: /
-        #         pathType: Prefix
-        # tls:
-        #   - hosts:
-        #       - *host
+        hosts:
+          - host: &host "{{ .Release.Name }}.waltr.tech"
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - *host
     podSecurityContext:
     persistence:
       config:
