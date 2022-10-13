@@ -5,7 +5,7 @@ metadata:
   name: "waltrtech-default"
   namespace: default
 spec:
-  secretName: "waltrtech-default-tls"
+  secretName: "waltrtech-tls"
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
