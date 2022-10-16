@@ -1,0 +1,25 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: k8s_gateway
+  namespace: default
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: k8s_gateway
+      version: 0.2.2
+      sourceRef:
+        kind: HelmRepository
+        name: exdns-charts
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 5
+  upgrade:
+    remediation:
+      retries: 5
+  values:
+    domain: "waltr.tech"
