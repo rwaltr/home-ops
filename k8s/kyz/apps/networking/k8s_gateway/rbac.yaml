@@ -49,4 +49,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: k8s-gateway
-    namespace: network
+    namespace: networking
