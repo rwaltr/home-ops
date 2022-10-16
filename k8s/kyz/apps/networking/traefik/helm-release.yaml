@@ -37,7 +37,7 @@ spec:
     logs:
       general:
         format: json
-        level: INFO
+        level: DEBUG
       access:
         enabled: true
         format: json
