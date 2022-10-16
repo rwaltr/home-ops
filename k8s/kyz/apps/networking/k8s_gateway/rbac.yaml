@@ -30,7 +30,7 @@ rules:
   - apiGroups: ["k8s.nginx.org"]
     resources: ["*"]
     verbs: ["watch", "list"]
-  - apiGroups: ["networking.k8s.io"]
+  - apiGroups: ["ingresses.networking.k8s.io"]
     resources: ["*"]
     verbs: ["watch", "list"]
 
