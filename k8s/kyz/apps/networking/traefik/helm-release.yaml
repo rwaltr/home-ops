@@ -25,6 +25,9 @@ spec:
       namespace: cert-manager
   values:
     fullnameOverride: traefik
+    image:
+      name: traefik
+      tag: 2.7.0
     autoscaling:
       enabled: true
       minReplicas: 2
@@ -75,3 +78,6 @@ spec:
     service:
       spec:
         loadBalancerIP: 10.22.2.1
+    providers:
+      kubernetesIngress:
+        enabled: true
