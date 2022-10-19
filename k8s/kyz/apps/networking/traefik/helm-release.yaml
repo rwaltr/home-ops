@@ -76,8 +76,12 @@ spec:
       limits:
         memory: 500Mi
     service:
+      annotations:
+        external-dns.alpha.kubernetes.io/hostname: kyz.waltr.tech
       spec:
         loadBalancerIP: 10.22.2.1
     providers:
       kubernetesIngress:
         enabled: true
+        publishedService:
+          enabled: true
