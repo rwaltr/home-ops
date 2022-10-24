@@ -8,13 +8,13 @@
     ":separatePatchReleases",
     "docker:enableMajor",
     ":enablePreCommit",
-    "github>rwaltr/infra//.github/renovate/autoMerge",
-    "github>rwaltr/infra//.github/renovate/labels",
+    "github>rwaltr/home-ops//.github/renovate/autoMerge",
+    "github>rwaltr/home-ops//.github/renovate/labels",
     /* "github>onedr0p/home-ops//.github/renovate/semanticCommits" */
   ],
   platform: "github",
   username: "Teletraan-X[bot]",
-  repositories: ["rwaltr/infra"],
+  repositories: ["rwaltr/home-ops"],
   onboarding: false,
   requireConfig: false,
   gitAuthor: "99223764+teletraan-x[bot]@users.noreply.github.com",
@@ -23,5 +23,5 @@
   rebaseWhen: "conflicted",
   // set up ignored deps
   // ignoreDeps: [],
-  ignorePaths: ["legacy/**", "docs/**"]
+  ignorePaths: ["docs/**"]
 }
