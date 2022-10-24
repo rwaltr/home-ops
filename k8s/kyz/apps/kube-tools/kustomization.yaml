@@ -6,3 +6,4 @@ resources:
   - reloader
   - node-feature-discovery
   - flux
+  - kyverno
