@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - cloudnative-pg
   - kube-prometheus-stack
+  - kyverno.yaml
