@@ -1,4 +1,5 @@
 clusterName: kyz
+# renovate: datasource=github-release depName=siderolabs/talos
 talosVersion: v1.0.5
 kubernetesVersion: v1.23.6
 endpoint: https://10.10.0.9:6443
