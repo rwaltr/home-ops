@@ -36,9 +36,6 @@ spec:
       IS_HTTPS_ENABLED: "true"
       PORT: &port 8080
       TIMEZONE: "America/Chicago"
-    envFrom:
-      - secretRef:
-          name: *app
     service:
       main:
         ports:
