@@ -36,6 +36,12 @@ spec:
       IS_HTTPS_ENABLED: "true"
       PORT: &port 8080
       TIMEZONE: "America/Chicago"
+    persistence:
+      config:
+        type: pvc
+        size: 2G
+        enabled: true
+        storageClass: nfs-storage2
     service:
       main:
         ports:
