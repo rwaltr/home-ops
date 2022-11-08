@@ -52,7 +52,7 @@ spec:
         enabled: true
         ingressClassName: "traefik"
         annotations:
-          external-dns.home.arpa/enabled: "false"
+          external-dns.home.arpa/enabled: "true"
         hosts:
           - host: *host
             paths:
