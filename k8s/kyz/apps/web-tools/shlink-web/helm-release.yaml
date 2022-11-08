@@ -41,7 +41,7 @@ spec:
     ingress:
       main:
         enabled: true
-        ingressClassName: "nginx"
+        ingressClassName: "traefik"
         hosts:
           - host: &host "shlink.waltr.tech"
             paths:
