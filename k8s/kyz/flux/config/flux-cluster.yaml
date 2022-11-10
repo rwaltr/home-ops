@@ -25,3 +25,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: rwaltr-homeops
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - flux-install.yaml
   - flux-cluster.yaml
+  - flux-prereqs.yaml
