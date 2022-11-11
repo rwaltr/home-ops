@@ -81,3 +81,5 @@ spec:
     providers:
       kubernetesIngress:
         enabled: true
+        publishedService:
+          enabled: true
