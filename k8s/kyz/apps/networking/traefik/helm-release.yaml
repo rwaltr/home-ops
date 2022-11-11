@@ -58,7 +58,7 @@ spec:
     globalArguments:
       - "--serverstransport.insecureskipverify=true"
       - "--providers.kubernetesingress.ingressclass=traefik"
-      - "--providers.kubernetesingress.ingressendpoint.hostname=kyz.waltr.tech"
+      # - "--providers.kubernetesingress.ingressendpoint.hostname=kyz.waltr.tech"
     ports:
       web:
         redirectTo: websecure
