@@ -18,7 +18,7 @@ spec:
               key: cloudflare-token
         selector:
           dnsZones:
-            - "waltr.tech"
+            - "${SECRET_PUBLIC_DOMAIN}"
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -39,4 +39,4 @@ spec:
               key: cloudflare-token
         selector:
           dnsZones:
-            - "waltr.tech"
+            - "${SECRET_PUBLIC_DOMAIN}"

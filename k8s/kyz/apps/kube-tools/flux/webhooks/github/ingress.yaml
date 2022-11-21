@@ -10,7 +10,7 @@ metadata:
 spec:
   ingressClassName: "traefik"
   rules:
-    - host: "flux-webhook.waltr.tech"
+    - host: &host "flux-webhook.${SECRET_PUBLIC_DOMAIN}"
       http:
         paths:
           - path: /hook/
@@ -22,4 +22,4 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - "flux-webhook.waltr.tech"
+        - *host

@@ -28,7 +28,7 @@ spec:
       repository: ghcr.io/onedr0p/navidrome
       tag: 0.48.0@sha256:2ff33a7fd75521998683a4e50b490adfad9697c97edd2106b56f835547781de7
     env:
-      TZ: "America/Chicago"
+      TZ: "${TIMEZONE}"
       ND_DATAFOLDER: /config
       ND_ENABLEGRAVATAR: "false"
       ND_LOGLEVEL: info
@@ -54,7 +54,7 @@ spec:
           auth.home.arpa/enabled: "true"
           external-dns.home.arpa/enabled: "true"
         hosts:
-          - host: &host "navidrome.waltr.tech"
+          - host: &host "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
             paths:
               - path: /
                 pathType: Prefix

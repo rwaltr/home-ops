@@ -31,7 +31,7 @@ spec:
       repository: ghcr.io/onedr0p/jellyfin
       tag: 10.8.5@sha256:b6e93e1bf3c8917d0136034db1fbd6455a90812f7083946d9101d9fca8ea53d2
     env:
-      TZ: "America/Chicago"
+      TZ: "${TIMEZONE}"
     service:
       main:
         type: LoadBalancer
@@ -47,7 +47,7 @@ spec:
         annotations:
           external-dns.home.arpa/enabled: "true"
         hosts:
-          - host: &host "{{ .Release.Name }}.waltr.tech"
+          - host: &host "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
             paths:
               - path: /
                 pathType: Prefix

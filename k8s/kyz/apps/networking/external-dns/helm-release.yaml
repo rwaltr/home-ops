@@ -40,7 +40,7 @@ spec:
     txtPrefix: "kyz."
     txtOwnerId: "default"
     domainFilters:
-      - "waltr.tech"
+      - "${SECRET_PUBLIC_DOMAIN}"
     serviceMonitor:
       enabled: true
     resources:

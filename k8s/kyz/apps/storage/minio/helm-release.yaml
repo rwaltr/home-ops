@@ -26,10 +26,10 @@ spec:
       repository: quay.io/minio/minio
       tag: RELEASE.2022-09-25T15-44-53Z
     env:
-      TZ: "America/Chicago"
+      TZ: "${TIMEZONE}"
       MINIO_UPDATE: "off"
-      MINIO_BROWSER_REDIRECT_URL: "https://minio.waltr.tech"
-      MINIO_SERVER_URL: "https://s3.waltr.tech"
+      MINIO_BROWSER_REDIRECT_URL: "https://minio.${SECRET_PUBLIC_DOMAIN}"
+      MINIO_SERVER_URL: "https://s3.${SECRET_PUBLIC_DOMAIN}"
     envFrom:
       - secretRef:
           name: *app
@@ -61,13 +61,13 @@ spec:
         annotations:
           external-dns.home.arpa/enabled: "true"
         hosts:
-          - host: &host-console "{{ .Release.Name }}.waltr.tech"
+          - host: &host-console "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
             paths:
               - path: /
                 pathType: Prefix
                 service:
                   port: *port-console
-          - host: &host-api "s3.waltr.tech"
+          - host: &host-api "s3.${SECRET_PUBLIC_DOMAIN}"
             paths:
               - path: /
                 pathType: Prefix

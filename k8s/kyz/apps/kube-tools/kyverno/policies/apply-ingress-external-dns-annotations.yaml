@@ -27,4 +27,4 @@ spec:
           metadata:
             annotations:
               +(external-dns.alpha.kubernetes.io/target): |-
-                kyz.waltr.tech
+                kyz.${SECRET_PUBLIC_DOMAIN}

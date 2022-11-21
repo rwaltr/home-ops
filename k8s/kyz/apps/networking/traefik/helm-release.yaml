@@ -58,7 +58,6 @@ spec:
     globalArguments:
       - "--serverstransport.insecureskipverify=true"
       - "--providers.kubernetesingress.ingressclass=traefik"
-      # - "--providers.kubernetesingress.ingressendpoint.hostname=kyz.waltr.tech"
     ports:
       web:
         redirectTo: websecure
@@ -77,7 +76,7 @@ spec:
         memory: 500Mi
     service:
       annotations:
-        external-dns.alpha.kubernetes.io/hostname: kyz.waltr.tech
+        external-dns.alpha.kubernetes.io/hostname: kyz.${SECRET_PUBLIC_DOMAIN}
       spec:
         loadBalancerIP: 10.22.2.1
     providers:
