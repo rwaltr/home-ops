@@ -30,7 +30,7 @@ spec:
       tag: 3.3.2
     env:
       DB_DRIVER: sqlite
-      DEFAULT_DOMAIN: &host "{{ .Release.Name }}.${SECRET_PUBLIC_DOMAIN}"
+      DEFAULT_DOMAIN: &host "ln.${SECRET_PUBLIC_DOMAIN}"
       # DISABLE_TRACKING_FROM: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
       ENABLE_PERIODIC_VISIT_LOCATE: "true"
       IS_HTTPS_ENABLED: "true"
