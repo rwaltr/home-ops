@@ -1,9 +1,9 @@
 clusterName: kyz
 # renovate: datasource=github-releases depName=siderolabs/talos
-talosVersion: v1.2.6
-kubernetesVersion: v1.23.6
+talosVersion: v1.2.7
+kubernetesVersion: v1.25.4
 endpoint: https://10.10.0.9:6443
-domain: cluster.local
+domain: k8s.kyz.waltr.tech
 clusterPodNets:
   - 10.244.0.0/16
 clusterSvcNets:
@@ -34,13 +34,12 @@ nodes:
         path: /cluster/apiServer/certSANs
         value:
           - 10.10.0.9
-          - kmaster1
           - kcp1
-          - kcp1.kyz.waltr.tech
+          - kcp1.k8s.kyz.waltr.tech
           - k8s.kyz.waltr.tech
 
   - hostname: kw1
-    ipAddress: 10.10.0.11
+    ipAddress: 10.10.0.111
     controlPlane: false
     installDisk: /dev/sda
     nameservers:
