@@ -1,6 +1,6 @@
 clusterName: kyz
 # renovate: datasource=github-releases depName=siderolabs/talos
-talosVersion: v1.2.7
+talosVersion: v1.3.0
 kubernetesVersion: v1.25.4
 endpoint: https://10.10.0.9:6443
 domain: k8s.kyz.waltr.tech
