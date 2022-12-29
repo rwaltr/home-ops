@@ -33,8 +33,12 @@ data "sops_file" "cloudflare_secrets" {
   source_file = "../cloudflare/cloudflare_secrets.sops.yaml"
 }
 
+data "http" "github_ssh_keys" {
+  url = "https://github.com./rwaltr.keys"
+}
+
 locals {
-  linode_secrets     = sensitive(yamldecode(nonsensitive(data.sops_file.linode_secrets)))
+  linode_secrets     = sensitive(yamldecode(nonsensitive(data.sops_file.linode_secrets.raw)))
   cloudflare_secrets = sensitive(yamldecode(nonsensitive(data.sops_file.cloudflare_secrets.raw)))
 }
 provider "linode" {
@@ -44,4 +48,9 @@ provider "linode" {
 provider "cloudflare" {
   email   = local.cloudflare_secrets["cloudflare_email"]
   api_key = local.cloudflare_secrets["cloudflare_api_key"]
+}
+
+resource "linode_sshkey" "rwaltr_gh_key" {
+  label = "rwaltr_gh_key"
+  ssh_key = chomp(data.http.github_ssh_keys.response_body)
 }
