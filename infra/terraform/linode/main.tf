@@ -41,6 +41,7 @@ locals {
   linode_secrets     = sensitive(yamldecode(nonsensitive(data.sops_file.linode_secrets.raw)))
   cloudflare_secrets = sensitive(yamldecode(nonsensitive(data.sops_file.cloudflare_secrets.raw)))
 }
+
 provider "linode" {
   token = local.linode_secrets["token"]
 }
@@ -50,7 +51,27 @@ provider "cloudflare" {
   api_key = local.cloudflare_secrets["cloudflare_api_key"]
 }
 
-resource "linode_sshkey" "rwaltr_gh_key" {
-  label = "rwaltr_gh_key"
-  ssh_key = chomp(data.http.github_ssh_keys.response_body)
+resource "linode_instance" "factorio_server" {
+  label           = "FactorioServer"
+  image           = "linode/fedora37"
+  region          = "us-central"
+  type            = "g6-standard-1"
+  authorized_keys = compact(split("\n", data.http.github_ssh_keys.response_body))
+
+}
+
+
+data "cloudflare_zones" "public_domain" {
+  filter {
+    name = "waltr.tech"
+  }
+}
+
+resource "cloudflare_record" "factorio_dns" {
+  name    = "factorio"
+  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+  type    = "A"
+  ttl     = 1
+  proxied = false
+  value   = resource.linode_instance.factorio_server.ip_address
 }
