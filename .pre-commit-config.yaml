@@ -14,7 +14,7 @@ repos:
     hooks:
       - id: fix-smartquotes
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.3.1
+    rev: v1.4.0
     hooks:
       - id: remove-crlf
       - id: remove-tabs
