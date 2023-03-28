@@ -13,15 +13,6 @@ resource "cloudflare_record" "public_blog" {
   proxied = true
 }
 
-resource "cloudflare_record" "public_www" {
-  name    = "www"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  type    = "CNAME"
-  value   = resource.cloudflare_record.public_blog.value
-  ttl     = 1
-
-}
-
 resource "cloudflare_record" "public_kyz" {
   name    = "kyz"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
