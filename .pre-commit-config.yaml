@@ -19,7 +19,7 @@ repos:
       - id: remove-crlf
       - id: remove-tabs
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.30.0
+    rev: v1.31.0
     hooks:
       - args:
           - -c
