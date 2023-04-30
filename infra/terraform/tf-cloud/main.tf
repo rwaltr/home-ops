@@ -27,3 +27,15 @@ resource "tfe_workspace" "linode" {
   organization   = data.tfe_organization.rwaltr.name
   execution_mode = "local"
 }
+
+resource "tfe_workspace" "github-provisioner" {
+  name           = "github-provisioner"
+  organization   = data.tfe_organization.rwaltr.name
+  execution_mode = "local"
+}
+
+resource "tfe_workspace" "doppler-provisioner" {
+  name           = "doppler-provisioner"
+  organization   = data.tfe_organization.rwaltr.name
+  execution_mode = "local"
+}
