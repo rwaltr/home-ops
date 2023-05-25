@@ -2,31 +2,19 @@
 # Manual edits may be lost in future updates.
 
 provider "registry.terraform.io/hashicorp/tfe" {
-  version     = "0.44.1"
-  constraints = "~> 0.44.0"
+  version     = "0.45.0"
+  constraints = "~> 0.45.0"
   hashes = [
-    "h1:+WB1Qqo3dcRP3Lx717qgWh1xgQAZ2d3YOJVOmL3ck4A=",
-    "h1:0jEZgtgr+N25EWWTVkycIzP+FT5rBwgxyYlE6bSn4L0=",
-    "h1:22hUlcTIVQF0Jqctx52S/QWAoH0HjywMaoonNA96mCY=",
-    "h1:6/Qgq+BeMMzPF8RuEke2SLpdD1c3Vt7L+Ay2Pfxmizc=",
-    "h1:8oAzvJJNPILI4OKlxseFmXZpzaZMnaAhiQ3Xw+fbWsU=",
-    "h1:CdKVl+GO4nft5mGd+YENPHTBgbk2LqzKw4sYMPSO1GU=",
-    "h1:HTSUKnvhfcPLcsLOetcEoLEYiZRhAJSVT5EzMN2/slM=",
-    "h1:OOXJQHO3GhrGJf7EC9zjO1Hnl6HwrkaiXHGX//9gDgI=",
-    "h1:VEN/xJfP1kvHj/tLombNtBkM4rU0DlVrcYQKGlHZp7w=",
-    "h1:ikdCnEfKvNLZAWGWXynZ4Mzl6uVHilCFh1HRwOuTrLQ=",
-    "h1:khzcBOb/6O4HFRLF9NaqDeU3/Fb0aS06N4pp7Ek6B74=",
-    "zh:00efe5957430cb6d855a2f107e4b93ea72f74e4f3044bbacfc8cf4407f48cc59",
-    "zh:01fd66c8dada0c3e5ac01cd738a9b1e77557e5dbfff0fb9137c4981619102996",
-    "zh:097d0e1ed04faeaab2aca0319269f641fe114146388c75b7108e7976a8384d31",
-    "zh:12d8720ea35933e74ffdbe0bf65888ce6de23c4c31fb1e1c84404a8afe5a55ef",
-    "zh:5a49b8c4f93177e40a3399071cc49f42a11ce0c3b2b52aebc72ca3e29f47f91f",
-    "zh:656fd901d831fecc86769ab175b7d0a5c2a172618254998c2ca8488f4d6c63d0",
-    "zh:8f3bc0a28838e35c0567d7de044f7d94cf851814703acfd30696854bb5e37db4",
-    "zh:911c02dd88721317af6494029387384002d52f62539d51fd6ac30b667c78dfc5",
-    "zh:c266895f7ea65282e6ec7bdd473bb512345971891244efa3635edbf91f825867",
-    "zh:d95ec293fa70e946b6cd657912b33155f8be3413e6128ed2bfa5a493f788e439",
-    "zh:e71c815c8d09e3c7e239707a5ca756894ebd8ec4639f6910756ad85b83129443",
-    "zh:fcd60145a34394863d4e049a1decc07063f827e1287e39406adbca6658cec476",
+    "h1:/IS0JSRLlIq9dyf9iZA946pG2QZ/g24plIsURCBoU8U=",
+    "h1:3/Yal4GcTluDS859uKLONrnpMNeNssyyaR5Eied7ZaM=",
+    "h1:93Dwb2HCpnmUxFbGIq9oL7ulCETszTdLcLNg/47hXhc=",
+    "h1:DEYvw5mBkXplkSe0nOLAGH80SXdKJlOMnq6vWVbSZRU=",
+    "h1:IL7LqDTdmhO3WAFsWUwajQX8Kqkv2p9MOFyPaQMjCP0=",
+    "h1:OTRZeOMq9XCh6YQJ+1OdaHfHgz5ETVTX6uH5AtG9oz8=",
+    "h1:cmXDmiQZHTjqafXo2UWaHbQUW0PFxG+8OPPC8aS/894=",
+    "h1:ePtoJ7ziD10aWqm9kbzH/CX+pub9OIc9nQ4oQwA91nk=",
+    "h1:kNOBTJR6Xtue4rCn7uSUMrgv7E36EezE1Q1ijAf6wdw=",
+    "h1:kqJWrqVrP+iK/M9UMy4Qdbomqt/3axrOwrduwVO4e2E=",
+    "h1:lluJmiFVX8rwZnFl98bs5jKZi6pAZd403L2l9CAn3Vo=",
   ]
 }
