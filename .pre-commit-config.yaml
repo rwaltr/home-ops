@@ -33,11 +33,6 @@ repos:
           - --list-different
           - --ignore-unknown
           - --write
-  - repo: git://github.com/kintoandar/pre-commit.git
-    rev: v2.1.2
-    hooks:
-      - id: terraform_fmt
-      #- id: terraform_validate
   - repo: https://github.com/k8s-at-home/sops-pre-commit
     rev: v2.1.1
     hooks:
