@@ -1,11 +1,11 @@
 <!-- Header -->
 <div align="center">
 
-# Under major construction and rebuild.
+# 🚧 Please pardon the dust 🚧
 
-    The homelag is currently undergoing operation HISTH. See Pinned Issue
+The homelab is currently undergoing operation "Honey I Shrunk The Homelab". See Issues for progress
 
-## <img src="https://external-content.duckduckgo.com/iu/?u=http%3A%2F%2Fvignette3.wikia.nocookie.net%2Ffossils-archeology%2Fimages%2Fd%2Fdf%2FPatrick_star.png%2Frevision%2Flatest%3Fcb%3D20160401153603&f=1&nofb=1&ipt=41964821b231f453e9d0e60b9af655c8566587350449513761e03ff04ab50e66&ipo=images" align="center" width="144px" height="144px"/>
+## <img src="https://external-content.duckduckgo.com/iu/?u=http%3A%2F%2Fvignette3.wikia.nocookie.net%2Ffossils-archeology%2Fimages%2Fd%2Fdf%2FPatrick_star.png%2Frevision%2Flatest%3Fcb%3D20160401153603&f=1&nofb=1&ipt=41964821b231f453e9d0e60b9af655c8566587350449513761e03ff04ab50e66&ipo=images" align="center" width="244px" height="244px"/>
 
 <img src="https://raw.githubusercontent.com/rwaltr/branding/master/vector/logoisolated.png" align="center" width="144px" height="144px"/>
 
