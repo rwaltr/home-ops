@@ -1,6 +1,6 @@
 data "cloudflare_zones" "legacy_domain" {
   filter {
-    name = "blackphidora.com"
+    name = local.my_domains["personallegacy"]
   }
 }
 

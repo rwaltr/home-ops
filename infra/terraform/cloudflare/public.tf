@@ -1,6 +1,6 @@
 data "cloudflare_zones" "public_domain" {
   filter {
-    name = "waltr.tech"
+    name = local.my_domains["personal"]
   }
 }
 

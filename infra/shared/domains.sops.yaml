@@ -1,6 +1,8 @@
 personal: ENC[AES256_GCM,data:R2etxyecQ+MxAw==,iv:ORI2hSLZlCB2lAoVqBCMSeFAWQ/3iWw0rhoUzL/2Jos=,tag:zCjgd70yrM1WXZwN2QGe+w==,type:str]
-home: ENC[AES256_GCM,data:h9LzQwQlwESc,iv:AqXS2XYwyek66Boeq9rF7xgCS26Subc86diZMc5hvcY=,tag:Z08C8PChHeI5ieYgeagLUg==,type:str]
-legacy: ENC[AES256_GCM,data:16k8VYp5PsKJFIX3gpL2Gg==,iv:u144OFANQa/+AFbFHAteRldvq7AyIhhwVH8nhX0HCSk=,tag:XhttEuz0xhmoKEHLagT20w==,type:str]
+localhome: ENC[AES256_GCM,data:EOCyWtQA2NB0,iv:AQR5yPPmxy1/OwG66RniIigdu97By3EUbun02Q0sPLg=,tag:MIrBpUnkYAgvr19OhbhsgA==,type:str]
+personallegacy: ENC[AES256_GCM,data:QmGNzCCL26JqWcNXcpp7oA==,iv:d/qejHpnuCN+AqtbRUx+TlWObP+tMBNE+e+RduMoMJA=,tag:Mp53Yp1ppnrebYZv5qVr8w==,type:str]
+familylegacy: ENC[AES256_GCM,data:Izi/T0q0+6h8g8jP,iv:u8qlFvE4b+ZJ7WgtzmevIt6f/ALnhLW/V/3Ib0TmoNM=,tag:UlxpMgvwi6KGaKfF6GBFYg==,type:str]
+prof: ENC[AES256_GCM,data:gVE7afPtMCEs,iv:eJqaf1bzZqEgoNhyxo7BBnezZj1Hxk2n4z6aybEdrhI=,tag:p0XdFy/etBR/Db0ycpAfjQ==,type:str]
 sops:
   kms: []
   gcp_kms: []
@@ -16,8 +18,8 @@ sops:
         SHBLVi9JU0lZMXF2Y3M5S2c5QWZ6ZlkKmg8l1aHDDBu8QnfLfPPdL+1hosn+1Smb
         G2yel8D/B3soHLtunNsfLtDPAwX2qRVTeklawzWaL6QMEv3v71EYaQ==
         -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2022-12-07T01:08:19Z"
-  mac: ENC[AES256_GCM,data:0/hnFxnpDzYFHtyAVYVe2ME7rNjui3o9xUK8058eNwcHIYDU8dNMdPhZq+mQODGZRnbVrplPGuOBdjG5AWb9dPNeWhCGKhiWERctFSPTFCLM/iP9E4VbCNkPkGMkPNMqLz008ENle1jjBuf+Iqww1sMelAdzDPNupVE3H2OizCM=,iv:SpyxqRkwfIklW+eXIgM4ClBwaS67UlVlOjrFXOBkP94=,tag:ygWxgrHaTt+6msGcOog1aw==,type:str]
+  lastmodified: "2023-08-28T17:24:01Z"
+  mac: ENC[AES256_GCM,data:TVI8fUwnxFmmcc+elcjv1IteThqXmoCggUWtaPGuiEadP//U7fTfESuynMDczfWW6mgCoWliPquIERm9I5jct8JIjmdV+7xEF3+589q9P9FTjpQL5GOaSOcD7TKapbcqu8jluLTdUNoxrMjyQ4GXNydpnrnf/1vnuy0jruLzq8U=,iv:WT6CP+yebOrhmI2b5JNcbe+44IFFYcB1xq7O25HkvTw=,tag:CUxhHgSFNxZVwt0Ec809VA==,type:str]
   pgp:
     - created_at: "2022-12-07T01:08:19Z"
       enc: |

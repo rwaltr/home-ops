@@ -26,8 +26,13 @@ data "sops_file" "cloudflare_secrets" {
   source_file = "cloudflare_secrets.sops.yaml"
 }
 
+data "sops_file" "my_domains"{
+  source_file = "../../shared/domains.sops.yaml"
+}
+
 locals {
   cloudflare_secrets = sensitive(yamldecode(nonsensitive(data.sops_file.cloudflare_secrets.raw)))
+  my_domains = sensitive(yamldecode(nonsensitive(data.sops_file.my_domains.raw)))
 }
 
 provider "cloudflare" {
