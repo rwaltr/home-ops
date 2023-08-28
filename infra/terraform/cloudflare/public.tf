@@ -4,6 +4,14 @@ data "cloudflare_zones" "public_domain" {
   }
 }
 
+
+resource "cloudflare_record" "public_githubverify" {
+  name = "_github-pages-challenge-rwaltr"
+  type = "TXT"
+  value = "b79e49f4db1fd5edf70c1ccaf4a124"
+  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+}
+
 resource "cloudflare_record" "public_blog" {
   name    = "blog"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")

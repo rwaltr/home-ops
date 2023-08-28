@@ -3,6 +3,28 @@ resource "cloudflare_zone" "prof_domain" {
   account_id = cloudflare_account.waltrtech.id
 }
 
+resource "cloudflare_record" "prof_root" {
+  type = "CNAME"
+  name = "@"
+  value = "rwaltr.github.io"
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_www" {
+  type = "CNAME"
+  name = "www"
+  value = "rwaltr.github.io"
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_githubverify" {
+  type = "TXT"
+  name = "_github-pages-challenge-rwaltr"
+  value = "8697f334fc9261ca5d28a65ce0544e"
+  zone_id = cloudflare_zone.prof_domain.id
+
+}
+
 resource "cloudflare_zone_settings_override" "prof_domain" {
   zone_id = cloudflare_zone.prof_domain.id
   settings {
