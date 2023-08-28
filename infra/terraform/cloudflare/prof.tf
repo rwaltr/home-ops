@@ -24,6 +24,67 @@ resource "cloudflare_record" "prof_githubverify" {
   zone_id = cloudflare_zone.prof_domain.id
 
 }
+# Email Records /
+resource "cloudflare_record" "prof_MigaduVerify" {
+  type = "TXT"
+  name = "@"
+  value = "hosted-email-verify=mtm4pnvs"
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_MX1" {
+  type = "MX"
+  name = "@"
+  value = "aspmx1.migadu.com"
+  priority = 10
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_MX2" {
+  type = "MX"
+  name = "@"
+  value = "aspmx2.migadu.com"
+  priority = 20
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_DKIM1" {
+  type = "CNAME"
+  name = "key1._domainkey"
+  value = "key1.rwalt.pro._domainkey.migadu.com."
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_DKIM2" {
+  type = "CNAME"
+  name = "key2._domainkey"
+  value = "key2.rwalt.pro._domainkey.migadu.com."
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_DKIM3" {
+  type = "CNAME"
+  name = "key3._domainkey"
+  value = "key3.rwalt.pro._domainkey.migadu.com."
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_SPF" {
+  type = "TXT"
+  name = "@"
+  value = "v=spf1 include:spf.migadu.com -all"
+  zone_id = cloudflare_zone.prof_domain.id
+}
+
+resource "cloudflare_record" "prof_DMARC" {
+  type = "TXT"
+  name = "_dmarc"
+  value = "v=DMARC1; p=quarantine;"
+  zone_id = cloudflare_zone.prof_domain.id
+
+}
+
+# / Email Records
 
 resource "cloudflare_zone_settings_override" "prof_domain" {
   zone_id = cloudflare_zone.prof_domain.id

@@ -3,7 +3,6 @@ resource "cloudflare_zone" "legacyfamily" {
   account_id = cloudflare_account.waltrtech.id
 }
 
-
 resource "cloudflare_zone_settings_override" "legacyfamily_domain_settings" {
   zone_id = cloudflare_zone.legacyfamily.id
   settings {
