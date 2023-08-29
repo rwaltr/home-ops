@@ -31,80 +31,143 @@ resource "cloudflare_record" "public_kyz" {
 
 }
 
+# Email Records /
+resource "cloudflare_record" "public_MigaduVerify" {
+  type = "TXT"
+  name = "@"
+  value = "hosted-email-verify=ddjnsvhm"
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+}
 
 resource "cloudflare_record" "public_mx1" {
-  name     = "waltr.tech"
-  value    = "mail.protonmail.ch"
-  type     = "MX"
-  priority = "10"
+  type = "MX"
+  name = "@"
+  value = "aspmx1.migadu.com"
+  priority = 10
   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl      = 1
-  proxied  = false
 }
 
 resource "cloudflare_record" "public_mx2" {
-  name     = "waltr.tech"
-  value    = "mailsec.protonmail.ch"
-  type     = "MX"
-  priority = "20"
+  type = "MX"
+  name = "@"
+  value = "aspmx2.migadu.com"
+  priority = 20
   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl      = 1
-  proxied  = false
 }
 
-resource "cloudflare_record" "public_dmarc" {
-  name    = "_dmarc"
-  value   = "v=DMARC1; p=none"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "TXT"
+resource "cloudflare_record" "public_dkim1" {
+  type = "CNAME"
+  name = "key1._domainkey"
+  value = "key1.waltr.tech._domainkey.migadu.com."
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+}
+
+resource "cloudflare_record" "public_dkim2" {
+  type = "CNAME"
+  name = "key2._domainkey"
+  value = "key2.waltr.tech._domainkey.migadu.com."
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+}
+
+resource "cloudflare_record" "public_dkim3" {
+  type = "CNAME"
+  name = "key3._domainkey"
+  value = "key3.waltr.tech._domainkey.migadu.com."
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_spf" {
-  name    = "waltr.tech"
-  value   = "v=spf1 include:_spf.protonmail.ch mx ~all"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "TXT"
+  type = "TXT"
+  name = "@"
+  value = "v=spf1 include:spf.migadu.com -all"
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
-resource "cloudflare_record" "public_protonmail_verify" {
-  name    = "waltr.tech"
-  value   = "protonmail-verification=49547740ee7975bcce254d09c76c57dbd22ae672"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "TXT"
+resource "cloudflare_record" "public_dmarc" {
+  type = "TXT"
+  name = "_dmarc"
+  value = "v=DMARC1; p=quarantine;"
+  zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
-resource "cloudflare_record" "public_protonmail_donainkey1" {
-  name    = "protonmail._domainkey"
-  value   = "protonmail.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "CNAME"
-}
+# / Email Records
 
-resource "cloudflare_record" "public_protonmail_donainkey2" {
-  name    = "protonmail2._domainkey"
-  value   = "protonmail2.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "CNAME"
-}
 
-resource "cloudflare_record" "public_protonmail_donainkey3" {
-  name    = "protonmail3._domainkey"
-  value   = "protonmail3.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  ttl     = 1
-  proxied = false
-  type    = "CNAME"
-}
+
+#
+# resource "cloudflare_record" "public_mx1" {
+#   name     = "waltr.tech"
+#   value    = "mail.protonmail.ch"
+#   type     = "MX"
+#   priority = "10"
+#   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl      = 1
+#   proxied  = false
+# }
+#
+# resource "cloudflare_record" "public_mx2" {
+#   name     = "waltr.tech"
+#   value    = "mailsec.protonmail.ch"
+#   type     = "MX"
+#   priority = "20"
+#   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl      = 1
+#   proxied  = false
+# }
+#
+# resource "cloudflare_record" "public_dmarc" {
+#   name    = "_dmarc"
+#   value   = "v=DMARC1; p=none"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "TXT"
+# }
+#
+# resource "cloudflare_record" "public_spf" {
+#   name    = "waltr.tech"
+#   value   = "v=spf1 include:_spf.protonmail.ch mx ~all"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "TXT"
+# }
+#
+# resource "cloudflare_record" "public_protonmail_verify" {
+#   name    = "waltr.tech"
+#   value   = "protonmail-verification=49547740ee7975bcce254d09c76c57dbd22ae672"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "TXT"
+# }
+#
+# resource "cloudflare_record" "public_protonmail_donainkey1" {
+#   name    = "protonmail._domainkey"
+#   value   = "protonmail.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "CNAME"
+# }
+#
+# resource "cloudflare_record" "public_protonmail_donainkey2" {
+#   name    = "protonmail2._domainkey"
+#   value   = "protonmail2.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "CNAME"
+# }
+#
+# resource "cloudflare_record" "public_protonmail_donainkey3" {
+#   name    = "protonmail3._domainkey"
+#   value   = "protonmail3.domainkey.dwigogkdcjwayzy3t2jp74ogrjtrij5a6bnxm3u25aocolxjgtwiq.domains.proton.ch"
+#   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
+#   ttl     = 1
+#   proxied = false
+#   type    = "CNAME"
+# }
 
 resource "cloudflare_zone_settings_override" "public_domain_settings" {
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
