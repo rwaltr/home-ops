@@ -8,7 +8,7 @@ data "cloudflare_zones" "legacy_domain" {
 resource "cloudflare_record" "legacy_MigaduVerify" {
   type = "TXT"
   name = "@"
-  value = "hosted-email-verify=xr7ptjnw"
+  value = "hosted-email-verify=gkkczxli"
   zone_id  = lookup(data.cloudflare_zones.legacy_domain.zones[0], "id")
 }
 
