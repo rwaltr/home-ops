@@ -1,0 +1,52 @@
+{
+  description = "Rwaltr's Home-ops";
+  inputs = {
+
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+
+    unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+
+    hardware.url = "github:nixos/nixos-hardware";
+
+    nixos-generators.url = "github:nix-community/nixos-generators";
+    nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
+
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+  };
+
+  outputs = inputs @ { flake-parts, ... }:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-darwin" ];
+      imports = [
+        inputs.treefmt-nix.flakeModule
+        # .nix/lib
+      ];
+
+      perSystem = { pkgs, ... }: {
+        devShells.default = pkgs.mkShell {
+          name = "minimal";
+          packages = with pkgs; [
+            nix
+            git
+            terraform
+            kubectl
+            flux
+            neovim
+          ];
+        };
+        treefmt = {
+          projectRootFile = "flake.nix";
+          programs.alejandra.enable = true;
+          programs.deadnix.enable = true;
+        };
+      };
+    };
+}
