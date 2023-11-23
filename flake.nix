@@ -14,6 +14,8 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
+    talhelper.url = "github:budimanjojo/talhelper";
+
     treefmt-nix.url = "github:numtide/treefmt-nix";
 
     flake-parts = {
@@ -30,16 +32,20 @@
         # .nix/lib
       ];
 
-      perSystem = { pkgs, ... }: {
+      perSystem = { pkgs, inputs', ... }: {
         devShells.default = pkgs.mkShell {
-          name = "minimal";
+          name = "Deployment";
           packages = with pkgs; [
-            nix
-            git
-            terraform
-            kubectl
+            age
             flux
-            neovim
+            git
+            kubectl
+            clusterctl
+            nix
+            sops
+            talosctl
+            terraform
+            inputs'.talhelper.packages.default
           ];
         };
         treefmt = {
