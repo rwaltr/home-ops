@@ -27,3 +27,9 @@ resource "tfe_workspace" "linode" {
   organization   = data.tfe_organization.rwaltr.name
   execution_mode = "local"
 }
+
+resource "tfe_workspace" "backblaze" {
+  name           = "backblaze-provisioner"
+  organization   = data.tfe_organization.rwaltr.name
+  execution_mode = "local"
+}
