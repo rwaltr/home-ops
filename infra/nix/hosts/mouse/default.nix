@@ -12,7 +12,13 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  filesystem.zfs.enable = true;
+  boot.supportedFilesystems = [ "zfs" ];
+  zfs = {
+    forceImportRoot = false;
+  };
+
+  services.zfs.autoScrub.enable = true;
+  services.zfs.trim.enable = true;
 
 
   servers.nfs.enable = true;
