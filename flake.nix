@@ -30,6 +30,7 @@
       imports = [
         inputs.treefmt-nix.flakeModule
         # .nix/lib
+        ./infra/nix/hosts
       ];
 
       perSystem = { pkgs, inputs', ... }: {
