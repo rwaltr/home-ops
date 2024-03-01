@@ -40,10 +40,11 @@
   services.tailscale.enable = true;
 
   services.avahi = {
-    enable = true;
+    enable = false;
     publish = {
       enable = true;
       addresses = true;
+      workstation = true;
     };
     openFirewall = true;
     nssmdns = true;
