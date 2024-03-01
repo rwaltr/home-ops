@@ -10,13 +10,10 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  boot.supportedFilesystems = [ "zfs" ];
-  zfs = {
-    forceImportRoot = false;
-  };
-
-  services.zfs.autoScrub.enable = true;
-  services.zfs.trim.enable = true;
+  # boot.supportedFilesystems = [ "zfs" ];
+  # zfs = {
+  #   forceImportRoot = false;
+  # };
 
 
   networking.hostName = "nomadix";
