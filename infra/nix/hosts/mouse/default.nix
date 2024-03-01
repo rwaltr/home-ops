@@ -32,7 +32,7 @@
   users.users.rwaltr = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
-    shell = pkgs.fish;
+    # shell = pkgs.fish;
   };
 
   services.openssh.enable = true;
