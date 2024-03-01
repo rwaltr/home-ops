@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -10,12 +10,6 @@
   boot.loader.efi.canTouchEfiVariables = true;
 
   nixpkgs.config.allowUnfree = true;
-
-
-  # boot.supportedFilesystems = [ "zfs" ];
-  # zfs = {
-  #   forceImportRoot = false;
-  # };
 
 
   networking.hostName = "mouse";
@@ -40,6 +34,7 @@
   services.openssh.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
   services.tailscale.enable = true;
+  services.tailscale.package = inputs.unstable.tailscale;
 
   services.avahi = {
     enable = true;
