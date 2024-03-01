@@ -11,13 +11,14 @@
 
   nixpkgs.config.allowUnfree = true;
 
+
   # boot.supportedFilesystems = [ "zfs" ];
   # zfs = {
   #   forceImportRoot = false;
   # };
 
 
-  networking.hostName = "nomadix";
+  networking.hostName = "mouse";
   networking.networkmanager.enable = true;
   time.timeZone = "America/Chicago";
 
