@@ -22,7 +22,6 @@
 
 
   servers.nfs.enable = true;
-  monitoring.smartd.enable = true;
 
 
   networking.hostName = "nomadix";
