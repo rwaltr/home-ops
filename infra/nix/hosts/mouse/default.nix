@@ -52,6 +52,8 @@
     nssmdns = true;
   };
 
+  services.smartd.enable = true;
+
   environment.systemPackages = with pkgs; [
     rclone
     curl
