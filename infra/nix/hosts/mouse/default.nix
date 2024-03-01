@@ -50,6 +50,15 @@
   services.tailscale.enable = true;
 
 
+  services.avahi = {
+    enable = true;
+    publish = {
+      enable = true;
+      addresses = true;
+    };
+    openFirewall = true;
+    nssmdns = true;
+  };
 
 
   # This option defines the first version of NixOS you have installed on this particular machine,
