@@ -1,4 +1,4 @@
-{ pkgs, inputs, ... }:
+{ pkgs, unstable, ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -34,7 +34,7 @@
   services.openssh.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
   services.tailscale.enable = true;
-  services.tailscale.package = inputs.unstable.tailscale;
+  services.tailscale.package = unstable.tailscale;
 
   services.avahi = {
     enable = true;
