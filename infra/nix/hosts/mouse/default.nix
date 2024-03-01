@@ -61,7 +61,7 @@
     gh
     age
     sops
-    canTouchEfiVariablescroc
+    croc
   ];
 
 
