@@ -8,8 +8,6 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-
-
   nixpkgs.config.allowUnfree = true;
 
   boot.supportedFilesystems = [ "zfs" ];
@@ -19,9 +17,6 @@
 
   services.zfs.autoScrub.enable = true;
   services.zfs.trim.enable = true;
-
-
-  servers.nfs.enable = true;
 
 
   networking.hostName = "nomadix";
@@ -43,11 +38,9 @@
     shell = pkgs.fish;
   };
 
-
   services.openssh.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
   services.tailscale.enable = true;
-
 
   services.avahi = {
     enable = true;
