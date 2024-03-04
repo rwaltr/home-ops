@@ -31,8 +31,9 @@
     # shell = pkgs.fish;
   };
 
+  services.fstrim.enable = true;
   services.openssh.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 19999 ];
+  networking.firewall.allowedTCPPorts = [ 22 2049 19999 ];
   services.tailscale.enable = true;
 
   services.avahi = {
@@ -59,6 +60,8 @@
     croc
   ];
 
+
+  services.nfs.server.enable = true;
 
   # TODO: Switch to prometheus when prometheus
   services.netdata.enable = true;
