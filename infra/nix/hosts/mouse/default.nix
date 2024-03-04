@@ -32,7 +32,7 @@
   };
 
   services.openssh.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 ];
+  networking.firewall.allowedTCPPorts = [ 22 19999 ];
   services.tailscale.enable = true;
 
   services.avahi = {
@@ -42,7 +42,6 @@
       addresses = true;
       workstation = true;
     };
-    openFirewall = true;
     nssmdns = true;
   };
 
