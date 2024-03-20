@@ -3,7 +3,7 @@
   services.minio.enable = true;
   services.minio = {
     configDir = "/tank/services/minio/cfg";
-    dataDir = "/tank/services/minio/data";
+    dataDir = [ "/tank/services/minio/data" ];
     region = "us-kyz-0";
   };
 
