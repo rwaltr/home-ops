@@ -3,6 +3,7 @@
   imports = [
     ./hardware-configuration.nix
     ./zfs.nix
+    ./minio.nix
   ];
 
 
