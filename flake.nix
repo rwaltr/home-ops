@@ -45,7 +45,7 @@
             nix
             sops
             talosctl
-            terraform
+            opentofu
             inputs'.talhelper.packages.default
           ];
         };
