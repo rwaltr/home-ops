@@ -1,6 +1,7 @@
 terraform {
   cloud {
     organization = "rwaltr"
+    hostname     = "app.terraform.io"
     workspaces {
       name = "tfcloud-provision"
     }
