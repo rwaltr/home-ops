@@ -26,7 +26,13 @@ The homelab is currently undergoing operation "Honey I Shrunk The Homelab". See 
 
 ## 📖 Overview
 
-This is a Monorepo to manage my personal environment. A combination of Talos, Terraform, and flux allow this repo to provide most of the configuration required to manage this environment across regions/clouds.
+This is a Monorepo to manage my personal environment. A combination of Talos, NixOS, Terraform, and Flux allow this repo to provide most of the configuration required to manage this environment across regions/clouds.
+
+## 🔧 Orchestration tools
+
+### KCL
+
+Yaml is old school, KCL is a DSL that provides the power of full type safety while rendering yaml at the end of the day.
 
 ### ⛵ Kubernetes
 
@@ -36,23 +42,37 @@ The result is that the text files here turn into actual running applications.
 
 I use a toolset called `Talos Linux` to help abstract the hardware management of Kubernetes.
 
-#### 🐦 Talos
+### 🌐 Terraform/OpenTofu
 
-Talos is a OS that is configured by a YAML manifest. You can see this in `:/infra/talos`
+Terraform does one-shot api calls. Things I wont want managed by a controller but should be gitops.
+
+### 🍭 Crossplane
+
+Crossplane is the platform behind my operator focused management.
+
+### ❄️ Nix
+
+Nix is used for hosts that do not run Kubernetes directly. This is a declarative configuration management system that allows me to manage my hosts in a gitops fashion.
+
+## Nodes types
+
+### 🐦 Talos
+
+Talos is a kubernetes focused OS that is configured by a YAML manifest. You can see this in `:/infra/talos`
 
 I use `talhelper` to further abstract Talos's config for easy config file expandability
 
-### 🐧 Gitops
+### ❄️ NixOS
 
-Gitops generally means that your git repo is the state of your environment.
+NixOS is used in hosts that are not meant to run Kubernetes directly.
 
-Here it is done with Flux and Terraform
+`:/infra/nix` is where I store this but the entry point is `:/flake.nix`
 
-### Networking
+## 🏘️ Sites
 
-#### KYZ
+### 🏢 KYZ
 
-In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports 80 and 443 are forwarded to the Ingress manager
+KYZ acts as the management and as a workload site.
 
 <!-- TODO items -->
 
@@ -66,19 +86,16 @@ In the site `KYZ` The cluster communicates with the edge gateway with BGP. Ports
 
 <!-- Tools -->
 
-## 🧰 Tools!
+## 🧰 Tools
 
-| Tool         | Use                    | Active |
-| ------------ | ---------------------- | ------ |
-| Flux         | Gitops Operator        | ☑️     |
-| Talos        | Operating System       | ☑️     |
-| Traefik      | Ingress Management     | ☑️     |
-| Cert-manager | X509 Secrets manager   | ☑️     |
-| Age          | Secrets Encryption     | ☑️     |
-| External-dns | Public DNS operator    | ☑️     |
-| SOPS         | inline secrets-manager | ☑️     |
-| pre-commit   | Commit checking        | ☑️     |
-| Cilium       | CNI                    | ☑️     |
+| Tool       | Use                    | Active |
+| ---------- | ---------------------- | ------ |
+| NixOS      | Operating System       | ☑️     |
+| SOPS       | inline secrets-manager |        |
+| KCL        | DSL                    |        |
+| Talos      | Operating System       |        |
+| Flux       | Gitops Operator        |        |
+| Crossplane | API platform           |        |
 
 ---
 
@@ -90,7 +107,6 @@ Thank you to the below for inspiration
 
 - onedr0p
 - anthr76
-- dirtycajunrice
 - danmanners
 
 ---
