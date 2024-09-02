@@ -45,7 +45,6 @@
             nix
             sops
             talosctl
-            opentofu
             inputs'.talhelper.packages.default
           ];
         };
