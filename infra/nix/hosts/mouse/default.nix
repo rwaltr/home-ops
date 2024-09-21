@@ -64,6 +64,10 @@
 
   services.nfs.server.enable = true;
 
+  services.syncthing.enable = true;
+  services.syncthing.dataDir = "/tank/services/syncthing/data";
+  services.syncthing.configDir = "/tank/services/syncthing/config";
+
   # TODO: Switch to prometheus when prometheus
   services.netdata.enable = true;
 
