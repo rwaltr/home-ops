@@ -34,7 +34,8 @@
 
   services.fstrim.enable = true;
   services.openssh.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 2049 19999 ];
+  networking.firewall.allowedTCPPorts = [ 22 2049 19999 8384 22000 ];
+  networking.firewall.allowedUDPPorts = [ 22000 21027 ];
   services.tailscale.enable = true;
 
   services.avahi = {
@@ -67,6 +68,7 @@
   services.syncthing.enable = true;
   services.syncthing.dataDir = "/tank/services/syncthing/data";
   services.syncthing.configDir = "/tank/services/syncthing/config";
+  services.syncthing.guiAddress = "0.0.0.0:8384";
 
   # TODO: Switch to prometheus when prometheus
   services.netdata.enable = true;
