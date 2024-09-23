@@ -70,6 +70,15 @@
   services.syncthing.configDir = "/tank/services/syncthing/config";
   services.syncthing.guiAddress = "0.0.0.0:8384";
 
+  services.navidrome = {
+    enable = true;
+    openFirewall = true;
+    settings = {
+      Address = "0.0.0.0";
+      MusicFolder = "/tank/nas/library/music";
+    };
+  };
+
   # TODO: Switch to prometheus when prometheus
   services.netdata.enable = true;
 
