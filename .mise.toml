@@ -1,0 +1,57 @@
+# mise configuration for home-ops infrastructure tooling
+# Tools from the previous nix flake.nix devShell
+
+[tools]
+# Core infrastructure tools
+"ubi:FiloSottile/age" = "latest"
+"ubi:fluxcd/flux2" = { version = "latest", exe = "flux" }
+"ubi:derailed/k9s" = "latest"
+kubectl = "latest"
+"ubi:kubernetes-sigs/cluster-api" = { version = "latest", exe = "cluster-api", rename_exe = "clusterctl" }
+terraform = "latest"
+"ubi:siderolabs/talos" = { version = "latest", exe = "talos", rename_exe = "talosctl" }
+sops = "latest"
+
+# Additional useful tools for this repo
+go = "latest"
+node = "latest"
+
+[env]
+# Project-specific environment variables
+_.file = ".env"                        # Load from .env if exists
+
+[tasks.tf-init]
+description = "Initialize Terraform in all directories"
+run = """
+for dir in infra/terraform/*/; do
+  echo "Initializing $dir"
+  terraform -chdir="$dir" init
+done
+"""
+
+[tasks.tf-fmt]
+description = "Format Terraform files"
+run = "terraform fmt -recursive infra/terraform/"
+
+[tasks.tf-validate]
+description = "Validate Terraform configurations"
+run = """
+for dir in infra/terraform/*/; do
+  echo "Validating $dir"
+  terraform -chdir="$dir" validate
+done
+"""
+
+[tasks.sops-check]
+description = "Verify SOPS encrypted files can be decrypted"
+run = '''
+find . -name '*.sops.yaml' -exec echo "Checking {}" \; -exec sops -d {} > /dev/null \;
+'''
+
+[tasks.flux-check]
+description = "Check Flux installation prerequisites"
+run = "flux check --pre"
+
+[tasks.k8s-ctx]
+description = "Show current Kubernetes context"
+run = "kubectl config current-context"

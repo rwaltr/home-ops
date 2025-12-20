@@ -2,6 +2,9 @@
 bin/
 .vscode
 
+# Mise
+.mise.local.toml
+
 # Sops
 .decrypted~*.yaml
 
