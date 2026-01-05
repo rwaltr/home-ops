@@ -1,0 +1,11 @@
+name: cloudflare-provisioner
+runtime: go
+main: .
+description: Cloudflare DNS and domain management with Pulumi
+config:
+  cloudflare:email:
+    description: Cloudflare account email
+    secret: true
+  cloudflare:api_key:
+    description: Cloudflare API key
+    secret: true

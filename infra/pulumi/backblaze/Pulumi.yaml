@@ -1,0 +1,11 @@
+name: backblaze-provisioner
+runtime: go
+main: .
+description: Backblaze B2 bucket provisioning with Pulumi
+config:
+  backblaze:application_key:
+    description: Backblaze B2 application key
+    secret: true
+  backblaze:application_key_id:
+    description: Backblaze B2 application key ID
+    secret: true

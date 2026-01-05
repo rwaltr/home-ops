@@ -1,85 +1,85 @@
 resource "cloudflare_zone" "prof_domain" {
-  zone = local.my_domains["prof"]
+  zone       = local.my_domains["prof"]
   account_id = cloudflare_account.waltrtech.id
 }
 
 resource "cloudflare_record" "prof_root" {
-  type = "CNAME"
-  name = "@"
-  value = "rwaltr.github.io"
+  type    = "CNAME"
+  name    = "@"
+  value   = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_www" {
-  type = "CNAME"
-  name = "www"
-  value = "rwaltr.github.io"
+  type    = "CNAME"
+  name    = "www"
+  value   = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_githubverify" {
-  type = "TXT"
-  name = "_github-pages-challenge-rwaltr"
-  value = "8697f334fc9261ca5d28a65ce0544e"
+  type    = "TXT"
+  name    = "_github-pages-challenge-rwaltr"
+  value   = "8697f334fc9261ca5d28a65ce0544e"
   zone_id = cloudflare_zone.prof_domain.id
 
 }
 # Email Records /
 resource "cloudflare_record" "prof_MigaduVerify" {
-  type = "TXT"
-  name = "@"
-  value = "hosted-email-verify=mtm4pnvs"
+  type    = "TXT"
+  name    = "@"
+  value   = "hosted-email-verify=mtm4pnvs"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_MX1" {
-  type = "MX"
-  name = "@"
-  value = "aspmx1.migadu.com"
+  type     = "MX"
+  name     = "@"
+  value    = "aspmx1.migadu.com"
   priority = 10
-  zone_id = cloudflare_zone.prof_domain.id
+  zone_id  = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_MX2" {
-  type = "MX"
-  name = "@"
-  value = "aspmx2.migadu.com"
+  type     = "MX"
+  name     = "@"
+  value    = "aspmx2.migadu.com"
   priority = 20
-  zone_id = cloudflare_zone.prof_domain.id
+  zone_id  = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DKIM1" {
-  type = "CNAME"
-  name = "key1._domainkey"
-  value = "key1.rwalt.pro._domainkey.migadu.com."
+  type    = "CNAME"
+  name    = "key1._domainkey"
+  value   = "key1.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DKIM2" {
-  type = "CNAME"
-  name = "key2._domainkey"
-  value = "key2.rwalt.pro._domainkey.migadu.com."
+  type    = "CNAME"
+  name    = "key2._domainkey"
+  value   = "key2.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DKIM3" {
-  type = "CNAME"
-  name = "key3._domainkey"
-  value = "key3.rwalt.pro._domainkey.migadu.com."
+  type    = "CNAME"
+  name    = "key3._domainkey"
+  value   = "key3.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_SPF" {
-  type = "TXT"
-  name = "@"
-  value = "v=spf1 include:spf.migadu.com -all"
+  type    = "TXT"
+  name    = "@"
+  value   = "v=spf1 include:spf.migadu.com -all"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DMARC" {
-  type = "TXT"
-  name = "_dmarc"
-  value = "v=DMARC1; p=quarantine;"
+  type    = "TXT"
+  name    = "_dmarc"
+  value   = "v=DMARC1; p=quarantine;"
   zone_id = cloudflare_zone.prof_domain.id
 
 }

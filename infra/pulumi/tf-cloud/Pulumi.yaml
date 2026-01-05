@@ -1,0 +1,10 @@
+name: tfcloud-provisioner
+runtime: go
+main: .
+description: Terraform Cloud workspace management with Pulumi
+config:
+  terraform:organization:
+    description: Terraform Cloud organization name
+  terraform:token:
+    description: Terraform Cloud API token
+    secret: true
