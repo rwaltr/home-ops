@@ -1,0 +1,104 @@
+variant: fcos
+version: 1.5.0
+# Base system configuration for uCore
+# This file contains common configuration shared across all hosts
+
+passwd:
+  users:
+    - name: rwaltr
+      groups:
+        - wheel
+        - sudo
+      ssh_authorized_keys:
+        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDyFKJXF37y8R2lGAfzCd5aeDIWRGYaiXrqcW3GL3EnrM1rkZvJNWb+K7LssbKUd5yTOOi5pSElfJXtSrATfcNyVpir/4Mzxj0p0KAjRFbM6R23cOYVXU0nLN2BS2rpO6svCWuTvqs7C4yNe4DGnfexSas6y/Aeay8p5H5DKkz/Ab71En8xDYig0nIRqPDI/2wCm8WbKhZWFL34eLgOm1YIjHMCbUQ7z5D7w0Ysjk6gFlaiv+1HsgWo9zRo669jOEG5pr0tb+FN4ciX+asC10Nymu0c50i5Ne1IXHHB8eEqlpdkwglGu2elMYE0RKpWcun0BeH9jMIgCjEjRAxHwRif
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILc1vnF56JRCttjbG8pl+0amUr95iqtdGW7f4zrbFscE
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLxslWwoL1QrccIpaWTGwqJ1pL7Di3jnKg3CeEOLQFP
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBARcLnvy9JIlc5RctWBdtwDkbfYLn0DT6+/VtrpuZyt
+
+systemd:
+  units:
+    # Enable SSH
+    - name: sshd.service
+      enabled: true
+    
+    # Enable fstrim for SSD
+    - name: fstrim.timer
+      enabled: true
+
+storage:
+  links:
+    # Timezone configuration
+    - path: /etc/localtime
+      overwrite: true
+      target: /usr/share/zoneinfo/America/Chicago
+  
+  files:
+    
+    # Enable IP forwarding for Tailscale and other services
+    - path: /etc/sysctl.d/90-ip-forward.conf
+      mode: 0644
+      contents:
+        inline: |
+          net.ipv4.ip_forward = 1
+          net.ipv6.conf.all.forwarding = 1
+    
+    # Create directory for container storage
+    - path: /var/containers
+      mode: 0755
+      user:
+        name: root
+      group:
+        name: root
+    
+    # Firewall configuration for core services
+    - path: /etc/firewalld/services/homelab.xml
+      mode: 0644
+      contents:
+        inline: |
+          <?xml version="1.0" encoding="utf-8"?>
+          <service>
+            <short>Homelab Services</short>
+            <description>Custom firewall rules for homelab services</description>
+            <!-- SSH -->
+            <port protocol="tcp" port="22"/>
+            <!-- NFS -->
+            <port protocol="tcp" port="2049"/>
+            <!-- Netdata -->
+            <port protocol="tcp" port="19999"/>
+            <!-- Syncthing -->
+            <port protocol="tcp" port="8384"/>
+            <port protocol="tcp" port="22000"/>
+            <port protocol="udp" port="22000"/>
+            <port protocol="udp" port="21027"/>
+            <!-- MinIO -->
+            <port protocol="tcp" port="9000"/>
+            <port protocol="tcp" port="9001"/>
+            <!-- Navidrome -->
+            <port protocol="tcp" port="4533"/>
+          </service>
+    
+    # Install essential packages
+    - path: /etc/systemd/system/install-packages.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Install essential packages via rpm-ostree
+          ConditionPathExists=!/var/lib/rpm-ostree-install-complete
+          After=network-online.target
+          Wants=network-online.target
+          
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/rpm-ostree install --apply-live --allow-inactive \
+            nfs-utils \
+            rclone \
+            restic \
+            git \
+            age \
+            croc
+          ExecStartPost=/usr/bin/touch /var/lib/rpm-ostree-install-complete
+          RemainAfterExit=yes
+          
+          [Install]
+          WantedBy=multi-user.target

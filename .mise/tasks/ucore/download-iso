@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#MISE description="Download Fedora CoreOS ISO (shared across hosts)"
+#MISE outputs=[".vm/fedora-coreos-stable.iso"]
+
+set -euo pipefail
+
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+ISO_NAME="fedora-coreos-stable.iso"
+ISO_PATH="${VM_DIR}/${ISO_NAME}"
+
+mkdir -p "${VM_DIR}"
+
+if [ -f "${ISO_PATH}" ]; then
+    echo "✓ ISO already exists at ${ISO_PATH}"
+    exit 0
+fi
+
+echo "Downloading Fedora CoreOS stable ISO..."
+STREAM="stable"
+ISO_URL=$(curl -s "https://builds.coreos.fedoraproject.org/streams/${STREAM}.json" | \
+    python3 -c "import sys, json; print(json.load(sys.stdin)['architectures']['x86_64']['artifacts']['metal']['formats']['iso']['disk']['location'])")
+
+curl -L -o "${ISO_PATH}" "${ISO_URL}"
+echo "✓ Downloaded ISO to ${ISO_PATH}"

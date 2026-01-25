@@ -1,0 +1,38 @@
+# Podman Quadlet container definition for Navidrome
+# Music streaming server
+
+[Unit]
+Description=Navidrome music streaming server
+After=network-online.target zfs-import-tank.service
+Wants=network-online.target
+
+[Container]
+Image=docker.io/deluan/navidrome:latest
+ContainerName=navidrome
+PublishPort=4533:4533
+
+# Mount music library and config
+Volume=/var/tank/nas/library/music:/music:ro,Z
+Volume=/var/tank/services/navidrome/data:/data:Z
+
+# Navidrome configuration
+Environment=ND_MUSICFOLDER=/music
+Environment=ND_DATADIR=/data
+Environment=ND_LOGLEVEL=info
+Environment=ND_SCANSCHEDULE=1h
+Environment=ND_SESSIONTIMEOUT=24h
+Environment=ND_ADDRESS=0.0.0.0
+Environment=ND_PORT=4533
+
+# User/Group - run as root or specific UID if needed
+# User=1000:1000
+
+# Auto-restart
+Restart=on-failure
+RestartSec=10s
+
+[Service]
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

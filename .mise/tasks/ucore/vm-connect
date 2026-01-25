@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#MISE description="Connect to running uCore VM"
+#MISE arg "[hostname]" help="Host to connect to (default: mouse)"
+
+set -euo pipefail
+
+HOSTNAME="${1:-mouse}"
+VM_NAME="ucore-${HOSTNAME}-test"
+
+check_virsh() {
+    if ! command -v virsh &> /dev/null; then
+        echo "Error: virsh not found. Install libvirt:"
+        echo "  Arch: sudo pacman -S libvirt virt-manager"
+        echo "  Fedora: sudo dnf install libvirt virt-manager"
+        echo "  Ubuntu: sudo apt install libvirt-daemon-system virt-manager"
+        exit 1
+    fi
+    
+    if ! virsh --connect qemu:///system list --all &> /dev/null; then
+        echo "Error: Cannot connect to libvirt system. Make sure libvirtd is running:"
+        echo "  sudo systemctl start libvirtd"
+        echo ""
+        echo "Note: Using system connection requires sudo for some operations."
+        exit 1
+    fi
+    
+    echo "✓ libvirt is available (system mode)"
+}
+
+echo "==================================="
+echo "uCore VM: ${HOSTNAME}"
+echo "==================================="
+echo ""
+
+check_virsh
+
+if ! virsh --connect qemu:///system list --all | grep -q "${VM_NAME}"; then
+    echo "Error: VM '${VM_NAME}' does not exist."
+    echo "Run 'mise run ucore:vm ${HOSTNAME}' first to create and install."
+    exit 1
+fi
+
+if ! virsh --connect qemu:///system list | grep -q "${VM_NAME}"; then
+    echo "Starting VM..."
+    virsh --connect qemu:///system start "${VM_NAME}"
+    sleep 3
+else
+    echo "✓ VM is already running"
+fi
+
+echo ""
+VM_IP=$(virsh --connect qemu:///system domifaddr "${VM_NAME}" 2>/dev/null | grep -oP '(\d{1,3}\.){3}\d{1,3}' | head -1)
+
+if [ -n "${VM_IP}" ]; then
+    echo "VM IP: ${VM_IP}"
+    echo "SSH: ssh rwaltr@${VM_IP}"
+else
+    echo "Waiting for IP address..."
+fi
+
+echo ""
+echo "Opening virt-manager GUI..."
+virt-manager --connect qemu:///system --show-domain-console "${VM_NAME}" &

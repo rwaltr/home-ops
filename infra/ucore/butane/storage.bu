@@ -1,0 +1,64 @@
+variant: fcos
+version: 1.5.0
+# ZFS and storage configuration
+
+storage:
+  files:
+    # Load ZFS kernel module on boot
+    - path: /etc/modules-load.d/zfs.conf
+      mode: 0644
+      contents:
+        inline: |
+          zfs
+    
+    # ZFS pool import script
+    - path: /usr/local/bin/zfs-import-tank.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/bin/bash
+          # Import ZFS pool and ensure correct mountpoint
+          
+          # Check if pool is already imported
+          if zpool list tank &>/dev/null; then
+            echo "Pool 'tank' already imported"
+          else
+            echo "Importing pool 'tank'..."
+            zpool import tank
+          fi
+          
+          # Ensure mountpoint is set to /var/tank
+          CURRENT_MOUNT=$(zfs get -H -o value mountpoint tank)
+          if [ "$CURRENT_MOUNT" != "/var/tank" ]; then
+            echo "Setting mountpoint to /var/tank..."
+            zfs set mountpoint=/var/tank tank
+          fi
+          
+          echo "ZFS pool 'tank' ready at /var/tank"
+
+systemd:
+  units:
+    # ZFS pool import service
+    - name: zfs-import-tank.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Import ZFS pool 'tank'
+        After=zfs.target
+        Before=local-fs.target
+        
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/zfs-import-tank.sh
+        
+        [Install]
+        WantedBy=multi-user.target
+    
+    # Enable ZFS scrub timer (weekly)
+    - name: zfs-scrub-weekly@tank.timer
+      enabled: true
+    
+    # NFS server
+    - name: nfs-server.service
+      enabled: true

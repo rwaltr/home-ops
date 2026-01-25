@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#MISE description="Build all Ignition files from Butane configs"
+#MISE sources=["infra/ucore/butane/**/*.bu", "infra/ucore/containers/*.container"]
+#MISE outputs=["infra/ucore/ignition/*.ign"]
+
+set -euo pipefail
+
+BUTANE_DIR="${MISE_PROJECT_ROOT}/infra/ucore/butane"
+HOSTS_DIR="${BUTANE_DIR}/hosts"
+OUTPUT_DIR="${MISE_PROJECT_ROOT}/infra/ucore/ignition"
+
+mkdir -p "${OUTPUT_DIR}"
+
+build_butane() {
+    local butane_file="$1"
+    local basename=$(basename "${butane_file}" .bu)
+    local output_file="${OUTPUT_DIR}/${basename}.ign"
+    
+    echo "Building ${basename}.bu → ${basename}.ign"
+    
+    if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${output_file}" 2>&1; then
+        echo "Error: Failed to build ${butane_file}"
+        cat "${output_file}" 2>/dev/null || true
+        return 1
+    fi
+    
+    if [ ! -s "${output_file}" ]; then
+        echo "Error: Output file is empty"
+        return 1
+    fi
+    
+    echo "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"
+}
+
+echo "Building all Butane configs..."
+
+for butane_file in "${BUTANE_DIR}"/*.bu; do
+    if [ -f "${butane_file}" ]; then
+        build_butane "${butane_file}" || exit 1
+    fi
+done
+
+for butane_file in "${HOSTS_DIR}"/*.bu; do
+    if [ -f "${butane_file}" ]; then
+        build_butane "${butane_file}" || exit 1
+    fi
+done
+
+echo ""
+echo "All Ignition files built successfully!"
+echo "Output directory: ${OUTPUT_DIR}"

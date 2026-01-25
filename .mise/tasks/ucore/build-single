@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#MISE description="Build a single Ignition file from Butane config"
+#MISE arg "<config-name>" help="Name of the config file (without .bu extension)"
+
+set -euo pipefail
+
+if [ -z "${1:-}" ]; then
+    echo "Error: Please specify a config name"
+    echo "Usage: mise run ucore:build-single <config-name>"
+    exit 1
+fi
+
+BUTANE_DIR="${MISE_PROJECT_ROOT}/infra/ucore/butane"
+HOSTS_DIR="${BUTANE_DIR}/hosts"
+OUTPUT_DIR="${MISE_PROJECT_ROOT}/infra/ucore/ignition"
+
+mkdir -p "${OUTPUT_DIR}"
+
+config_name="$1"
+butane_file="${BUTANE_DIR}/${config_name}.bu"
+
+if [ ! -f "${butane_file}" ]; then
+    butane_file="${HOSTS_DIR}/${config_name}.bu"
+fi
+
+if [ ! -f "${butane_file}" ]; then
+    echo "Error: ${config_name}.bu not found in butane/ or butane/hosts/"
+    exit 1
+fi
+
+basename=$(basename "${butane_file}" .bu)
+output_file="${OUTPUT_DIR}/${basename}.ign"
+
+echo "Building ${basename}.bu → ${basename}.ign"
+
+if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${output_file}" 2>&1; then
+    echo "Error: Failed to build ${butane_file}"
+    cat "${output_file}" 2>/dev/null || true
+    exit 1
+fi
+
+if [ ! -s "${output_file}" ]; then
+    echo "Error: Output file is empty"
+    exit 1
+fi
+
+echo "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"

@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+#MISE description="Clean up all uCore VMs and disk images"
+#MISE arg "[hostname]" help="Host to clean (default: all hosts)"
+
+set -euo pipefail
+
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+HOSTNAME="${1:-}"
+
+check_virsh() {
+    if ! command -v virsh &> /dev/null; then
+        echo "Warning: virsh not found. Skipping VM cleanup."
+        return 1
+    fi
+    
+    if ! virsh --connect qemu:///system list --all &> /dev/null; then
+        echo "Warning: Cannot connect to libvirt system. Skipping VM cleanup."
+        return 1
+    fi
+    
+    return 0
+}
+
+clean_vm() {
+    local vm_name="$1"
+    
+    if ! virsh --connect qemu:///system list --all | grep -q "${vm_name}"; then
+        echo "  VM '${vm_name}' does not exist, skipping"
+        return
+    fi
+    
+    echo "  Destroying VM: ${vm_name}"
+    virsh --connect qemu:///system destroy "${vm_name}" 2>/dev/null || true
+    
+    echo "  Undefining VM: ${vm_name}"
+    virsh --connect qemu:///system undefine "${vm_name}" --nvram 2>/dev/null || true
+    
+    echo "  ✓ Cleaned up VM: ${vm_name}"
+}
+
+clean_disks() {
+    local pattern="$1"
+    
+    if [ ! -d "${VM_DIR}" ]; then
+        echo "  VM directory does not exist: ${VM_DIR}"
+        return
+    fi
+    
+    local files_found=false
+    for file in "${VM_DIR}"/${pattern}; do
+        if [ -f "${file}" ]; then
+            files_found=true
+            echo "  Removing: $(basename "${file}")"
+            rm -f "${file}"
+        fi
+    done
+    
+    if [ "$files_found" = false ]; then
+        echo "  No disk files found matching: ${pattern}"
+    else
+        echo "  ✓ Cleaned up disk files"
+    fi
+}
+
+echo "==================================="
+echo "uCore Cleanup"
+echo "==================================="
+echo ""
+
+if [ -n "${HOSTNAME}" ]; then
+    echo "Cleaning up host: ${HOSTNAME}"
+    echo ""
+    
+    if check_virsh; then
+        echo "Cleaning VM..."
+        clean_vm "ucore-${HOSTNAME}-test"
+    fi
+    
+    echo ""
+    echo "Cleaning disk images..."
+    clean_disks "ucore-${HOSTNAME}*.qcow2"
+    clean_disks "fedora-coreos-${HOSTNAME}-autoinstall.iso"
+    
+else
+    echo "Cleaning up all uCore VMs and disks"
+    echo ""
+    
+    if check_virsh; then
+        echo "Finding all uCore VMs..."
+        vm_list=$(virsh --connect qemu:///system list --all --name | grep "^ucore-" || true)
+        
+        if [ -n "${vm_list}" ]; then
+            echo "Found VMs:"
+            echo "${vm_list}" | sed 's/^/  - /'
+            echo ""
+            
+            while IFS= read -r vm_name; do
+                [ -z "${vm_name}" ] && continue
+                clean_vm "${vm_name}"
+            done <<< "${vm_list}"
+        else
+            echo "  No uCore VMs found"
+        fi
+    fi
+    
+    echo ""
+    echo "Cleaning all disk images..."
+    clean_disks "ucore-*.qcow2"
+    clean_disks "fedora-coreos-*-autoinstall.iso"
+fi
+
+echo ""
+echo "Cleanup complete!"
+echo ""
+echo "Kept (shared resources):"
+echo "  - Base Fedora CoreOS ISO (.vm/fedora-coreos-stable.iso)"
+echo "  - Ignition configs (infra/ucore/ignition/)"
+echo ""
+echo "To remove these as well:"
+echo "  rm .vm/fedora-coreos-stable.iso"
+echo "  rm -rf infra/ucore/ignition/"

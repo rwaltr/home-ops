@@ -1,0 +1,65 @@
+variant: fcos
+version: 1.5.0
+# Host-specific configuration template
+# 
+# CUSTOMIZE THIS FILE:
+# 1. Update hostname below
+# 2. Generate unique ZFS hostid: printf '%08x\n' $(date +%s)
+# 3. Add container definitions as needed (see mouse.bu for examples)
+
+storage:
+  files:
+    # Hostname
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: |
+          CHANGEME_HOSTNAME
+    
+    # ZFS hostid (generate with: printf '%08x\n' $(date +%s))
+    - path: /etc/hostid
+      mode: 0644
+      contents:
+        inline: |
+          CHANGEME_HOSTID
+    
+    # Container definitions (Podman Quadlet)
+    # Uncomment and add as needed:
+    # - path: /etc/containers/systemd/myapp.container
+    #   mode: 0644
+    #   contents:
+    #     local: infra/ucore/containers/myapp.container
+
+systemd:
+  units:
+    # Rebase to uCore on first boot
+    - name: rebase-to-ucore.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Rebase to Universal Blue uCore
+        After=network-online.target
+        Wants=network-online.target
+        ConditionPathExists=!/var/lib/ucore-rebased
+        
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/rpm-ostree rebase ostree-unverified-registry:ghcr.io/ublue-os/ucore-hci:stable
+        ExecStartPost=/usr/bin/touch /var/lib/ucore-rebased
+        ExecStartPost=/usr/bin/systemctl reboot
+        RemainAfterExit=yes
+        
+        [Install]
+        WantedBy=multi-user.target
+    
+    # Enable Avahi (mDNS)
+    - name: avahi-daemon.service
+      enabled: true
+    
+    # Enable smartd for disk monitoring
+    - name: smartd.service
+      enabled: true
+    
+    # Enable firewall
+    - name: firewalld.service
+      enabled: true

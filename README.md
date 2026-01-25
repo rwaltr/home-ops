@@ -24,13 +24,21 @@ _NixOS-powered homelab infrastructure with Terraform cloud management_
 
 This is a monorepo to manage my personal homelab infrastructure. Currently running a single NixOS host ("mouse") combined with Terraform for cloud resource management. The infrastructure provides file storage (ZFS, NFS), media services (Navidrome), synchronization (Syncthing), and backup capabilities (MinIO, Backblaze B2).
 
+**🚧 Migration in Progress:** Currently planning migration from NixOS to Universal Blue uCore. See [infra/ucore/README.md](infra/ucore/README.md) for details.
+
 ## 🔧 Infrastructure Components
 
-### ❄️ NixOS
+### ❄️ NixOS → 🔵 uCore (Migration in Progress)
 
-NixOS provides declarative host configuration management. The main host "mouse" is defined in `infra/nix/hosts/mouse/` with configurations for ZFS, MinIO, Syncthing, Navidrome, NFS, and monitoring.
+**Current:** NixOS provides declarative host configuration management. The main host "mouse" is defined in `infra/nix/hosts/mouse/` with configurations for ZFS, MinIO, Syncthing, Navidrome, NFS, and monitoring.
 
-Entry point: `flake.nix`
+**Planned:** Universal Blue uCore (Fedora CoreOS-based immutable OS) with container-first workflow. Configuration in `infra/ucore/`.
+
+- [uCore Migration Plan](infra/ucore/README.md)
+- [VM Testing Guide](infra/ucore/VM-TESTING.md)
+- [Migration Runbook](infra/ucore/MIGRATION.md)
+
+Entry point: `flake.nix` (current) | `infra/ucore/butane/` (future)
 
 ### 🌐 Terraform
 

@@ -17,6 +17,35 @@ terraform = "latest"
 
 # Additional useful tools for this repo
 go = "latest"
+"ubi:coreos/butane" = "latest"
+
+# uCore tasks are file-based tasks in .mise/tasks/ucore/
+# 
+# Task architecture:
+#   - Tasks without args use depends=[] for automatic parallel execution
+#   - Tasks with args are called explicitly via "mise run task arg"
+#
+# Execution flow for "mise run ucore:vm":
+#   1. Run depends in parallel: ucore:build + ucore:download-iso
+#   2. Call: mise run ucore:customize-iso ${hostname}
+#      - Which has its own depends: ucore:build + ucore:download-iso (cached)
+#   3. Create and start VM
+#
+# Available tasks:
+#   mise run ucore:build              - Build all Ignition files (incremental)
+#   mise run ucore:build-single <name> - Build single Ignition file
+#   mise run ucore:download-iso        - Download Fedora CoreOS ISO (cached)
+#   mise run ucore:customize-iso <host> - Create custom install ISO
+#   mise run ucore:vm [hostname]       - Create and auto-install VM (full chain)
+#   mise run ucore:vm-connect [hostname] - Connect to existing VM
+#   mise run ucore:clean [hostname]    - Clean up VMs and disks (all or specific host)
+#
+# Tips:
+#   - Build task uses source/output tracking for incremental builds
+#   - Use --force to rebuild: mise run ucore:build --force
+#   - View dependency tree: mise tasks deps ucore:vm
+#   - Watch for changes: mise watch ucore:build
+#   - Clean keeps shared resources (base ISO, ignition configs)
 
 [env]
 _.file = ".env"

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#MISE description="Create custom auto-install ISO for a host"
+#MISE arg "<hostname>" help="Host to create ISO for"
+#MISE depends=["ucore:build", "ucore:download-iso"]
+#MISE sources=["infra/ucore/ignition/${1:-mouse}.ign", ".vm/fedora-coreos-stable.iso"]
+#MISE outputs=[".vm/fedora-coreos-${1:-mouse}-autoinstall.iso"]
+
+set -euo pipefail
+
+if [ -z "${1:-}" ]; then
+    echo "Error: Please specify a hostname"
+    echo "Usage: mise run ucore:customize-iso <hostname>"
+    exit 1
+fi
+
+HOSTNAME="$1"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+IGNITION_DIR="${MISE_PROJECT_ROOT}/infra/ucore/ignition"
+ISO_NAME="fedora-coreos-stable.iso"
+ISO_PATH="${VM_DIR}/${ISO_NAME}"
+CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-autoinstall.iso"
+IGNITION_FILE="${IGNITION_DIR}/${HOSTNAME}.ign"
+
+if [ -f "${CUSTOM_ISO_PATH}" ]; then
+    echo "✓ Custom auto-install ISO already exists: ${CUSTOM_ISO_PATH}"
+    exit 0
+fi
+
+if [ ! -f "${ISO_PATH}" ]; then
+    echo "Error: Base ISO not found at ${ISO_PATH}"
+    echo "Run 'mise run ucore:download-iso' first"
+    exit 1
+fi
+
+if [ ! -f "${IGNITION_FILE}" ]; then
+    echo "Error: Ignition file not found at ${IGNITION_FILE}"
+    echo "Run 'mise run ucore:build' first"
+    exit 1
+fi
+
+echo "Customizing ISO for ${HOSTNAME}..."
+echo "  - Target device: /dev/vda"
+echo "  - Ignition config: ${IGNITION_FILE}"
+
+podman run --rm --privileged \
+    -v "${VM_DIR}:/data" \
+    -v "${IGNITION_DIR}:/ignition:ro" \
+    quay.io/coreos/coreos-installer:release \
+    iso customize \
+    --dest-device /dev/vda \
+    --dest-ignition "/ignition/${HOSTNAME}.ign" \
+    -o "/data/fedora-coreos-${HOSTNAME}-autoinstall.iso" \
+    "/data/${ISO_NAME}"
+
+echo "✓ Created custom auto-install ISO: ${CUSTOM_ISO_PATH}"

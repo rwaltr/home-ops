@@ -1,0 +1,40 @@
+# Podman Quadlet container definition for Netdata
+# System monitoring and metrics
+
+[Unit]
+Description=Netdata real-time monitoring
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/netdata/netdata:latest
+ContainerName=netdata
+PublishPort=19999:19999
+
+# Privileged access for system monitoring
+SecurityLabelDisable=true
+AddCapability=SYS_PTRACE
+AddCapability=SYS_ADMIN
+
+# Mount system directories for monitoring
+Volume=/proc:/host/proc:ro
+Volume=/sys:/host/sys:ro
+Volume=/etc/os-release:/host/etc/os-release:ro
+Volume=/var/run/docker.sock:/var/run/docker.sock:ro
+Volume=/var/tank/services/netdata/config:/etc/netdata:Z
+Volume=/var/tank/services/netdata/lib:/var/lib/netdata:Z
+Volume=/var/tank/services/netdata/cache:/var/cache/netdata:Z
+
+# Environment
+Environment=VIRTUALIZATION=podman
+Environment=DOCKER_HOST=/var/run/docker.sock
+
+# Auto-restart
+Restart=on-failure
+RestartSec=10s
+
+[Service]
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
