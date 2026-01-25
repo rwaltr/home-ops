@@ -29,12 +29,10 @@ Volume=/var/tank/services/netdata/cache:/var/cache/netdata:Z
 Environment=VIRTUALIZATION=podman
 Environment=DOCKER_HOST=/var/run/docker.sock
 
-# Auto-restart
-Restart=on-failure
-RestartSec=10s
-
 [Service]
 TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

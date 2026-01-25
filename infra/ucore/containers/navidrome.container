@@ -27,12 +27,10 @@ Environment=ND_PORT=4533
 # User/Group - run as root or specific UID if needed
 # User=1000:1000
 
-# Auto-restart
-Restart=on-failure
-RestartSec=10s
-
 [Service]
 TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

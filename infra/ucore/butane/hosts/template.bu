@@ -7,6 +7,12 @@ version: 1.5.0
 # 2. Generate unique ZFS hostid: printf '%08x\n' $(date +%s)
 # 3. Add container definitions as needed (see mouse.bu for examples)
 
+ignition:
+  config:
+    merge:
+      - local: infra/ucore/ignition/base.ign
+      - local: infra/ucore/ignition/storage.ign
+
 storage:
   files:
     # Hostname

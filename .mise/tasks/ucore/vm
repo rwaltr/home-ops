@@ -1,34 +1,18 @@
 #!/usr/bin/env bash
 #MISE description="Create and auto-install uCore VM"
-#MISE arg "[hostname]" help="Host to install (default: mouse)"
 #MISE depends=["ucore:build", "ucore:download-iso"]
+#USAGE flag "--force" help="Force recreate VM even if it exists"
+#USAGE arg "[hostname]" help="Host to install" default="mouse"
 
 set -euo pipefail
 
-HOSTNAME="${1:-mouse}"
+HOSTNAME="${usage_hostname?}"
+FORCE="${usage_force:-false}"
+VM_NAME="ucore-${HOSTNAME}-test"
 VM_DIR="${MISE_PROJECT_ROOT}/.vm"
 CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-autoinstall.iso"
 DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}.qcow2"
 ZFS_DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}-zfs.qcow2"
-VM_NAME="ucore-${HOSTNAME}-test"
-
-create_disks() {
-    if [ ! -f "${DISK_PATH}" ]; then
-        echo "Creating main disk (40GB)..."
-        qemu-img create -f qcow2 "${DISK_PATH}" 40G
-        echo "✓ Created ${DISK_PATH}"
-    else
-        echo "✓ Main disk already exists"
-    fi
-    
-    if [ ! -f "${ZFS_DISK_PATH}" ]; then
-        echo "Creating ZFS disk (20GB)..."
-        qemu-img create -f qcow2 "${ZFS_DISK_PATH}" 20G
-        echo "✓ Created ${ZFS_DISK_PATH}"
-    else
-        echo "✓ ZFS disk already exists"
-    fi
-}
 
 check_virsh() {
     if ! command -v virsh &> /dev/null; then
@@ -50,12 +34,21 @@ check_virsh() {
     echo "✓ libvirt is available (system mode)"
 }
 
-destroy_existing_vm() {
-    if virsh --connect qemu:///system list --all | grep -q "${VM_NAME}"; then
-        echo "Cleaning up existing VM..."
-        virsh --connect qemu:///system destroy "${VM_NAME}" 2>/dev/null || true
-        virsh --connect qemu:///system undefine "${VM_NAME}" --nvram 2>/dev/null || true
-        echo "✓ Removed existing VM"
+create_disks() {
+    if [ ! -f "${DISK_PATH}" ]; then
+        echo "Creating main disk (40GB)..."
+        qemu-img create -f qcow2 "${DISK_PATH}" 40G
+        echo "✓ Created ${DISK_PATH}"
+    else
+        echo "✓ Main disk already exists"
+    fi
+    
+    if [ ! -f "${ZFS_DISK_PATH}" ]; then
+        echo "Creating ZFS disk (20GB)..."
+        qemu-img create -f qcow2 "${ZFS_DISK_PATH}" 20G
+        echo "✓ Created ${ZFS_DISK_PATH}"
+    else
+        echo "✓ ZFS disk already exists"
     fi
 }
 
@@ -64,13 +57,36 @@ echo "uCore VM: ${HOSTNAME}"
 echo "==================================="
 echo ""
 
+# Check if VM already exists
+if virsh --connect qemu:///system list --all --name 2>/dev/null | grep -q "^${VM_NAME}$"; then
+    if [ "${FORCE}" != "true" ]; then
+        echo "❌ VM '${VM_NAME}' already exists!"
+        echo ""
+        echo "Options:"
+        echo "  1. Connect to existing VM:"
+        echo "     mise run ucore:vm-connect ${HOSTNAME}"
+        echo ""
+        echo "  2. Force recreate (destroys existing VM):"
+        echo "     mise run ucore:vm -- ${HOSTNAME} --force"
+        echo ""
+        echo "  3. Clean up and recreate:"
+        echo "     mise run ucore:clean ${HOSTNAME}"
+        echo "     mise run ucore:vm ${HOSTNAME}"
+        exit 1
+    else
+        echo "⚠️  Force recreating VM '${VM_NAME}'..."
+        echo ""
+        mise run ucore:clean "${HOSTNAME}"
+        echo ""
+    fi
+fi
+
 echo "Creating custom ISO for ${HOSTNAME}..."
 mise run ucore:customize-iso "${HOSTNAME}"
 
 echo ""
 create_disks
 check_virsh
-destroy_existing_vm
 
 echo ""
 echo "Creating and starting VM: ${VM_NAME}"

@@ -157,16 +157,16 @@ Containers are managed via Podman Quadlet. The workflow:
 systemctl list-units '*.service' --type=service | grep container
 
 # Status
-systemctl status minio.service
+systemctl status rustfs.service
 
 # Logs
-journalctl -u minio.service -f
+journalctl -u rustfs.service -f
 
 # Restart
-systemctl restart minio.service
+systemctl restart rustfs.service
 
 # Disable
-systemctl disable --now minio.service
+systemctl disable --now rustfs.service
 ```
 
 ## VM Management

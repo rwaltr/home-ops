@@ -35,7 +35,7 @@ infra/ucore/
 │       ├── template.bu      # Template for new hosts
 │       └── mouse.bu         # Host-specific config (references containers)
 ├── containers/              # Podman Quadlet definitions
-│   ├── minio.container      # Referenced by mouse.bu
+│   ├── rustfs.container     # Referenced by mouse.bu
 │   ├── navidrome.container  # Referenced by mouse.bu
 │   ├── syncthing.container  # Referenced by mouse.bu
 │   └── netdata.container    # Referenced by mouse.bu
@@ -85,7 +85,7 @@ infra/ucore/
 |--------------|---------------------|
 | ZFS | Pre-installed, systemd mount units |
 | NFS Server | nfs-utils via rpm-ostree |
-| MinIO | Podman container (Quadlet) |
+| RustFS | Podman container (Quadlet) |
 | Navidrome | Podman container (Quadlet) |
 | Syncthing | Podman container (Quadlet) |
 | Netdata | Podman container (Quadlet) |
@@ -99,7 +99,7 @@ infra/ucore/
 - **Reason:** uCore has immutable root filesystem
 
 All service paths updated:
-- `/tank/services/minio` → `/var/tank/services/minio`
+- `/tank/services/rustfs` → `/var/tank/services/rustfs`
 - `/tank/nas/library/music` → `/var/tank/nas/library/music`
 
 ### Configuration Management

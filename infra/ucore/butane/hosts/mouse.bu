@@ -2,6 +2,12 @@ variant: fcos
 version: 1.5.0
 # Host-specific configuration for 'mouse'
 
+ignition:
+  config:
+    merge:
+      - local: infra/ucore/ignition/base.ign
+      - local: infra/ucore/ignition/storage.ign
+
 storage:
   files:
     # Hostname
@@ -19,10 +25,10 @@ storage:
           1e1719e4
     
     # Container definitions (Podman Quadlet)
-    - path: /etc/containers/systemd/minio.container
+    - path: /etc/containers/systemd/rustfs.container
       mode: 0644
       contents:
-        local: infra/ucore/containers/minio.container
+        local: infra/ucore/containers/rustfs.container
     
     - path: /etc/containers/systemd/navidrome.container
       mode: 0644

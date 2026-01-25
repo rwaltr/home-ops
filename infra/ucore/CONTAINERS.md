@@ -7,15 +7,15 @@ Containers are managed using **Podman Quadlet**, which integrates container defi
 ## File Flow
 
 ```
-containers/minio.container (Quadlet definition)
+containers/rustfs.container (Quadlet definition)
          ↓
 butane/hosts/mouse.bu (references via contents.local)
          ↓
 ignition/mouse.ign (embeds container file)
          ↓
-/etc/containers/systemd/minio.container (deployed on boot)
+/etc/containers/systemd/rustfs.container (deployed on boot)
          ↓
-systemd discovers and creates minio.service
+systemd discovers and creates rustfs.service
          ↓
 Container runs as systemd service
 ```
@@ -24,7 +24,7 @@ Container runs as systemd service
 
 | Container | Port(s) | Volume(s) | Purpose |
 |-----------|---------|-----------|---------|
-| minio | 9000, 9001 | `/var/tank/services/minio` | S3-compatible object storage |
+| rustfs | 9000, 9001 | `/var/tank/services/rustfs` | S3-compatible object storage (Rust-based) |
 | navidrome | 4533 | `/var/tank/nas/library/music`, `/var/tank/services/navidrome` | Music streaming server |
 | syncthing | 8384, 22000, 21027 | `/var/tank/services/syncthing` | File synchronization |
 | netdata | 19999 | `/var/tank/services/netdata`, host system mounts | System monitoring |
@@ -33,17 +33,17 @@ Container runs as systemd service
 
 ### 1. Container Definition (Quadlet)
 
-File: `containers/minio.container`
+File: `containers/rustfs.container`
 ```ini
 [Unit]
-Description=MinIO S3-compatible object storage
+Description=RustFS S3-compatible object storage
 After=network-online.target zfs-import-tank.service
 
 [Container]
-Image=quay.io/minio/minio:latest
+Image=docker.io/rustfs/rustfs:latest
 PublishPort=9000:9000
-Volume=/var/tank/services/minio/data:/data:Z
-Environment=MINIO_ROOT_USER=admin
+Volume=/var/tank/services/rustfs/data:/data:Z
+Environment=RUSTFS_ACCESS_KEY=admin
 
 [Install]
 WantedBy=multi-user.target
@@ -55,14 +55,14 @@ File: `butane/hosts/mouse.bu`
 ```yaml
 storage:
   files:
-    - path: /etc/containers/systemd/minio.container
+    - path: /etc/containers/systemd/rustfs.container
       mode: 0644
       contents:
-        local: infra/ucore/containers/minio.container
+        local: infra/ucore/containers/rustfs.container
 ```
 
 **What happens:**
-- Butane reads `containers/minio.container` from filesystem
+- Butane reads `containers/rustfs.container` from filesystem
 - Embeds content (compressed) into Ignition JSON
 - Ignition deploys to `/etc/containers/systemd/` on target
 
@@ -74,7 +74,7 @@ On boot, systemd's **quadlet generator** (`/usr/lib/systemd/system-generators/po
 2. Generates systemd service units in `/run/systemd/system/`
 3. Enables and starts services per `[Install]` directive
 
-Result: `minio.service` runs like any systemd service.
+Result: `rustfs.service` runs like any systemd service.
 
 ## Adding a New Container
 
@@ -130,21 +130,21 @@ mise run ucore:vm mouse
 
 ```bash
 # Status
-systemctl status minio.service
+systemctl status rustfs.service
 
 # Start/Stop
-systemctl start minio.service
-systemctl stop minio.service
+systemctl start rustfs.service
+systemctl stop rustfs.service
 
 # Enable/Disable
-systemctl enable minio.service
-systemctl disable minio.service
+systemctl enable rustfs.service
+systemctl disable rustfs.service
 
 # Restart
-systemctl restart minio.service
+systemctl restart rustfs.service
 
 # Logs
-journalctl -u minio.service -f
+journalctl -u rustfs.service -f
 ```
 
 ### Updating Container Images
@@ -153,10 +153,10 @@ Since containers use `:latest` tags, update by:
 
 ```bash
 # Pull new image
-podman pull quay.io/minio/minio:latest
+podman pull docker.io/rustfs/rustfs:latest
 
 # Restart service
-systemctl restart minio.service
+systemctl restart rustfs.service
 ```
 
 For pinned versions, edit the `.container` file, rebuild Ignition, and redeploy.

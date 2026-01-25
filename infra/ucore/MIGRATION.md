@@ -99,7 +99,7 @@ cp infra/ucore/ignition/mouse.ign /path/to/usb/
 ssh rwaltr@mouse
 
 # Stop all services gracefully
-sudo systemctl stop minio
+sudo systemctl stop rustfs
 sudo systemctl stop navidrome  
 sudo systemctl stop syncthing
 sudo systemctl stop netdata
@@ -219,13 +219,13 @@ sudo systemctl poweroff
    sudo systemctl daemon-reload
    
    # Start services
-   sudo systemctl start minio.service
+   sudo systemctl start rustfs.service
    sudo systemctl start navidrome.service
    sudo systemctl start syncthing.service
    sudo systemctl start netdata.service
    
    # Enable on boot
-   sudo systemctl enable minio.service navidrome.service syncthing.service netdata.service
+   sudo systemctl enable rustfs.service navidrome.service syncthing.service netdata.service
    ```
 
 5. **Configure Tailscale**
@@ -259,7 +259,7 @@ sudo systemctl poweroff
 
 ```bash
 # Check all services running
-systemctl status minio.service
+systemctl status rustfs.service
 systemctl status navidrome.service
 systemctl status syncthing.service
 systemctl status netdata.service
@@ -269,7 +269,7 @@ systemctl status tailscale.service
 # Check containers
 podman ps
 
-# Test MinIO
+# Test RustFS
 curl http://localhost:9000
 
 # Test Syncthing
@@ -362,8 +362,8 @@ sudo zpool clear tank
 ### Containers Won't Start
 ```bash
 # Check logs
-journalctl -u minio.service -n 50
-podman logs minio
+journalctl -u rustfs.service -n 50
+podman logs rustfs
 
 # Check SELinux (might block mounts)
 sudo ausearch -m avc -ts recent

@@ -1,0 +1,32 @@
+# Podman Quadlet container definition for RustFS
+# Place in /etc/containers/systemd/ or include in Ignition config
+
+[Unit]
+Description=RustFS S3-compatible object storage
+After=network-online.target zfs-import-tank.service
+Wants=network-online.target
+
+[Container]
+Image=docker.io/rustfs/rustfs:latest
+ContainerName=rustfs
+PublishPort=9000:9000
+PublishPort=9001:9001
+
+# Mount ZFS paths
+Volume=/var/tank/services/rustfs/data:/data:Z
+
+# RustFS configuration
+Environment=RUSTFS_ACCESS_KEY=admin
+Environment=RUSTFS_SECRET_KEY=changeme
+Environment=RUSTFS_CONSOLE_ENABLE=true
+
+# Command - pass data directory
+Exec=/data
+
+[Service]
+TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

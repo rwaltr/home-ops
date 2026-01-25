@@ -70,7 +70,7 @@ storage:
             <port protocol="tcp" port="22000"/>
             <port protocol="udp" port="22000"/>
             <port protocol="udp" port="21027"/>
-            <!-- MinIO -->
+            <!-- RustFS (S3 API + Console) -->
             <port protocol="tcp" port="9000"/>
             <port protocol="tcp" port="9001"/>
             <!-- Navidrome -->

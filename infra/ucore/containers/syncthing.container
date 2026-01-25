@@ -24,12 +24,10 @@ Volume=/var/tank/services/syncthing/config:/var/syncthing/config:Z
 Environment=PUID=1000
 Environment=PGID=1000
 
-# Auto-restart
-Restart=on-failure
-RestartSec=10s
-
 [Service]
 TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

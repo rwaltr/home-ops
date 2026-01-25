@@ -1,0 +1,3 @@
+# This directory contains generated Ignition files (*.ign)
+# These files are gitignored because they contain secrets like SSH keys
+# Run `mise run ucore:build` to generate them

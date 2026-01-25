@@ -12,3 +12,6 @@ bin/
 *Chart.lock
 terraform.tfstate*
 .vm/
+
+# uCore Ignition files (contain secrets like SSH keys)
+infra/ucore/ignition/*.ign
