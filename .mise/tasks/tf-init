@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Initialize Terraform in all terraform directories"
+for dir in infra/terraform/*/; do
+  echo "Initializing $dir"
+  terraform -chdir="$dir" init
+done

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Format Nix files"
+
+nix fmt

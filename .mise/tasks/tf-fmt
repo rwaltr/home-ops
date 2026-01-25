@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Format Terraform files recursively"
+terraform fmt -recursive infra/terraform/

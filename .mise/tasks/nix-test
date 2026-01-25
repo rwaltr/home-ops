@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Build and test NixOS configuration (no bootloader update)"
+#MISE arg "[host]" help="Host to test (default: mouse)"
+
+HOST="${1:-mouse}"
+sudo nixos-rebuild test --flake ".#$HOST"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Run Terraform plan for a specific directory"
+#MISE arg "<dir>" help="Terraform directory name (e.g., 'cloudflare', 'backblaze', 'tf-cloud')"
+
+if [ -z "$1" ]; then
+  echo "Error: Please specify a directory (cloudflare, backblaze, tf-cloud)"
+  exit 1
+fi
+
+terraform -chdir="infra/terraform/$1" plan

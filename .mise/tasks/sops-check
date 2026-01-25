@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Verify SOPS encrypted files can be decrypted"
+
+find . -name '*.sops.yaml' -exec echo "Checking {}" \; -exec sops -d {} > /dev/null \;

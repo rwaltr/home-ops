@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Switch Kubernetes context"
+#MISE arg "<context>" help="Context name to switch to"
+
+if [ -z "$1" ]; then
+  echo "Error: Please specify a context name"
+  exit 1
+fi
+
+kubectl config use-context "$1"

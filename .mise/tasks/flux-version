@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Show Flux version"
+
+flux version --client

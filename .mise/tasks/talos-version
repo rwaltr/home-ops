@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Show Talos version"
+
+talosctl version --client

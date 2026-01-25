@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run all terraform checks (fmt, init, validate)"
+#MISE depends=["tf-fmt", "tf-init", "tf-validate"]
+
+echo "All terraform checks completed"

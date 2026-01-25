@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Validate Terraform configurations in all directories"
+#MISE depends=["tf-init"]
+for dir in infra/terraform/*/; do
+  echo "Validating $dir"
+  terraform -chdir="$dir" validate
+done

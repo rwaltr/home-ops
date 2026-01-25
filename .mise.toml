@@ -9,7 +9,7 @@ kubectl = "latest"
 "ubi:kubernetes-sigs/cluster-api" = { version = "latest", exe = "cluster-api", rename_exe = "clusterctl" }
 sops = "latest"
 "ubi:siderolabs/talos" = { version = "latest", exe = "talos", rename_exe = "talosctl" }
-"ubi:opentofu/opentofu" = { version = "latest", exe = "tofu", rename_exe = "opentofu" }
+terraform = "latest"
 "ubi:budimanjojo/talhelper" = "latest"
 
 "ubi:derailed/k9s" = "latest"
@@ -19,41 +19,4 @@ sops = "latest"
 go = "latest"
 
 [env]
-# Project-specific environment variables
-_.file = ".env"                        # Load from .env if exists
-
-[tasks.tf-init]
-description = "Initialize OpenTofu in all directories"
-run = """
-for dir in infra/terraform/*/; do
-  echo "Initializing $dir"
-  opentofu -chdir="$dir" init
-done
-"""
-
-[tasks.tf-fmt]
-description = "Format OpenTofu files"
-run = "opentofu fmt -recursive infra/terraform/"
-
-[tasks.tf-validate]
-description = "Validate OpenTofu configurations"
-run = """
-for dir in infra/terraform/*/; do
-  echo "Validating $dir"
-  opentofu -chdir="$dir" validate
-done
-"""
-
-[tasks.sops-check]
-description = "Verify SOPS encrypted files can be decrypted"
-run = '''
-find . -name '*.sops.yaml' -exec echo "Checking {}" \; -exec sops -d {} > /dev/null \;
-'''
-
-[tasks.flux-check]
-description = "Check Flux installation prerequisites"
-run = "flux check --pre"
-
-[tasks.k8s-ctx]
-description = "Show current Kubernetes context"
-run = "kubectl config current-context"
+_.file = ".env"

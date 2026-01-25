@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Check Talos cluster health"
+
+talosctl health

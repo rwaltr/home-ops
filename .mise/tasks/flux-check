@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Check Flux installation prerequisites"
+
+flux check --pre

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Show current Kubernetes context"
+
+kubectl config current-context
