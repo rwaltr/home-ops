@@ -151,10 +151,12 @@ mise run ucore:vm-connect mouse
 - **[HOSTS.md](HOSTS.md)** - Multi-host management guide
 - **[CONTAINERS.md](CONTAINERS.md)** - Container integration architecture
 - **[MIGRATION.md](MIGRATION.md)** - Production migration runbook
+- **[docs/MOLTBOT-VULTR.md](docs/MOLTBOT-VULTR.md)** - Moltbot AI agent on Vultr
 
 ## Current Hosts
 
 - **mouse** - Primary homelab server (NixOS → uCore migration)
+- **moltbot-vultr** - Moltbot AI agent platform on Vultr (planned)
 
 ## Current Status
 
