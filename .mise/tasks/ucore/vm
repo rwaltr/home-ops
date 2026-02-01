@@ -10,7 +10,8 @@ HOSTNAME="${usage_hostname?}"
 FORCE="${usage_force:-false}"
 VM_NAME="ucore-${HOSTNAME}-test"
 VM_DIR="${MISE_PROJECT_ROOT}/.vm"
-CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-autoinstall.iso"
+# VMs always use /dev/vda, so ISO is device-specific
+CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-vda-autoinstall.iso"
 DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}.qcow2"
 ZFS_DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}-zfs.qcow2"
 

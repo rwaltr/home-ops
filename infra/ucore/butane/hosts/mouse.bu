@@ -23,27 +23,6 @@ storage:
       contents:
         inline: |
           1e1719e4
-    
-    # Container definitions (Podman Quadlet)
-    - path: /etc/containers/systemd/rustfs.container
-      mode: 0644
-      contents:
-        local: infra/ucore/containers/rustfs.container
-    
-    - path: /etc/containers/systemd/navidrome.container
-      mode: 0644
-      contents:
-        local: infra/ucore/containers/navidrome.container
-    
-    - path: /etc/containers/systemd/syncthing.container
-      mode: 0644
-      contents:
-        local: infra/ucore/containers/syncthing.container
-    
-    - path: /etc/containers/systemd/netdata.container
-      mode: 0644
-      contents:
-        local: infra/ucore/containers/netdata.container
 
 systemd:
   units:
@@ -73,37 +52,4 @@ systemd:
     
     # Enable smartd for disk monitoring
     - name: smartd.service
-      enabled: true
-    
-    # Tailscale systemd service
-    - name: tailscale.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Tailscale VPN
-        After=network-online.target
-        Wants=network-online.target
-        
-        [Service]
-        Type=notify
-        ExecStartPre=/usr/bin/podman pull ghcr.io/tailscale/tailscale:stable
-        ExecStart=/usr/bin/podman run \
-          --name=tailscale \
-          --rm \
-          --network=host \
-          --privileged \
-          --cap-add=NET_ADMIN \
-          --cap-add=NET_RAW \
-          -v /var/lib/tailscale:/var/lib/tailscale \
-          -v /dev/net/tun:/dev/net/tun \
-          ghcr.io/tailscale/tailscale:stable
-        ExecStop=/usr/bin/podman stop tailscale
-        Restart=on-failure
-        RestartSec=10
-        
-        [Install]
-        WantedBy=multi-user.target
-    
-    # Enable firewall with homelab services
-    - name: firewalld.service
       enabled: true
