@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Run garbage collection (delete old generations)"
-
-echo "Running Nix garbage collection..."
-sudo nix-collect-garbage --delete-older-than 7d

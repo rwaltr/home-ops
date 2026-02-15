@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Build NixOS configuration without switching"
-#MISE arg "[host]" help="Host to build (default: mouse)"
-
-HOST="${1:-mouse}"
-nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel"

@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Enter development shell from flake"
-
-nix develop

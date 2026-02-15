@@ -1,8 +1,7 @@
 # mise configuration for home-ops infrastructure tooling
-# Tools from the previous nix flake.nix devShell
 
 [tools]
-# Core infrastructure tools from flake.nix devShell
+# Core infrastructure tools
 "ubi:FiloSottile/age" = "latest"
 "ubi:fluxcd/flux2" = { version = "latest", exe = "flux" }
 kubectl = "latest"

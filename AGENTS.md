@@ -4,12 +4,11 @@ This document provides context and guidelines for AI coding assistants (like Cur
 
 ## 📖 Project Overview
 
-This is a NixOS-powered homelab infrastructure monorepo with two active migrations:
-1. **OS Migration**: NixOS → Universal Blue uCore
-2. **IaC Migration**: Terraform → Pulumi
+This is a Universal Blue uCore homelab infrastructure monorepo with one active migration:
+1. **IaC Migration**: Terraform → Pulumi
 
 It manages:
-- **Host Configuration**: Currently NixOS (mouse), migrating to uCore
+- **Host Configuration**: uCore (mouse) — immutable Fedora CoreOS-based OS
 - **Cloud Resources**: Terraform for Cloudflare DNS and Backblaze B2 storage (migrating to Pulumi)
 - **Services**: MinIO, Syncthing, Navidrome, NFS, monitoring
 - **Secrets**: SOPS with age encryption
@@ -19,20 +18,15 @@ It manages:
 ```
 .
 ├── infra/
-│   ├── nix/               # ⚠️ Current NixOS (DO NOT MODIFY - frozen)
-│   │   ├── hosts/         # Host-specific configs (mouse)
-│   │   ├── modules/       # Reusable NixOS modules
-│   │   └── pkgs/          # Custom package derivations
-│   ├── ucore/             # 🚧 Future uCore (PRIMARY TARGET)
+│   ├── ucore/             # 🔵 Primary host configuration
 │   │   ├── butane/        # Butane configs (YAML → Ignition)
 │   │   ├── containers/    # Container definitions
-│   │   └── *.md          # Migration docs & runbooks
+│   │   └── *.md          # Docs & runbooks
 │   ├── terraform/         # 🔄 Current IaC (maintenance mode)
 │   │   ├── cloudflare/    # DNS & domain management
 │   │   ├── backblaze/     # B2 backup storage
 │   │   └── tf-cloud/      # Terraform Cloud config
 │   └── pulumi/            # 🚧 Future IaC (to be created)
-├── flake.nix              # Nix flake entry point (frozen)
 ├── .sops.yaml             # SOPS configuration
 └── .mise.toml             # Development environment
 
@@ -41,55 +35,43 @@ It manages:
 ## 🎯 Key Technologies
 
 ### Current Stack
-- **NixOS 24.05**: Declarative OS configuration (⚠️ **DO NOT MODIFY**)
-- **Nix Flakes**: Dependency management (⚠️ **DO NOT MODIFY**)
+- **Universal Blue uCore**: Immutable Fedora CoreOS-based OS
+- **Butane/Ignition**: Host configuration (YAML → JSON)
 - **Terraform**: Infrastructure as Code (🔄 **Migrating to Pulumi**)
 - **SOPS + age**: Secrets encryption
 - **ZFS**: Storage with snapshots
 - **Pre-commit**: Code quality hooks
 - **mise**: Task runner and development environment manager
 
-### Future Stack (Migration in Progress)
-- **Universal Blue uCore**: Immutable Fedora CoreOS-based OS
-- **Butane**: YAML configs compiled to Ignition
-- **Podman/Docker**: Container-first workflow
-- **Systemd Quadlets**: Container management
+### Future IaC Stack (Migration in Progress)
 - **Pulumi**: Modern IaC with built-in cost tracking and state management
 
 ## 📝 Working with This Repository
 
 ### Before Making Changes
 
-1. **⚠️ NEVER modify NixOS configurations**: The `infra/nix/` directory is legacy and should not be touched
+1. **Consider Pulumi for new IaC**: When adding new cloud resources, prefer Pulumi over Terraform when possible
 
-2. **Consider Pulumi for new IaC**: When adding new cloud resources, prefer Pulumi over Terraform when possible
+2. **Use mise tasks**: Most operations have mise task wrappers - check `.mise/tasks/` before running commands manually
 
-3. **Use mise tasks**: Most operations have mise task wrappers - check `.mise/tasks/` before running commands manually
-
-4. **Read migration docs** if working on uCore:
+3. **Read uCore docs** before working on host configuration:
    - `infra/ucore/README.md` - Overview & architecture
    - `infra/ucore/MIGRATION.md` - Step-by-step runbook
    - `infra/ucore/VM-TESTING.md` - Testing procedures
    - `infra/ucore/CONTAINERS.md` - Container inventory
 
-5. **Check for TODOs**: Search for `TODO:` comments in relevant files
+4. **Check for TODOs**: Search for `TODO:` comments in relevant files
 
-6. **Review existing patterns**: Look at similar implementations before creating new ones
+5. **Review existing patterns**: Look at similar implementations before creating new ones
 
-### NixOS Configuration (Current)
-
-**⚠️ DO NOT MODIFY - Legacy system being replaced**
-
-**Location**: `infra/nix/` - This is the current production system but is frozen during migration to uCore. Any changes needed should be implemented in uCore instead.
-
-### uCore Configuration (Future - Primary Development Target)
+### uCore Configuration (Primary Development Target)
 
 **Location**: `infra/ucore/`
 
 - Butane configs: `butane/*.bu` (YAML)
 - Compiled to Ignition: `ignition/*.ign` (JSON)
 - Container definitions: Follow quadlet format
-- Test in VMs before deploying (see VM-TESTING.md)
+- Test in VMs before deploying (see `infra/ucore/VM-TESTING.md`)
 
 **Use mise tasks** for common operations:
 ```bash
@@ -197,9 +179,7 @@ sops -e -i secrets.yaml
 
 ### Adding a New Service
 
-**⚠️ Do not add to NixOS** - Implement in uCore only
-
-**uCore (Primary Development Target)**:
+**uCore**:
 1. Define container in Butane config
 2. Add to `CONTAINERS.md` inventory
 3. Create systemd quadlet configuration
@@ -221,9 +201,6 @@ sops -e -i secrets.yaml
 4. Plan migration to Pulumi
 
 ### Updating Dependencies
-
-**Nix** (⚠️ DO NOT MODIFY):
-- NixOS dependencies are frozen during migration
 
 **Terraform** (maintenance mode):
 ```bash
@@ -249,7 +226,7 @@ mise upgrade <tool-name>
 
 ### Finding Configuration
 
-- **Host settings**: `infra/nix/hosts/mouse/` (read-only reference)
+- **Host settings**: `infra/ucore/butane/` (active)
 - **Service configs**: `infra/ucore/butane/` (active development)
 - **Cloud resources**: `infra/terraform/*/` (maintenance) or `infra/pulumi/` (future)
 - **Secrets**: Search for `sops.secrets` or `.sops.yaml`
@@ -259,16 +236,9 @@ mise upgrade <tool-name>
 
 ### Migration Context
 
-This project has **two active migrations**:
+This project has **one active migration**:
 
-**1. NixOS → uCore (OS/Host Migration)**
-- **⚠️ DO NOT modify NixOS configurations** - they are frozen during migration
-- **All new work should target uCore** (`infra/ucore/`)
-- NixOS system remains in production but is not being updated
-- Reference `infra/ucore/MIGRATION.md` for migration status
-- Use mise tasks for all uCore operations
-
-**2. Terraform → Pulumi (IaC Migration)**
+**Terraform → Pulumi (IaC Migration)**
 - Existing Terraform workspaces remain in maintenance mode
 - **Prefer Pulumi for new cloud resources** when possible
 - Gradually migrate Terraform resources to Pulumi
@@ -329,14 +299,12 @@ This project has **two active migrations**:
 
 ### Project Documentation
 - [Main README](README.md) - Project overview
-- [uCore Migration](infra/ucore/README.md) - Migration plan
+- [uCore Overview](infra/ucore/README.md) - uCore architecture
 - [uCore Testing](infra/ucore/VM-TESTING.md) - VM testing guide
 - [uCore Runbook](infra/ucore/MIGRATION.md) - Migration steps
 - [Terraform Cloud](infra/terraform/tf-cloud/readme.md) - TF Cloud setup
 
 ### External Resources
-- [NixOS Manual](https://nixos.org/manual/nixos/stable/) (reference only - no modifications)
-- [Nix Flakes](https://nixos.wiki/wiki/Flakes) (reference only - no modifications)
 - [Universal Blue Docs](https://universal-blue.org/)
 - [Butane Configs](https://coreos.github.io/butane/)
 - [SOPS Documentation](https://github.com/getsops/sops)
@@ -349,11 +317,9 @@ This project has **two active migrations**:
 
 1. **Context is key**: This is a homelab, not production enterprise infrastructure
 2. **Personal project**: Single-user system, optimize for maintainability over scale
-3. **⚠️ NixOS is frozen**: Never suggest modifications to `infra/nix/` - all work goes to uCore
+3. **uCore is primary**: All host configuration work goes to `infra/ucore/`
 4. **Use mise tasks**: Check `.mise/tasks/` and suggest mise commands, not raw commands
-5. **Two migrations in progress**: 
-   - OS: All new features → uCore
-   - IaC: New cloud resources → Pulumi (when possible)
+5. **IaC migration in progress**: New cloud resources → Pulumi (when possible)
 6. **Cost awareness**: When suggesting Pulumi implementations, highlight cost tracking capabilities
 7. **Read first**: Check existing implementations before suggesting new patterns
 8. **Ask about secrets**: If you need credentials, remind user to use SOPS
@@ -371,12 +337,11 @@ When suggesting changes:
 3. **Use mise tasks**: Suggest `mise run` commands instead of raw commands
 4. **Test locally**: Provide mise task commands to test changes
 5. **Document changes**: Update relevant markdown files
-6. **Target uCore only**: All new work should be in `infra/ucore/`
+6. **Target uCore for host config**: All host configuration goes in `infra/ucore/`
 7. **Prefer Pulumi for IaC**: When adding cloud resources, suggest Pulumi implementation with cost tracking
-8. **Never touch NixOS**: `infra/nix/` is frozen during migration
-9. **Security first**: Never suggest committing secrets
-10. **Show cost implications**: When using Pulumi, demonstrate cost estimation commands
-11. **Explain reasoning**: Help user understand why, not just how
+8. **Security first**: Never suggest committing secrets
+9. **Show cost implications**: When using Pulumi, demonstrate cost estimation commands
+10. **Explain reasoning**: Help user understand why, not just how
 
 ## 📞 Getting Help
 

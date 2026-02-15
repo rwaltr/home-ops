@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="List NixOS system generations"
-
-sudo nix-env --list-generations --profile /nix/var/nix/profiles/system

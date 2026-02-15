@@ -5,7 +5,7 @@
 
 # rwaltr/home-ops
 
-_NixOS-powered homelab infrastructure with Terraform cloud management_
+_Universal Blue uCore homelab infrastructure with Terraform/Pulumi cloud management_
 
 </div>
 
@@ -13,7 +13,6 @@ _NixOS-powered homelab infrastructure with Terraform cloud management_
 <div align="center">
 
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
-[![NixOS](https://img.shields.io/badge/NixOS-24.05-blue?style=for-the-badge&logo=nixos&logoColor=white)](https://nixos.org/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
 
 </div>
@@ -22,23 +21,19 @@ _NixOS-powered homelab infrastructure with Terraform cloud management_
 
 ## 📖 Overview
 
-This is a monorepo to manage my personal homelab infrastructure. Currently running a single NixOS host ("mouse") combined with Terraform for cloud resource management. The infrastructure provides file storage (ZFS, NFS), media services (Navidrome), synchronization (Syncthing), and backup capabilities (MinIO, Backblaze B2).
-
-**🚧 Migration in Progress:** Currently planning migration from NixOS to Universal Blue uCore. See [infra/ucore/README.md](infra/ucore/README.md) for details.
+This is a monorepo to manage my personal homelab infrastructure. Running Universal Blue uCore (Fedora CoreOS-based immutable OS) on the main host ("mouse") with Terraform/Pulumi for cloud resource management. The infrastructure provides file storage (ZFS, NFS), media services (Navidrome), synchronization (Syncthing), and backup capabilities (MinIO, Backblaze B2).
 
 ## 🔧 Infrastructure Components
 
-### ❄️ NixOS → 🔵 uCore (Migration in Progress)
+### 🔵 uCore
 
-**Current:** NixOS provides declarative host configuration management. The main host "mouse" is defined in `infra/nix/hosts/mouse/` with configurations for ZFS, MinIO, Syncthing, Navidrome, NFS, and monitoring.
+Universal Blue uCore provides immutable, container-first host configuration. Configuration in `infra/ucore/` using Butane → Ignition.
 
-**Planned:** Universal Blue uCore (Fedora CoreOS-based immutable OS) with container-first workflow. Configuration in `infra/ucore/`.
-
-- [uCore Migration Plan](infra/ucore/README.md)
+- [uCore Overview](infra/ucore/README.md)
 - [VM Testing Guide](infra/ucore/VM-TESTING.md)
 - [Migration Runbook](infra/ucore/MIGRATION.md)
 
-Entry point: `flake.nix` (current) | `infra/ucore/butane/` (future)
+Entry point: `infra/ucore/butane/`
 
 ### 🌐 Terraform
 
@@ -52,7 +47,7 @@ Age-based secrets management for encrypting sensitive configuration values inlin
 
 ## 🖥️ Current Host
 
-### mouse (NixOS)
+### mouse (uCore)
 
 Primary infrastructure host running:
 - **Storage**: ZFS pools, NFS server
@@ -62,7 +57,7 @@ Primary infrastructure host running:
 - **Monitoring**: Netdata for system metrics
 - **Networking**: Tailscale for VPN mesh
 
-Configuration: `infra/nix/hosts/mouse/`
+Configuration: `infra/ucore/butane/`
 
 ## 🌐 Cloud Integrations
 
@@ -88,10 +83,10 @@ S3-compatible backup storage for long-term data retention
 
 | Tool            | Use                        | Active |
 | --------------- | -------------------------- | ------ |
-| NixOS           | Operating System           | ☑️     |
+| uCore           | Operating System           | ☑️     |
 | SOPS            | Secrets Management         | ☑️     |
 | Terraform       | Cloud Resource Management  | ☑️     |
-| Flakes          | Nix Dependency Management  | ☑️     |
+| Pulumi          | Cloud Resource Management  | ☑️     |
 | ZFS             | Storage & Snapshots        | ☑️     |
 | MinIO           | S3-compatible Storage      | ☑️     |
 | Syncthing       | File Synchronization       | ☑️     |

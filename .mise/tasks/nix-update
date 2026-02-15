@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Update flake inputs"
-
-nix flake update

@@ -1,0 +1,74 @@
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: k0s-cluster
+  user: admin
+spec:
+  hosts:
+  - ssh:
+      address: 192.168.122.76
+      user: rwaltr
+      port: 22
+      keyPath: ~/.ssh/id_ed25519
+    role: controller+worker
+  k0s:
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: Cluster
+      metadata:
+        name: k0s
+      spec:
+        api:
+          k0sApiPort: 9443
+          port: 6443
+          sans:
+            - 192.168.122.76
+        installConfig:
+          users:
+            etcdUser: etcd
+            kineUser: kube-apiserver
+            konnectivityUser: konnectivity-server
+            kubeAPIserverUser: kube-apiserver
+            kubeSchedulerUser: kube-scheduler
+        konnectivity:
+          adminPort: 8133
+          agentPort: 8132
+        network:
+          kubeProxy:
+            disabled: false
+            mode: iptables
+          kuberouter:
+            autoMTU: true
+            mtu: 0
+            peerRouterASNs: ""
+            peerRouterIPs: ""
+          podCIDR: 10.244.0.0/16
+          provider: kuberouter
+          serviceCIDR: 10.96.0.0/12
+        podSecurityPolicy:
+          defaultPolicy: 00-k0s-privileged
+        storage:
+          type: etcd
+        telemetry:
+          enabled: true
+  options:
+    wait:
+      enabled: true
+    drain:
+      enabled: true
+      gracePeriod: 2m0s
+      timeout: 5m0s
+      force: true
+      ignoreDaemonSets: true
+      deleteEmptyDirData: true
+      podSelector: ""
+      skipWaitForDeleteTimeout: 0s
+    concurrency:
+      limit: 30
+      workerDisruptionPercent: 10
+      uploads: 5
+    evictTaint:
+      enabled: false
+      taint: k0sctl.k0sproject.io/evict=true
+      effect: NoExecute
+      controllerWorkers: false
