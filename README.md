@@ -1,7 +1,7 @@
 <!-- Header -->
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/rwaltr/branding/master/vector/logoisolated.png" align="center" width="144px" height="144px"/>
+<img src="https://raw.githubusercontent.com/rwaltr/branding/master/vector/logo.svg" align="center" width="144px" height="144px"/>
 
 # rwaltr/home-ops
 
