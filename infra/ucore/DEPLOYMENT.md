@@ -22,7 +22,7 @@ uCore deployments have three distinct layers, each with different update mechani
 
 ### Inspiration
 
-Based on [deuill/coreos-home-server](https://github.com/deuill/coreos-home-server) - a production homelab using Git-based automatic configuration sync.
+Based on [deuill/coreos-home-server](https://github.com/deuill/coreos-home-server) — a production homelab using Git-based automatic configuration sync.
 
 **Key Concept**: Git repository is the source of truth. Systems pull configuration updates periodically via systemd timer.
 
@@ -84,7 +84,7 @@ rsync -av --delete "${REPO_ROOT}/infra/ucore/containers/" "${QUADLET_DIR}/"
 # Reload systemd to pick up changes
 systemctl daemon-reload
 
-# Restart changed services (optional - may cause brief downtime)
+# Restart changed services (optional — may cause brief downtime)
 for container in "${REPO_ROOT}/infra/ucore/containers/"*.container; do
     service_name=$(basename "$container" .container)
     if systemctl is-active "${service_name}.service" >/dev/null 2>&1; then
@@ -111,11 +111,11 @@ systemctl status home-ops-sync.timer
 
 ```bash
 # 1. Edit configuration locally
-vim infra/ucore/containers/navidrome.container
+vim infra/ucore/containers/rustfs.container
 
 # 2. Commit and push
-git add infra/ucore/containers/navidrome.container
-git commit -m "Update Navidrome configuration"
+git add infra/ucore/containers/rustfs.container
+git commit -m "Update RustFS configuration"
 git push
 
 # 3. Wait for automatic sync (within 1 hour)
@@ -123,7 +123,7 @@ git push
 ssh rwaltr@mouse "sudo systemctl start home-ops-sync.service"
 
 # 4. Verify deployment
-ssh rwaltr@mouse "systemctl status navidrome.service"
+ssh rwaltr@mouse "systemctl status rustfs.service"
 ```
 
 ---
@@ -141,16 +141,19 @@ sudo systemctl enable rpm-ostreed-automatic.timer --now
 ```
 
 **How it works:**
+
 - Updates download and stage automatically
 - No automatic reboots
 - You control when to apply via `systemctl reboot`
 
 **Check for staged updates:**
+
 ```bash
 rpm-ostree status
 ```
 
 **Apply staged update:**
+
 ```bash
 sudo systemctl reboot
 ```
@@ -193,31 +196,24 @@ Enable Podman's built-in auto-update timer:
 sudo systemctl enable --now podman-auto-update.timer
 ```
 
-**Configure containers for auto-update:**
+**Configure containers for auto-update** (add label to Quadlet):
 
 ```ini
-# infra/ucore/containers/navidrome.container
+# infra/ucore/containers/rustfs.container
 [Container]
-Image=docker.io/deluan/navidrome:latest
+Image=docker.io/rustfs/rustfs:latest
 Label=io.containers.autoupdate=registry
-PublishPort=4533:4533
-Volume=/var/tank/nas/library/music:/music:ro
-Volume=/var/tank/services/navidrome:/data:Z
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
 ```
 
 **How it works:**
+
 - Timer runs daily
 - Checks registry for new image digest
 - Pulls updated images
 - Restarts systemd services
 
 **Manual trigger:**
+
 ```bash
 podman auto-update --dry-run  # Check for updates
 podman auto-update            # Apply updates
@@ -227,8 +223,8 @@ podman auto-update            # Apply updates
 
 ```bash
 # Update single container
-sudo podman pull docker.io/deluan/navidrome:latest
-sudo systemctl restart navidrome.service
+sudo podman pull docker.io/rustfs/rustfs:latest
+sudo systemctl restart rustfs.service
 
 # Update all containers
 sudo podman auto-update
@@ -253,14 +249,14 @@ sudo systemctl reboot
 
 ```bash
 # Pull specific version
-sudo podman pull docker.io/deluan/navidrome:0.52.0
+sudo podman pull docker.io/rustfs/rustfs:0.1.0
 
 # Update container file to pin version
-vim infra/ucore/containers/navidrome.container
-# Change: Image=docker.io/deluan/navidrome:0.52.0
+vim infra/ucore/containers/rustfs.container
+# Change: Image=docker.io/rustfs/rustfs:0.1.0
 
 # Commit and push
-git commit -am "Rollback Navidrome to 0.52.0"
+git commit -am "Rollback RustFS to 0.1.0"
 git push
 
 # Wait for sync or trigger manually
@@ -304,10 +300,10 @@ journalctl -u home-ops-sync.service
 
 ```bash
 # List all Quadlet services
-systemctl list-units '*.service' | grep -E '(rustfs|navidrome|syncthing|netdata)'
+systemctl list-units '*.service' | grep -E '(rustfs|netdata)'
 
 # View service logs
-journalctl -u navidrome.service -f
+journalctl -u rustfs.service -f
 
 # Check container status
 podman ps -a
@@ -327,18 +323,19 @@ For multi-host fleets, consider Ansible:
   tasks:
     - name: Layer packages
       ansible.builtin.command: rpm-ostree install htop
-      
+
     - name: Deploy container configs
       ansible.builtin.copy:
         src: containers/
         dest: /etc/containers/systemd/
-        
+
     - name: Reload systemd
       ansible.builtin.systemd:
         daemon_reload: yes
 ```
 
 **References:**
+
 - [zjpeterson/ansible-edge-management](https://github.com/zjpeterson/ansible-edge-management)
 - [RedHat Edge API templates](https://github.com/RedHatInsights/edge-api/tree/main/templates)
 
@@ -371,10 +368,10 @@ sudo systemctl reboot
 1. **Git as Source of Truth**: All configuration changes go through Git
 2. **Automatic Staging**: Updates download automatically, apply manually
 3. **Pin Critical Versions**: Use specific tags for production services
-4. **Test in VM First**: Validate changes in `mise run ucore:vm` before production
+4. **Test in VM First**: Validate changes with `mise run ucore:vm` before production
 5. **Enable Rollback**: Keep previous deployment available (`ostree admin pin 0`)
 6. **Monitor Logs**: Use `journalctl` to track service health
-7. **Immutability Matters**: Never manually edit files - always update via Git
+7. **Immutability Matters**: Never manually edit files — always update via Git
 
 ---
 
@@ -387,14 +384,14 @@ sudo systemctl reboot
 - [ ] Enable `podman-auto-update.timer` for container updates
 - [ ] Add `io.containers.autoupdate=registry` label to containers
 - [ ] Test deployment workflow in VM
-- [ ] Document rollback procedure for team
+- [ ] Document rollback procedure
 
 ---
 
 ## References
 
-- [deuill/coreos-home-server](https://github.com/deuill/coreos-home-server) - GitOps pattern inspiration
-- [Fedora CoreOS FAQ](https://docs.fedoraproject.org/en-US/fedora-coreos/faq/) - Official guidance
-- [Podman Auto-Update](https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html) - Container updates
-- [bootc Getting Started](https://docs.fedoraproject.org/en-US/bootc/getting-started/) - Modern OS updates
-- [Major Hayden: Podman Quadlet Auto-Updates](https://major.io/p/podman-quadlet-automatic-updates/) - Tutorial
+- [deuill/coreos-home-server](https://github.com/deuill/coreos-home-server) — GitOps pattern inspiration
+- [Fedora CoreOS FAQ](https://docs.fedoraproject.org/en-US/fedora-coreos/faq/) — Official guidance
+- [Podman Auto-Update](https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html) — Container updates
+- [bootc Getting Started](https://docs.fedoraproject.org/en-US/bootc/getting-started/) — Modern OS updates
+- [Major Hayden: Podman Quadlet Auto-Updates](https://major.io/p/podman-quadlet-automatic-updates/) — Tutorial

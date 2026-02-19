@@ -1,1 +1,20 @@
-![](https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.TPKOKhnTpbph0JXAIOTFrgHaEy%26pid%3DApi&f=1&ipt=22212b31f368c101a6129c2197a98270a672a616b08d0c5d96ff3e52e73492eb&ipo=images)
+# Terraform Cloud Configuration
+
+Manages Terraform Cloud workspace configuration for this project.
+
+## Overview
+
+This workspace provisions and configures Terraform Cloud settings used by the other Terraform workspaces (cloudflare, backblaze).
+
+## Usage
+
+```bash
+cd infra/terraform/tf-cloud
+terraform init
+terraform plan
+terraform apply
+```
+
+## Migration Note
+
+A Pulumi stub exists at `infra/pulumi/tf-cloud/` for eventual migration. The Terraform workspace remains active in the meantime.

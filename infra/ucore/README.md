@@ -1,4 +1,4 @@
-# uCore Migration Project
+# uCore Infrastructure
 
 ## Quick Start
 
@@ -15,9 +15,10 @@ mise run ucore:vm-connect mouse
 
 ## What This Is
 
-Infrastructure-as-code for managing multiple uCore hosts. Currently migrating "mouse" from NixOS to Universal Blue uCore.
+Infrastructure-as-code for managing uCore hosts. Running Universal Blue uCore (Fedora CoreOS-based immutable OS) on the primary host "mouse".
 
 **Why uCore?**
+
 - Immutable OS with atomic updates
 - Container-first workflow with Podman Quadlet
 - ZFS pre-installed (no layering needed)
@@ -29,20 +30,24 @@ Infrastructure-as-code for managing multiple uCore hosts. Currently migrating "m
 ```
 infra/ucore/
 ├── butane/
-│   ├── base.bu              # Shared base config (all hosts)
-│   ├── storage.bu           # Shared storage config (ZFS hosts)
+│   ├── base.bu              # Shared base config (users, SSH, sudo)
 │   └── hosts/
 │       ├── template.bu      # Template for new hosts
-│       └── mouse.bu         # Host-specific config (references containers)
+│       └── mouse.bu         # Host-specific config
 ├── containers/              # Podman Quadlet definitions
-│   ├── rustfs.container     # Referenced by mouse.bu
-│   ├── navidrome.container  # Referenced by mouse.bu
-│   ├── syncthing.container  # Referenced by mouse.bu
-│   └── netdata.container    # Referenced by mouse.bu
-└── ignition/                # Generated Ignition files (gitignored)
+│   ├── rustfs.container     # S3-compatible object storage
+│   └── netdata.container    # System monitoring
+├── ignition/                # Generated Ignition files (gitignored)
+│   └── .gitkeep
+├── CONTAINERS.md            # Container integration architecture
+├── DEPLOYMENT.md            # Deployment strategies
+├── HOSTS.md                 # Multi-host management guide
+├── KUBERNETES.md            # k0s on uCore
+└── SECRETS.md               # Secret management approach
 ```
 
 **Container Integration:**
+
 - Container `.container` files are Podman Quadlet definitions
 - Host Butane configs reference them via `contents.local`
 - Butane embeds container files into Ignition config
@@ -50,17 +55,18 @@ infra/ucore/
 - Systemd auto-discovers and manages as services
 
 **Task Management:**
+
 - All build/VM tasks are mise file-based tasks in `.mise/tasks/ucore/`
 - Discovered automatically by mise from the project root
-```
 
 ## Multi-Host Management
 
 ### Adding a New Host
 
 1. Create host-specific config:
+
    ```bash
-   cp infra/ucore/butane/hosts/mouse.bu infra/ucore/butane/hosts/newhost.bu
+   cp infra/ucore/butane/hosts/template.bu infra/ucore/butane/hosts/newhost.bu
    ```
 
 2. Edit `newhost.bu`:
@@ -69,50 +75,53 @@ infra/ucore/
    - Customize services
 
 3. Build and test:
+
    ```bash
    mise run ucore:vm newhost
    ```
 
 ### Host Config Files
 
-- **`butane/base.bu`** - Shared across all hosts (users, SSH, firewall, packages)
-- **`butane/storage.bu`** - Shared ZFS configuration
-- **`butane/hosts/<hostname>.bu`** - Host-specific (hostname, hostid, uCore rebase service)
+- **`butane/base.bu`** — Shared across all hosts (users, SSH keys, sudo)
+- **`butane/hosts/<hostname>.bu`** — Host-specific (hostname, hostid, uCore rebase, container references)
 
-## Services Migration Map
+## Current Containers
 
-| NixOS Service | uCore Implementation |
-|--------------|---------------------|
-| ZFS | Pre-installed, systemd mount units |
-| NFS Server | nfs-utils via rpm-ostree |
-| RustFS | Podman container (Quadlet) |
-| Navidrome | Podman container (Quadlet) |
-| Syncthing | Podman container (Quadlet) |
-| Netdata | Podman container (Quadlet) |
-| Tailscale | Podman container (Quadlet) |
+| Container | Port(s) | Purpose |
+|-----------|---------|---------|
+| rustfs | 9000, 9001 | S3-compatible object storage (Rust-based) |
+| netdata | 19999 | Real-time system monitoring |
 
-## Key Changes
+## Service Status
 
-### Storage Paths
-- **Old:** `/tank/*`
-- **New:** `/var/tank/*`
-- **Reason:** uCore has immutable root filesystem
+| Service | Implementation | Status |
+|---------|---------------|--------|
+| ZFS | Pre-installed, systemd mount units | ✅ Active |
+| RustFS | Podman container (Quadlet) | ✅ Container defined |
+| Netdata | Podman container (Quadlet) | ✅ Container defined |
+| NFS Server | nfs-utils via rpm-ostree | 📋 Planned |
+| Navidrome | Podman container (Quadlet) | 📋 Planned |
+| Syncthing | Podman container (Quadlet) | 📋 Planned |
+| Tailscale | Podman container (Quadlet) | 📋 Planned |
 
-All service paths updated:
-- `/tank/services/rustfs` → `/var/tank/services/rustfs`
-- `/tank/nas/library/music` → `/var/tank/nas/library/music`
+## Storage Paths
 
-### Configuration Management
-- **Old:** NixOS declarative rebuild
-- **New:** Butane → Ignition (provisioning) + rpm-ostree (packages)
+All service data lives under `/var/tank/` (uCore has an immutable root filesystem):
 
-### Service Management
-- **Old:** systemd units via Nix modules
-- **New:** Podman Quadlet + systemd
+- `/var/tank/services/rustfs` — RustFS data
+- `/var/tank/services/netdata` — Netdata config/cache
+- `/var/tank/nas/library/music` — Media library
+
+## Configuration Management
+
+- **Provisioning**: Butane → Ignition
+- **Packages**: rpm-ostree
+- **Services**: Podman Quadlet + systemd
 
 ## Installation Process
 
 The VM automatically:
+
 1. **Downloads Fedora CoreOS ISO** (~1GB, shared across hosts)
 2. **Creates custom auto-install ISO** with host-specific Ignition config
 3. **Boots VM** and installs Fedora CoreOS to disk (1-2 min)
@@ -137,32 +146,40 @@ mise run ucore:vm laptop
 
 # Connect to existing VM
 mise run ucore:vm-connect mouse
+
+# Clean up VMs and disks
+mise run ucore:clean [hostname]
 ```
 
 ## Testing Workflow
 
-1. `mise run ucore:vm mouse` - Watch the automated installation
+1. `mise run ucore:vm mouse` — Watch the automated installation
 2. Wait for system to rebase to uCore and reboot (~10-15 min total)
-3. Verify services work
-4. Follow production migration: `infra/ucore/MIGRATION.md`
+3. `mise run ucore:vm-connect mouse` — SSH in and verify services
+4. Verify services and deploy to production (see [DEPLOYMENT.md](DEPLOYMENT.md))
 
 ## Documentation
 
-- **[HOSTS.md](HOSTS.md)** - Multi-host management guide
-- **[CONTAINERS.md](CONTAINERS.md)** - Container integration architecture
-- **[MIGRATION.md](MIGRATION.md)** - Production migration runbook
+- **[CONTAINERS.md](CONTAINERS.md)** — Container integration architecture
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — Post-provisioning deployment strategies
+- **[HOSTS.md](HOSTS.md)** — Multi-host management guide
+- **[KUBERNETES.md](KUBERNETES.md)** — k0s single-node cluster on uCore
+- **[SECRETS.md](SECRETS.md)** — Secret management with SOPS + age
 
 ## Current Hosts
 
-- **mouse** - Primary homelab server (NixOS → uCore migration)
+| Hostname | Purpose | Status |
+|----------|---------|--------|
+| mouse | Primary homelab server | ✅ Running |
 
 ## Current Status
 
 - [x] Multi-host architecture
-- [x] Butane configs created
-- [x] Container definitions written  
-- [x] Automated installation workflow
+- [x] Base Butane config (users, SSH, sudo)
+- [x] Host-specific configs (mouse, template)
+- [x] Container definitions (rustfs, netdata)
+- [x] Automated VM installation workflow
 - [x] Auto-rebase to uCore
-- [ ] VM testing validated
-- [ ] Production migration scheduled
-- [ ] Migration executed
+- [ ] Additional containers (navidrome, syncthing, tailscale)
+- [ ] k0s Kubernetes integration
+- [ ] GitOps deployment workflow (see [DEPLOYMENT.md](DEPLOYMENT.md))

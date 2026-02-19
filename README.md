@@ -21,7 +21,7 @@ _Universal Blue uCore homelab infrastructure with Terraform/Pulumi cloud managem
 
 ## 📖 Overview
 
-This is a monorepo to manage my personal homelab infrastructure. Running Universal Blue uCore (Fedora CoreOS-based immutable OS) on the main host ("mouse") with Terraform/Pulumi for cloud resource management. The infrastructure provides file storage (ZFS, NFS), media services (Navidrome), synchronization (Syncthing), and backup capabilities (MinIO, Backblaze B2).
+This is a monorepo to manage my personal homelab infrastructure. Running Universal Blue uCore (Fedora CoreOS-based immutable OS) on the main host ("mouse") with Terraform/Pulumi for cloud resource management. The infrastructure provides object storage (RustFS), monitoring (Netdata), and backup capabilities (Backblaze B2).
 
 ## 🔧 Infrastructure Components
 
@@ -30,16 +30,34 @@ This is a monorepo to manage my personal homelab infrastructure. Running Univers
 Universal Blue uCore provides immutable, container-first host configuration. Configuration in `infra/ucore/` using Butane → Ignition.
 
 - [uCore Overview](infra/ucore/README.md)
-- [VM Testing Guide](infra/ucore/VM-TESTING.md)
-- [Migration Runbook](infra/ucore/MIGRATION.md)
+- [Container Architecture](infra/ucore/CONTAINERS.md)
+- [Deployment Strategies](infra/ucore/DEPLOYMENT.md)
 
 Entry point: `infra/ucore/butane/`
 
+### ☸️ Kubernetes (k0s)
+
+Single-node k0s cluster planned for mouse. Configuration managed via k0sctl.
+
+- [Kubernetes on uCore](infra/ucore/KUBERNETES.md)
+
+Entry point: `infra/k0s/`
+
 ### 🌐 Terraform
 
-Terraform manages cloud resources through GitOps:
+Terraform manages cloud resources (maintenance mode — migrating to Pulumi):
+
 - **Cloudflare**: DNS and domain management (`infra/terraform/cloudflare/`)
 - **Backblaze B2**: Backup storage provisioning (`infra/terraform/backblaze/`)
+- **Terraform Cloud**: Workspace management (`infra/terraform/tf-cloud/`)
+
+### 🚀 Pulumi
+
+Pulumi stubs created for migrating cloud resources from Terraform (Go-based):
+
+- **Backblaze**: B2 provisioning (`infra/pulumi/backblaze/`) — has initial Go code
+- **Cloudflare**: DNS management (`infra/pulumi/cloudflare/`) — stub
+- **Terraform Cloud**: Workspace management (`infra/pulumi/tf-cloud/`) — stub
 
 ### 🔐 SOPS
 
@@ -50,21 +68,21 @@ Age-based secrets management for encrypting sensitive configuration values inlin
 ### mouse (uCore)
 
 Primary infrastructure host running:
-- **Storage**: ZFS pools, NFS server
-- **Media**: Navidrome music server
-- **Sync**: Syncthing for file synchronization
-- **Object Storage**: MinIO for S3-compatible storage
-- **Monitoring**: Netdata for system metrics
-- **Networking**: Tailscale for VPN mesh
 
-Configuration: `infra/ucore/butane/`
+- **Storage**: ZFS pools
+- **Object Storage**: RustFS (S3-compatible, Rust-based)
+- **Monitoring**: Netdata for system metrics
+
+Configuration: `infra/ucore/butane/hosts/mouse.bu`
 
 ## 🌐 Cloud Integrations
 
 ### Cloudflare
+
 DNS and domain management for multiple domains (familylegacy, legacy, prof, public zones)
 
 ### Backblaze B2
+
 S3-compatible backup storage for long-term data retention
 
 <!-- TODO items -->
@@ -86,14 +104,13 @@ S3-compatible backup storage for long-term data retention
 | uCore           | Operating System           | ☑️     |
 | SOPS            | Secrets Management         | ☑️     |
 | Terraform       | Cloud Resource Management  | ☑️     |
-| Pulumi          | Cloud Resource Management  | ☑️     |
+| Pulumi          | Cloud Resource Management  | 🚧     |
 | ZFS             | Storage & Snapshots        | ☑️     |
-| MinIO           | S3-compatible Storage      | ☑️     |
-| Syncthing       | File Synchronization       | ☑️     |
-| Navidrome       | Music Streaming Server     | ☑️     |
+| RustFS          | S3-compatible Storage      | ☑️     |
 | Netdata         | System Monitoring          | ☑️     |
-| Tailscale       | VPN Mesh Network           | ☑️     |
+| k0s             | Kubernetes (single-node)   | 🚧     |
 | Pre-commit      | Code Quality Automation    | ☑️     |
+| mise            | Task Runner & Tool Mgmt    | ☑️     |
 
 ---
 
@@ -131,11 +148,5 @@ Thank you to the below for inspiration
 ## 📜 Changelog
 
 See [commit history](https://github.com/rwaltr/home-ops/commits/master)
-
----
-
-## 🔏 License
-
-See [LICENSE](./LICENSE)
 
 ---

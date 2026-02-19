@@ -8,10 +8,6 @@ creation_rules:
     key_groups:
       - age:
           - *rwaltr
-  - path_regex: infra/nix/secrets/[*/]+\.yaml$
-    key_groups:
-      - age:
-          - *rwaltr
   - key_groups:
       - age:
           - *rwaltr

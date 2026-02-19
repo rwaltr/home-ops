@@ -19,17 +19,21 @@ mise run ucore:vm-connect newhost
 ```
 infra/ucore/
 ├── butane/
-│   ├── base.bu              # Shared: users, SSH, firewall, packages
-│   ├── storage.bu           # Shared: ZFS config
+│   ├── base.bu              # Shared: users, SSH keys, sudo
 │   └── hosts/
 │       ├── template.bu      # Template for new hosts
 │       └── <hostname>.bu    # Per-host config
 ├── containers/              # Shared container definitions
+│   ├── rustfs.container
+│   └── netdata.container
 └── ignition/                # Generated files (gitignored)
 
 .mise/tasks/ucore/           # Mise task files
 ├── build                    # Build all Ignition configs
 ├── build-single             # Build single host config
+├── clean                    # Clean up VMs and disks
+├── customize-iso            # Create custom install ISO
+├── download-iso             # Download Fedora CoreOS ISO
 ├── vm                       # Create and install VM
 └── vm-connect               # Connect to existing VM
 ```
@@ -53,9 +57,10 @@ vim infra/ucore/butane/hosts/newhost.bu
 ### 2. Customize Host Config
 
 Required changes in `newhost.bu`:
+
 - Replace `CHANGEME_HOSTNAME` with actual hostname
 - Replace `CHANGEME_HOSTID` with generated hostid
-- Add host-specific services/configuration
+- Add container references as needed (see mouse.bu for examples)
 
 ### 3. Build and Test
 
@@ -70,6 +75,7 @@ mise run ucore:vm newhost
 ### 4. Verify Installation
 
 Watch the VM console for:
+
 1. Fedora CoreOS installation (1-2 min)
 2. First reboot
 3. uCore rebase (5-10 min)
@@ -77,11 +83,8 @@ Watch the VM console for:
 5. Services starting
 
 ```bash
-# Get VM IP
-virsh --connect qemu:///system domifaddr ucore-newhost-test
-
-# SSH into VM
-ssh rwaltr@<ip>
+# Connect to VM
+mise run ucore:vm-connect newhost
 
 # Verify uCore
 rpm-ostree status
@@ -90,46 +93,55 @@ rpm-ostree status
 ## Host Configuration Files
 
 ### base.bu (Shared)
-- User accounts and SSH keys
-- Firewall rules
-- System packages (rpm-ostree)
-- Common system settings
 
-### storage.bu (Shared - ZFS hosts only)
-- ZFS kernel module loading
-- ZFS pool import service
-- NFS server configuration
-- ZFS scrub timer
+- User accounts (`rwaltr`) and SSH authorized keys
+- Passwordless sudo via `nopasswd` group
+- Applied to all hosts via Ignition `merge`
 
-### hosts/<hostname>.bu (Per-Host)
-- Hostname
-- ZFS hostid (unique per host)
-- uCore rebase service
-- **Container definitions** (references to `containers/*.container`)
-- Host-specific services
-- Host-specific network configuration
+### hosts/template.bu (Template)
+
+Starting point for new hosts. Includes:
+
+- Placeholder hostname and hostid
+- Merges `base.ign` and `storage.ign`
+- Rebase to uCore service
+- Avahi, smartd, firewalld systemd units
+- Commented container reference examples
+
+### hosts/mouse.bu (Production Host)
+
+Mouse-specific configuration:
+
+- Hostname: `mouse`
+- ZFS hostid: `1e1719e4`
+- Merges `base.ign` and `storage.ign`
+- Rebase to uCore service
+- Avahi (mDNS) and smartd (disk monitoring)
+- **Note**: Container references not yet added to mouse.bu (containers are defined in `containers/` but not referenced in Butane yet)
 
 ## Adding Containers to a Host
 
 Containers are managed via Podman Quadlet. The workflow:
 
 1. **Create container definition** in `containers/myapp.container`:
+
    ```ini
    [Unit]
    Description=My Application
    After=network-online.target
-   
+
    [Container]
    Image=docker.io/myapp:latest
    ContainerName=myapp
    PublishPort=8080:8080
    Volume=/var/tank/services/myapp:/data:Z
-   
+
    [Install]
    WantedBy=multi-user.target
    ```
 
 2. **Reference in host Butane config** (`butane/hosts/<hostname>.bu`):
+
    ```yaml
    storage:
      files:
@@ -140,6 +152,7 @@ Containers are managed via Podman Quadlet. The workflow:
    ```
 
 3. **Build and deploy**:
+
    ```bash
    mise run ucore:build
    # Container is now embedded in Ignition config
@@ -149,6 +162,8 @@ Containers are managed via Podman Quadlet. The workflow:
    - Discovers `*.container` files in `/etc/containers/systemd/`
    - Creates systemd services (e.g., `myapp.service`)
    - Starts containers according to dependencies
+
+See [CONTAINERS.md](CONTAINERS.md) for full architecture details.
 
 ### Container Management Commands
 
@@ -181,41 +196,35 @@ virsh --connect qemu:///system start ucore-<hostname>-test
 # Stop VM
 virsh --connect qemu:///system shutdown ucore-<hostname>-test
 
-# Delete VM
+# Delete VM and disks
+mise run ucore:clean <hostname>
+
+# Or manually:
 virsh --connect qemu:///system destroy ucore-<hostname>-test
 virsh --connect qemu:///system undefine ucore-<hostname>-test --nvram
-
-# Delete VM disks
 rm .vm/ucore-<hostname>*.qcow2
-rm .vm/fedora-coreos-<hostname>-autoinstall.iso
+rm .vm/fedora-coreos-<hostname>-*-autoinstall.iso
 ```
 
 ## Deployment to Production
 
 ### Option 1: USB Boot (Recommended)
 
-1. Write custom ISO to USB:
+1. Build Ignition and create custom ISO:
+
    ```bash
-   # Build Ignition
    mise run ucore:build
-   
-   # Create custom ISO
-   podman run --rm --privileged \
-     -v .vm:/data \
-     -v infra/ucore/ignition:/ignition:ro \
-     quay.io/coreos/coreos-installer:release \
-     iso customize \
-     --dest-device /dev/sda \
-     --dest-ignition /ignition/<hostname>.ign \
-     -o /data/<hostname>-install.iso \
-     /data/fedora-coreos-stable.iso
-   
-   # Write to USB
-   sudo dd if=.vm/<hostname>-install.iso of=/dev/sdX bs=4M status=progress
+   mise run ucore:customize-iso <hostname>
    ```
 
-2. Boot target machine from USB
-3. Installation happens automatically
+2. Write to USB:
+
+   ```bash
+   sudo dd if=.vm/fedora-coreos-<hostname>-vda-autoinstall.iso of=/dev/sdX bs=4M status=progress
+   ```
+
+3. Boot target machine from USB — installation happens automatically
+
 4. System reboots into uCore
 
 ### Option 2: PXE Boot
@@ -225,6 +234,7 @@ See Fedora CoreOS docs for PXE setup with custom Ignition configs.
 ## Troubleshooting
 
 ### Build fails
+
 ```bash
 # Check Butane syntax
 butane --strict < infra/ucore/butane/hosts/<hostname>.bu
@@ -234,6 +244,7 @@ mise run ucore:build-single <hostname>
 ```
 
 ### VM won't boot
+
 ```bash
 # Check VM console
 virsh --connect qemu:///system console ucore-<hostname>-test
@@ -243,6 +254,7 @@ journalctl -u ignition-*
 ```
 
 ### Rebase to uCore fails
+
 ```bash
 # Check rebase service
 systemctl status rebase-to-ucore.service
@@ -257,7 +269,7 @@ sudo systemctl reboot
 
 | Hostname | Status | ZFS Hostid | Purpose |
 |----------|--------|------------|---------|
-| mouse    | In Progress | 1e1719e4 | Primary homelab server |
+| mouse    | ✅ Running | 1e1719e4 | Primary homelab server |
 
 ## Resources
 

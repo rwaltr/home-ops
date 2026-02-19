@@ -20,30 +20,48 @@ systemd discovers and creates rustfs.service
 Container runs as systemd service
 ```
 
-## Current Containers (mouse host)
+## Current Containers
 
 | Container | Port(s) | Volume(s) | Purpose |
 |-----------|---------|-----------|---------|
-| rustfs | 9000, 9001 | `/var/tank/services/rustfs` | S3-compatible object storage (Rust-based) |
-| navidrome | 4533 | `/var/tank/nas/library/music`, `/var/tank/services/navidrome` | Music streaming server |
-| syncthing | 8384, 22000, 21027 | `/var/tank/services/syncthing` | File synchronization |
-| netdata | 19999 | `/var/tank/services/netdata`, host system mounts | System monitoring |
+| rustfs | 9000, 9001 | `/var/tank/services/rustfs/data` | S3-compatible object storage (Rust-based) |
+| netdata | 19999 | `/var/tank/services/netdata/*`, host system mounts | Real-time system monitoring |
+
+**Planned (not yet created):**
+
+| Container | Purpose | Status |
+|-----------|---------|--------|
+| navidrome | Music streaming server | 📋 Planned |
+| syncthing | File synchronization | 📋 Planned |
+| tailscale | VPN mesh network | 📋 Planned |
 
 ## How It Works
 
 ### 1. Container Definition (Quadlet)
 
 File: `containers/rustfs.container`
+
 ```ini
 [Unit]
 Description=RustFS S3-compatible object storage
 After=network-online.target zfs-import-tank.service
+Wants=network-online.target
 
 [Container]
 Image=docker.io/rustfs/rustfs:latest
+ContainerName=rustfs
 PublishPort=9000:9000
+PublishPort=9001:9001
 Volume=/var/tank/services/rustfs/data:/data:Z
 Environment=RUSTFS_ACCESS_KEY=admin
+Environment=RUSTFS_SECRET_KEY=changeme
+Environment=RUSTFS_CONSOLE_ENABLE=true
+Exec=/data
+
+[Service]
+TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target
@@ -52,6 +70,7 @@ WantedBy=multi-user.target
 ### 2. Host Butane Config
 
 File: `butane/hosts/mouse.bu`
+
 ```yaml
 storage:
   files:
@@ -62,6 +81,7 @@ storage:
 ```
 
 **What happens:**
+
 - Butane reads `containers/rustfs.container` from filesystem
 - Embeds content (compressed) into Ignition JSON
 - Ignition deploys to `/etc/containers/systemd/` on target
@@ -101,11 +121,12 @@ EOF
 ### Step 2: Reference in Host Config
 
 Edit `butane/hosts/mouse.bu`:
+
 ```yaml
 storage:
   files:
     # ... existing containers ...
-    
+
     - path: /etc/containers/systemd/myapp.container
       mode: 0644
       contents:
@@ -121,7 +142,7 @@ mise run ucore:build
 # Test in VM
 mise run ucore:vm mouse
 
-# Or deploy to production (see MIGRATION.md)
+# Or deploy to production (see DEPLOYMENT.md)
 ```
 
 ## Container Lifecycle Management
@@ -164,6 +185,7 @@ For pinned versions, edit the `.container` file, rebuild Ignition, and redeploy.
 ### Persistent Storage
 
 All containers use ZFS volumes under `/var/tank/services/<name>/`:
+
 - Survives container recreation
 - Benefits from ZFS snapshots/replication
 - Mounted with `:Z` for SELinux relabeling
