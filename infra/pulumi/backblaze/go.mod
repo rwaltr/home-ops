@@ -3,7 +3,7 @@ module github.com/rwaltr/home-ops/infra/pulumi/backblaze
 go 1.21
 
 require (
-	github.com/pulumi/pulumi/sdk/v3 v3.115.2
+	github.com/pulumi/pulumi/sdk/v3 v3.223.0
 )
 
 require (
