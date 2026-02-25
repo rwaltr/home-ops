@@ -12,6 +12,7 @@ terraform = "latest"
 "ubi:budimanjojo/talhelper" = "latest"
 
 "ubi:derailed/k9s" = "latest"
+"ubi:k0sproject/k0sctl" = "latest"
 "ubi:pulumi/pulumi" = "latest"
 
 # Additional useful tools for this repo

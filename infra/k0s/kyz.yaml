@@ -6,7 +6,7 @@ metadata:
 spec:
   hosts:
   - ssh:
-      address: 192.168.122.76
+      address: 100.82.231.96
       user: rwaltr
       port: 22
       keyPath: ~/.ssh/id_ed25519
@@ -22,7 +22,7 @@ spec:
           k0sApiPort: 9443
           port: 6443
           sans:
-            - 192.168.122.76
+            - 100.82.231.96
         installConfig:
           users:
             etcdUser: etcd
@@ -50,7 +50,7 @@ spec:
         storage:
           type: etcd
         telemetry:
-          enabled: true
+          enabled: false
   options:
     wait:
       enabled: true
