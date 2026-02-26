@@ -6,7 +6,7 @@ This document covers running a single-node Kubernetes cluster on mouse using **k
 
 **Stack**: **uCore + k0s (single-node) + OpenEBS ZFS LocalPV + Helm**
 
-**Current State**: k0sctl cluster definition exists at `infra/k0s/kyz.yaml`. Not yet deployed.
+**Current State**: ✅ Deployed. k0s v1.35.1+k0s.0 running on mouse (Tailscale: 100.82.231.96). Kubeconfig at `~/.kube/mouse-config`.
 
 ---
 
