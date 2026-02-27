@@ -10,7 +10,7 @@ sops = "latest"
 "ubi:siderolabs/talos" = { version = "latest", exe = "talos", rename_exe = "talosctl" }
 terraform = "latest"
 "ubi:budimanjojo/talhelper" = "latest"
-
+"github:Timmoth/RackPeek" = { version = "latest", bin = "rpk" }
 "ubi:derailed/k9s" = "latest"
 "ubi:k0sproject/k0sctl" = "latest"
 "ubi:pulumi/pulumi" = "latest"
@@ -49,3 +49,4 @@ go = "latest"
 
 [env]
 _.file = ".env"
+RPK_YAML_DIR = "{{config_root}}/docs"

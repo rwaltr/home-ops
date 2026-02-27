@@ -1,0 +1,162 @@
+version: 2
+resources:
+  - kind: Server
+    ram:
+      size: 32
+      mts: 5200
+    ipmi: true
+    cpus:
+      - model: Intel Core i9-13900H
+        cores: 14
+        threads: 20
+    drives:
+      - type: ssd
+        size: 954
+      - type: hdd
+        size: 5500
+      - type: hdd
+        size: 5500
+      - type: hdd
+        size: 5500
+      - type: hdd
+        size: 5500
+      - type: hdd
+        size: 5500
+      - type: hdd
+        size: 5500
+    nics:
+      - type: rj45
+        speed: 1
+        ports: 2
+      - type: sfp+
+        speed: 10
+        ports: 2
+    name: mouse
+    tags:
+      - kyz
+  - kind: System
+    type: Baremetal
+    os: fedora-coreos
+    cores: 14
+    ram: 32
+    drives:
+      - size: 954
+    name: mouse-ucore
+    runsOn:
+      - mouse
+  - kind: System
+    type: Baremetal
+    os: amt
+    cores: 1
+    ram: 1
+    name: mouse-amt
+    runsOn:
+      - mouse
+  - kind: System
+    type: KubernetesControlPlane
+    os: fedora-coreos
+    cores: 14
+    ram: 32
+    name: mouse-k0s
+    runsOn:
+      - mouse
+  - kind: Service
+    network:
+      ip: 192.168.1.207
+      port: 22
+      protocol: TCP
+    name: mouse-ssh
+    runsOn:
+      - mouse-ucore
+  - kind: Service
+    network:
+      ip: 100.82.231.96
+      port: 41641
+      protocol: UDP
+    name: mouse-tailscale
+    runsOn:
+      - mouse-ucore
+  - kind: Service
+    network:
+      ip: 192.168.1.207
+      port: 19999
+      protocol: TCP
+      url: http://mouse.local:19999
+    name: mouse-netdata
+    runsOn:
+      - mouse-ucore
+  - kind: Service
+    network:
+      ip: 192.168.1.207
+      port: 6443
+      protocol: TCP
+    name: mouse-k0s-api
+    runsOn:
+      - mouse-k0s
+  - kind: Desktop
+    ram:
+      size: 16
+    cpus:
+      - model: AMD Ryzen 7 3800X
+        cores: 8
+        threads: 16
+    drives:
+      - type: ssd
+        size: 500
+      - type: ssd
+        size: 500
+      - type: ssd
+        size: 500
+    gpus:
+      - model: AMD Radeon RX 5700 XT
+        vram: 8
+    nics:
+      - type: rj45
+        speed: 1
+        ports: 1
+    name: monolith
+    tags:
+      - kyz
+  - kind: Router
+    model: Ubiquiti-ER-4
+    managed: true
+    poe: false
+    ports:
+      - type: rj45
+        speed: 1
+        count: 3
+      - type: sfp
+        speed: 1
+        count: 1
+    name: kyz-gateway
+    tags:
+      - kyz
+  - kind: System
+    type: Baremetal
+    os: edgeos
+    cores: 4
+    ram: 1
+    name: kyz-gateway-os
+    runsOn:
+      - kyz-gateway
+  - kind: Service
+    network:
+      ip: 192.168.1.1
+      port: 443
+      protocol: TCP
+      url: https://192.168.1.1
+    name: kyz-gateway-webui
+    runsOn:
+      - kyz-gateway-os
+  - kind: System
+    type: Baremetal
+    os: cachyos
+    cores: 8
+    ram: 16
+    drives:
+      - size: 500
+      - size: 500
+      - size: 500
+    name: monolith-cachyos
+    runsOn:
+      - monolith
