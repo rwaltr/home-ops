@@ -22,15 +22,3 @@ resource "tfe_workspace" "cloudflare" {
   organization   = data.tfe_organization.rwaltr.name
   execution_mode = "local"
 }
-
-# resource "tfe_workspace" "linode" {
-#   name           = "linode-provisioner"
-#   organization   = data.tfe_organization.rwaltr.name
-#   execution_mode = "local"
-# }
-
-resource "tfe_workspace" "backblaze" {
-  name           = "backblaze-provisioner"
-  organization   = data.tfe_organization.rwaltr.name
-  execution_mode = "local"
-}
