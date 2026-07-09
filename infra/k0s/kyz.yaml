@@ -23,6 +23,7 @@ spec:
           port: 6443
           sans:
             - 100.82.231.96
+            - 192.168.88.232
         installConfig:
           users:
             etcdUser: etcd
@@ -48,6 +49,8 @@ spec:
         podSecurityPolicy:
           defaultPolicy: 00-k0s-privileged
         storage:
+          etcd:
+            peerAddress: 192.168.88.232
           type: etcd
         telemetry:
           enabled: false

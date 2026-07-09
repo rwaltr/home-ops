@@ -62,7 +62,7 @@ resources:
       - mouse
   - kind: Service
     network:
-      ip: 192.168.1.207
+      ip: 192.168.88.232
       port: 22
       protocol: TCP
     name: mouse-ssh
@@ -78,7 +78,7 @@ resources:
       - mouse-ucore
   - kind: Service
     network:
-      ip: 192.168.1.207
+      ip: 192.168.88.232
       port: 19999
       protocol: TCP
       url: http://mouse.local:19999
@@ -87,7 +87,7 @@ resources:
       - mouse-ucore
   - kind: Service
     network:
-      ip: 192.168.1.207
+      ip: 192.168.88.232
       port: 6443
       protocol: TCP
     name: mouse-k0s-api
