@@ -35,6 +35,21 @@ Universal Blue uCore provides immutable, container-first host configuration. Con
 
 Entry point: `infra/ucore/butane/`
 
+### 🚗 Flatcar (active experiment)
+
+Flatcar Container Linux test VMs for evaluating a uCore replacement. Raw qemu (no libvirt) VMs with ZFS via systemd-sysext and a k0s + Cilium cluster smoke test. Tasks take a host argument (`test` = scratch VM, `mouse` = mirrors the production host):
+
+```bash
+mise run flatcar:vm test      # build ignition, download image, boot VM
+mise run flatcar:verify test  # verify ZFS sysext, pool, VLAN over SSH
+mise run flatcar:k0s test     # install k0s + Cilium, nginx smoke test
+mise run flatcar:vm mouse     # boot the mouse config (import-only ZFS)
+mise run flatcar:seed mouse   # hand-create tank like bare metal, then reboot
+mise run flatcar:clean test   # destroy VM and disks
+```
+
+Entry point: `infra/flatcar/butane/`
+
 ### ☸️ Kubernetes (k0s)
 
 Single-node k0s cluster planned for mouse. Configuration managed via k0sctl.
@@ -99,18 +114,19 @@ S3-compatible backup storage for long-term data retention
 
 ## 🧰 Tools
 
-| Tool            | Use                        | Active |
-| --------------- | -------------------------- | ------ |
-| uCore           | Operating System           | ☑️     |
-| SOPS            | Secrets Management         | ☑️     |
-| Terraform       | Cloud Resource Management  | ☑️     |
-| Pulumi          | Cloud Resource Management  | 🚧     |
-| ZFS             | Storage & Snapshots        | ☑️     |
-| RustFS          | S3-compatible Storage      | ☑️     |
-| Netdata         | System Monitoring          | ☑️     |
-| k0s             | Kubernetes (single-node)   | 🚧     |
-| Pre-commit      | Code Quality Automation    | ☑️     |
-| mise            | Task Runner & Tool Mgmt    | ☑️     |
+| Tool       | Use                        | Active |
+| ---------- | -------------------------- | ------ |
+| uCore      | Operating System           | ☑️     |
+| Flatcar    | Operating System (testing) | 🚧     |
+| SOPS       | Secrets Management         | ☑️     |
+| Terraform  | Cloud Resource Management  | ☑️     |
+| Pulumi     | Cloud Resource Management  | 🚧     |
+| ZFS        | Storage & Snapshots        | ☑️     |
+| RustFS     | S3-compatible Storage      | ☑️     |
+| Netdata    | System Monitoring          | ☑️     |
+| k0s        | Kubernetes (single-node)   | 🚧     |
+| Pre-commit | Code Quality Automation    | ☑️     |
+| mise       | Task Runner & Tool Mgmt    | ☑️     |
 
 ---
 

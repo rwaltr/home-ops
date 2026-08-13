@@ -4,32 +4,40 @@ This document provides context and guidelines for AI coding assistants (like Cur
 
 ## 📖 Project Overview
 
-This is a Universal Blue uCore homelab infrastructure monorepo with one active migration:
+This is a homelab infrastructure monorepo with **two active migrations**:
 
-1. **IaC Migration**: Terraform → Pulumi
+1. **Host Migration**: uCore → **Flatcar + k0s + Cilium** (GitOps, modeled on onedr0p/home-ops)
+2. **IaC Migration**: Terraform → Pulumi
 
 It manages:
 
-- **Host Configuration**: uCore (mouse) — immutable Fedora CoreOS-based OS
-- **Kubernetes**: k0s single-node cluster (planned)
+- **Host Configuration**: Flatcar Container Linux (mouse) via Butane/Ignition — ZFS storage node + single-node k0s
+- **Kubernetes**: k0s v1.36 + Cilium (kube-proxy replacement) — validated in VM
 - **Cloud Resources**: Terraform for Cloudflare DNS and Backblaze B2 storage (migrating to Pulumi)
-- **Services**: RustFS (S3-compatible storage), Netdata (monitoring)
+- **Services**: RustFS (S3-compatible storage), Netdata (monitoring) — moving in-cluster
 - **Secrets**: SOPS with age encryption
+
+**Read `REFACTOR_PLANS.md` first** — it tracks the Flatcar migration phases, decisions, and lessons.
 
 ## 🏗️ Repository Structure
 
 ```
 .
+├── REFACTOR_PLANS.md      # 🗺️ Flatcar migration plan, decisions log, lessons
 ├── infra/
-│   ├── ucore/             # 🔵 Primary host configuration
+│   ├── flatcar/           # 🔵 Primary host configuration (uCore replacement)
 │   │   ├── butane/        # Butane configs (YAML → Ignition)
-│   │   │   ├── base.bu    # Shared base config (users, SSH, sudo)
-│   │   │   └── hosts/     # Per-host configs (mouse.bu, template.bu)
-│   │   ├── containers/    # Podman Quadlet definitions (rustfs, netdata)
-│   │   ├── ignition/      # Generated .ign files (gitignored, only .gitkeep tracked)
+│   │   │   ├── base.bu    # Shared base (users, SSH keys, tailscale, mDNS, update-strategy)
+│   │   │   ├── test.bu    # Scratch validation config
+│   │   │   └── hosts/     # Per-host configs (mouse.bu)
+│   │   └── ignition/      # Generated .ign files (gitignored)
+│   ├── ucore/             # ⚪ Legacy host configuration (being retired)
+│   │   ├── butane/        # base.bu + hosts/{mouse,template}.bu
 │   │   └── *.md           # Docs & runbooks
-│   ├── k0s/               # ☸️ Kubernetes cluster config
-│   │   └── kyz.yaml       # k0sctl cluster definition
+│   ├── k0s/               # ☸️ k0sctl cluster definitions
+│   │   ├── mouse.yaml     # Production single-node cluster (10.10.0.105)
+│   │   ├── test.yaml      # Scratch VM cluster
+│   │   └── kyz-0.yml      # Legacy (stale IP, superseded by mouse.yaml)
 │   ├── terraform/         # 🔄 Current IaC (maintenance mode)
 │   │   ├── cloudflare/    # DNS & domain management
 │   │   ├── backblaze/     # B2 backup storage
@@ -39,6 +47,9 @@ It manages:
 │   │   ├── cloudflare/    # DNS management (stub)
 │   │   └── tf-cloud/      # TF Cloud management (stub)
 │   └── shared/            # Shared config (domains.sops.yaml)
+├── .mise/
+│   ├── lib/common.sh      # Shared task helpers (log/die/download_artifact/vm_ports/vm_user)
+│   └── tasks/             # File-based tasks: flatcar/, ucore/, tf/
 ├── .sops.yaml             # SOPS configuration
 ├── fnox.toml              # Alternative SOPS config (age provider)
 └── .mise.toml             # Development environment & tool versions
@@ -48,18 +59,20 @@ It manages:
 
 ### Current Stack
 
-- **Universal Blue uCore**: Immutable Fedora CoreOS-based OS
+- **Flatcar Container Linux**: Immutable OS, ZFS via official systemd-sysext
 - **Butane/Ignition**: Host configuration (YAML → JSON)
+- **k0s + Cilium**: Single-node Kubernetes, kube-proxy replacement (validated)
 - **Terraform**: Infrastructure as Code (🔄 **Migrating to Pulumi**)
 - **SOPS + age**: Secrets encryption
-- **ZFS**: Storage with snapshots
+- **ZFS**: tank pool (raidz1×2, /var/tank) — created by hand, imported by Ignition
 - **Pre-commit**: Code quality hooks
 - **mise**: Task runner and development environment manager
 
 ### In-Progress
 
+- **Flatcar migration**: Phases 0–0.5 done (validation + mouse config); see REFACTOR_PLANS.md
 - **Pulumi**: Modern IaC with Go — stubs at `infra/pulumi/`, backblaze has initial code
-- **k0s**: Single-node Kubernetes — config at `infra/k0s/kyz.yaml`
+- **GitOps layout**: Flux + helmfile bootstrap modeled on onedr0p/home-ops (Phase 2+)
 
 ## 📝 Working with This Repository
 
@@ -69,26 +82,29 @@ It manages:
 
 2. **Use mise tasks**: Most operations have mise task wrappers — check `.mise/tasks/` before running commands manually
 
-3. **Read uCore docs** before working on host configuration:
-   - `infra/ucore/README.md` - Overview & architecture
-   - `infra/ucore/CONTAINERS.md` - Container integration architecture
-   - `infra/ucore/DEPLOYMENT.md` - Deployment strategies
-   - `infra/ucore/HOSTS.md` - Multi-host management guide
-   - `infra/ucore/KUBERNETES.md` - k0s on uCore
-   - `infra/ucore/SECRETS.md` - Secret management approach
+3. **Read `REFACTOR_PLANS.md`** before working on host configuration or Kubernetes —
+   it has the migration phases, the decisions log (k0s vs k3s, sysext delivery, Cilium
+   BGP), and hard-won Ignition lessons (e.g. `/etc/flatcar/update.conf` can't be
+   Ignition-written; sysext units can't be Ignition-enabled)
 
 4. **Check for TODOs**: Search for `TODO:` comments in relevant files
 
 5. **Review existing patterns**: Look at similar implementations before creating new ones
 
-### uCore Configuration (Primary Development Target)
+### Flatcar Configuration (Primary Development Target)
 
-**Location**: `infra/ucore/`
+**Location**: `infra/flatcar/`
 
-- Butane configs: `butane/base.bu` (shared), `butane/hosts/*.bu` (per-host)
-- Compiled to Ignition: `ignition/*.ign` (JSON, gitignored)
-- Container definitions: `containers/*.container` (Podman Quadlet format)
-- Current containers: `rustfs.container`, `netdata.container`
+- Butane configs: `butane/base.bu` (shared: users, tailscale, mDNS, update-strategy),
+  `butane/test.bu` (scratch), `butane/hosts/*.bu` (per-host, merge base.ign)
+- Compiled to Ignition: `ignition/*.ign` (JSON, gitignored) via `mise run flatcar:build`
+- ZFS: pool created by hand, **imported** by Ignition (`zpool import -a`) — never create in butane
+- k0sctl configs: `infra/k0s/<host>.yaml`
+
+### uCore Configuration (Legacy — being retired)
+
+**Location**: `infra/ucore/` — maintenance only, do not add new features.
+Docs there (README/HOSTS/DEPLOYMENT/KUBERNETES/SECRETS) are still useful background.
 
 **Use mise tasks** for common operations:
 
@@ -105,13 +121,22 @@ mise run ucore:download-iso
 # Create custom install ISO
 mise run ucore:customize-iso <host>
 
-# Create and auto-install VM (full chain)
+# Create and auto-install VM, then wait until SSH-ready (full chain)
 mise run ucore:vm [hostname]
+
+# Create VM without waiting (orchestrated by ucore:vm)
+mise run ucore:create [hostname]
+
+# Wait for a VM to finish installing and become SSH-ready
+mise run ucore:vm-wait [hostname]
 
 # Connect to existing VM
 mise run ucore:vm-connect [hostname]
 
-# Clean up VMs and disks
+# Print rendered Ignition config to stdout (pipe-friendly)
+mise run ucore:render [hostname] | jq .
+
+# Clean up VMs and disks (prompts for confirmation)
 mise run ucore:clean [hostname]
 
 # View available tasks
@@ -120,6 +145,39 @@ mise tasks
 # View task dependencies
 mise tasks deps ucore:vm
 ```
+
+**Flatcar test VMs** (raw qemu, no libvirt). All tasks take a host argument
+(`test` = scratch config, `mouse` = mirrors the production host; default `mouse`):
+
+```bash
+# Full env from scratch: boot → seed tank → verify → k0s + Cilium + nginx
+mise run flatcar:bootstrap mouse
+
+# Build ignition, download image, boot VM (test: SSH on 127.0.0.1:2223, mouse: 2224)
+mise run flatcar:vm test
+
+# Verify sysext, ZFS pool, network + host-specific checks over SSH
+mise run flatcar:verify test
+
+# Install k0s + Cilium and smoke-test with nginx
+mise run flatcar:k0s test
+
+# mouse only: hand-create the tank pool (mirrors bare metal), then reboot
+mise run flatcar:seed mouse
+
+# SSH into a VM
+mise run flatcar:vm-connect test
+
+# Destroy VM and disks (prompts for confirmation)
+mise run flatcar:clean test
+```
+
+Notes:
+
+- Destructive tasks (`ucore:clean`, `flatcar:clean`, `tf:apply`) prompt for confirmation before running
+- `[hostname]` args default to `mouse` (`UCORE_HOST` / `FLATCAR_HOST` env vars override)
+- `tf:plan`/`tf:apply` take a workspace (`cloudflare|backblaze|tf-cloud`) and pass extra args through to terraform: `mise run tf:plan cloudflare -target=x`
+- Shared shell helpers for tasks live in `.mise/lib/common.sh` — includes `log`/`die` and `download_artifact <url> <sha256|sha512|https-checksum-url> <dest>` (checksum-verified atomic downloads; use it for all artifact downloads instead of relying on mise `outputs` caching)
 
 **Manual Butane compilation** (if needed):
 
@@ -193,13 +251,15 @@ sops -e -i secrets.yaml
 
 ### Adding a New Service
 
-**uCore**:
+Services run **in the k0s cluster** (GitOps layout lands in Phase 3 — until then,
+prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 
-1. Create Quadlet container definition in `infra/ucore/containers/`
-2. Reference in host Butane config (`butane/hosts/<hostname>.bu`)
-3. Update `CONTAINERS.md` inventory
-4. Build: `mise run ucore:build`
-5. Test in VM: `mise run ucore:vm [hostname]`
+### Adding a New Flatcar Host
+
+1. Create `infra/flatcar/butane/hosts/<host>.bu` (merge `infra/flatcar/ignition/base.ign`)
+2. Create `infra/k0s/<host>.yaml` (copy mouse.yaml)
+3. Register ports/user in `vm_ports`/`vm_user` in `.mise/lib/common.sh`
+4. Test: `mise run flatcar:bootstrap <host>`
 
 ### Adding Cloud Resources
 
@@ -218,9 +278,9 @@ sops -e -i secrets.yaml
 
 ### Finding Configuration
 
-- **Host settings**: `infra/ucore/butane/` (active)
-- **Container definitions**: `infra/ucore/containers/` (rustfs, netdata)
-- **Kubernetes**: `infra/k0s/kyz.yaml`
+- **Migration plan/decisions**: `REFACTOR_PLANS.md`
+- **Host settings**: `infra/flatcar/butane/` (active), `infra/ucore/butane/` (legacy)
+- **Kubernetes**: `infra/k0s/mouse.yaml` (prod), `infra/k0s/test.yaml` (scratch)
 - **Cloud resources**: `infra/terraform/*/` (maintenance) or `infra/pulumi/` (in progress)
 - **Shared secrets**: `infra/shared/domains.sops.yaml`
 - **SOPS config**: `.sops.yaml`
@@ -230,7 +290,14 @@ sops -e -i secrets.yaml
 
 ### Migration Context
 
-This project has **one active migration**:
+This project has **two active migrations**:
+
+**uCore → Flatcar + k0s + Cilium (Host Migration)**
+
+- Tracked in `REFACTOR_PLANS.md` — check the phase checklist before starting host work
+- Flatcar configs live in `infra/flatcar/`; uCore (`infra/ucore/`) is legacy/maintenance
+- Workloads (rustfs, netdata) move from quadlets into the cluster
+- Validate everything with `mise run flatcar:bootstrap <host>`
 
 **Terraform → Pulumi (IaC Migration)**
 
@@ -241,7 +308,7 @@ This project has **one active migration**:
 
 ### Testing Requirements
 
-- **Always test uCore changes in VM**: `mise run ucore:vm [hostname]`
+- **Always test Flatcar changes in VM**: `mise run flatcar:bootstrap <host>`
 - Use mise tasks for building and testing
 - Use pre-commit hooks: `pre-commit run --all-files`
 - Validate syntax before committing
@@ -296,35 +363,33 @@ This project has **one active migration**:
 
 ### Project Documentation
 
+- [REFACTOR_PLANS.md](REFACTOR_PLANS.md) - **Flatcar migration plan, decisions, lessons**
 - [Main README](README.md) - Project overview
-- [uCore Overview](infra/ucore/README.md) - uCore architecture
-- [Container Architecture](infra/ucore/CONTAINERS.md) - Quadlet integration
-- [Deployment Strategies](infra/ucore/DEPLOYMENT.md) - Post-provisioning updates
-- [Multi-Host Guide](infra/ucore/HOSTS.md) - Host management
-- [Kubernetes on uCore](infra/ucore/KUBERNETES.md) - k0s setup
-- [Secret Management](infra/ucore/SECRETS.md) - SOPS + age approach
+- [uCore docs](infra/ucore/) - Legacy architecture (README/HOSTS/DEPLOYMENT/KUBERNETES/SECRETS)
 
 ### External Resources
 
-- [Universal Blue Docs](https://universal-blue.org/)
+- [Flatcar Docs](https://www.flatcar.org/docs/latest/) & [sysext-bakery](https://github.com/flatcar/sysext-bakery)
 - [Butane Configs](https://coreos.github.io/butane/)
+- [k0s Documentation](https://docs.k0sproject.io/stable/) & [k0sctl](https://github.com/k0sproject/k0sctl)
+- [Cilium Docs](https://docs.cilium.io/)
+- [onedr0p/home-ops](https://github.com/onedr0p/home-ops) - GitOps layout reference
 - [SOPS Documentation](https://github.com/getsops/sops)
 - [Terraform Docs](https://www.terraform.io/docs) (maintenance mode)
 - [Pulumi Documentation](https://www.pulumi.com/docs/)
-- [k0s Documentation](https://docs.k0sproject.io/stable/)
 - [mise Documentation](https://mise.jdx.dev/)
 
 ## 💡 Tips for AI Agents
 
 1. **Context is key**: This is a homelab, not production enterprise infrastructure
 2. **Personal project**: Single-user system, optimize for maintainability over scale
-3. **uCore is primary**: All host configuration work goes to `infra/ucore/`
-4. **Only 2 containers exist**: `rustfs.container` and `netdata.container` — others are planned
+3. **Flatcar is primary**: All host configuration work goes to `infra/flatcar/`; uCore is legacy
+4. **Read REFACTOR_PLANS.md**: Migration phases, decisions log, and Ignition gotchas live there
 5. **Use mise tasks**: Check `.mise/tasks/` and suggest mise commands, not raw commands
 6. **IaC migration in progress**: New cloud resources → Pulumi (Go-based stubs at `infra/pulumi/`)
 7. **Read first**: Check existing implementations before suggesting new patterns
 8. **Ask about secrets**: If you need credentials, remind user to use SOPS
-9. **VM testing**: Always suggest testing with `mise run ucore:vm` for infrastructure changes
+9. **VM testing**: Always suggest testing with `mise run flatcar:bootstrap <host>` for infrastructure changes
 10. **Follow conventions**: Match existing code style and structure
 11. **Check TODOs**: See if requested work aligns with existing TODO items
 12. **Terraform maintenance**: Existing Terraform is in maintenance mode, use `terraform` command
@@ -338,7 +403,7 @@ When suggesting changes:
 3. **Use mise tasks**: Suggest `mise run` commands instead of raw commands
 4. **Test locally**: Provide mise task commands to test changes
 5. **Document changes**: Update relevant markdown files
-6. **Target uCore for host config**: All host configuration goes in `infra/ucore/`
+6. **Target Flatcar for host config**: All host configuration goes in `infra/flatcar/`
 7. **Prefer Pulumi for IaC**: When adding cloud resources, suggest Pulumi implementation
 8. **Security first**: Never suggest committing secrets
 9. **Explain reasoning**: Help user understand why, not just how
@@ -352,4 +417,4 @@ When suggesting changes:
 
 ---
 
-*This document is living documentation. Update it as the project evolves.*
+_This document is living documentation. Update it as the project evolves._
