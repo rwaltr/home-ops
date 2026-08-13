@@ -85,6 +85,58 @@ Age-based secrets management — sensitive values are encrypted inline alongside
 
 Config: `infra/flatcar/butane/hosts/mouse.bu`
 
+## 🌐 Networking
+
+<details>
+  <summary>Click here to see the high-level network diagram</summary>
+
+```mermaid
+flowchart TD
+    isp(["🌍 ISP · CGNAT, IPv4 only"]) --> ont["ONT / modem<br/>172.16.1.0/24 (RFC1918 WAN)"]
+    ont --> wan
+
+    subgraph gw["gateway-132l · MikroTik RB5009UG+S+"]
+        wan["ether1-wan"]
+        br["br-lan · VLAN filtering · NAT44"]
+        wan --- br
+    end
+
+    br -- "VLAN 20 access" --> tv1["📺 Living Room"]
+    br -- "VLAN 20 access" --> tv2["📺 Bedroom"]
+    br == "trunk · VLANs 10–60" ==> sw["Study switch<br/>10.10.0.100"]
+
+    sw --> ap["📶 ap1-132l · CAPsMAN<br/>10.10.0.104"]
+    sw --> mouse["🖥️ mouse · Flatcar + k0s"]
+    sw --> cams["🎥 Reolink cams<br/>VLAN 40"]
+    sw --> iot["🏠 IoT · VLAN 30"]
+
+    mouse -. "planned: Cilium BGP<br/>LB VIPs as /32s" .-> br
+```
+
+</details>
+
+The network is segmented into six VLANs on a single bridge (`br-lan`, vlan-filtering).
+The ISP is behind **CGNAT** — the WAN is a private 172.16.1.0/24 with no inbound
+v4, so external access is via Tailscale. IPv6 is **ULA-only**
+(`fdad:207a:f1ab::/48`, one /64 per VLAN matching its ID, SLAAC) — the ISP
+delegates no prefix, so v6 stays internal. The router is `.1` / `::1` on every
+segment.
+
+| VLAN | Name      | IPv4         | IPv6 (ULA)             | DHCP/RA | Purpose                        |
+| ---- | --------- | ------------ | ---------------------- | ------- | ------------------------------ |
+| 10   | mgmt      | 10.10.0.0/24 | fdad:207a:f1ab:10::/64 | ✔      | Network gear + `mouse` host    |
+| 20   | clients   | 10.20.0.0/24 | fdad:207a:f1ab:20::/64 | ✔      | TVs, phones, laptops           |
+| 30   | iot       | 10.30.0.0/23 | fdad:207a:f1ab:30::/64 | ✔      | Appliances and robots          |
+| 40   | cameras   | 10.40.0.0/24 | fdad:207a:f1ab:40::/64 | ✔      | Reolink cameras                |
+| 50   | servers   | 10.50.0.0/24 | fdad:207a:f1ab:50::/64 | ✖      | Cluster services / Cilium VIPs |
+| 60   | untrusted | 10.60.0.0/24 | fdad:207a:f1ab:60::/64 | ✔      | Guest — upstream DNS only      |
+
+VLAN 50 gets no DHCPv4 and no router advertisements by design — addressing there
+is static, reserved for the k0s cluster where Cilium will announce LoadBalancer
+VIPs to the router over BGP (see [REFACTOR_PLANS.md](REFACTOR_PLANS.md)). The
+router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients, IoT,
+and servers. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
+
 ## ☁️ Cloud Integrations
 
 - **Cloudflare** — DNS and domain management (familylegacy, legacy, prof, public zones)
