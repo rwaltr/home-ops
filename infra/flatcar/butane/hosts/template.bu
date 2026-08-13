@@ -1,0 +1,73 @@
+variant: flatcar
+version: 1.1.0
+# Template for new Flatcar hosts. Copy to <hostname>.bu and fill in CHANGEME.
+# Then:
+#   1. infra/k0s/<hostname>.yaml      (copy mouse.yaml, set address/user)
+#   2. vm_ports/vm_user registry       (.mise/lib/common.sh)
+#   3. mise run flatcar:bootstrap <hostname>
+
+ignition:
+  config:
+    merge:
+      - local: infra/flatcar/ignition/base.ign
+
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: |
+          CHANGEME
+
+    # ZFS hostid — generate: head -c4 /dev/urandom | od -A n -t x4 | tr -d ' \n'
+    # Must match the host that created the pool, or import needs -f
+    - path: /etc/hostid
+      mode: 0644
+      contents:
+        inline: |
+          CHANGEME
+
+    # Official Flatcar ZFS sysext (delete if this host has no ZFS)
+    - path: /etc/flatcar/enabled-sysext.conf
+      mode: 0644
+      contents:
+        inline: |
+          zfs
+
+    # Primary NIC: DHCP + per-link mDNS (<hostname>.local)
+    - path: /etc/systemd/network/25-primary.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=en* eth*
+
+          [Network]
+          DHCP=yes
+          MulticastDNS=yes
+          LLMNR=yes
+
+          [DHCPv4]
+          UseDNS=yes
+          UseRoutes=yes
+
+systemd:
+  units:
+    # Import existing ZFS pools (created by hand on bare metal).
+    # Delete if this host has no ZFS.
+    - name: zfs-import-tank.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Import existing ZFS pools and mount datasets
+        After=systemd-sysext.service
+        Wants=systemd-sysext.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/zpool import -a
+        ExecStart=/usr/bin/zfs mount -a
+
+        [Install]
+        WantedBy=multi-user.target

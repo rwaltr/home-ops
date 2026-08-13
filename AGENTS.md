@@ -31,13 +31,9 @@ It manages:
 │   │   │   ├── test.bu    # Scratch validation config
 │   │   │   └── hosts/     # Per-host configs (mouse.bu)
 │   │   └── ignition/      # Generated .ign files (gitignored)
-│   ├── ucore/             # ⚪ Legacy host configuration (being retired)
-│   │   ├── butane/        # base.bu + hosts/{mouse,template}.bu
-│   │   └── *.md           # Docs & runbooks
 │   ├── k0s/               # ☸️ k0sctl cluster definitions
 │   │   ├── mouse.yaml     # Production single-node cluster (10.10.0.105)
-│   │   ├── test.yaml      # Scratch VM cluster
-│   │   └── kyz-0.yml      # Legacy (stale IP, superseded by mouse.yaml)
+│   │   └── test.yaml      # Scratch VM cluster
 │   ├── terraform/         # 🔄 Current IaC (maintenance mode)
 │   │   ├── cloudflare/    # DNS & domain management
 │   │   ├── backblaze/     # B2 backup storage
@@ -49,7 +45,7 @@ It manages:
 │   └── shared/            # Shared config (domains.sops.yaml)
 ├── .mise/
 │   ├── lib/common.sh      # Shared task helpers (log/die/download_artifact/vm_ports/vm_user)
-│   └── tasks/             # File-based tasks: flatcar/, ucore/, tf/
+│   └── tasks/             # File-based tasks: flatcar/, tf/
 ├── .sops.yaml             # SOPS configuration
 ├── fnox.toml              # Alternative SOPS config (age provider)
 └── .mise.toml             # Development environment & tool versions
@@ -101,50 +97,7 @@ It manages:
 - ZFS: pool created by hand, **imported** by Ignition (`zpool import -a`) — never create in butane
 - k0sctl configs: `infra/k0s/<host>.yaml`
 
-### uCore Configuration (Legacy — being retired)
-
-**Location**: `infra/ucore/` — maintenance only, do not add new features.
-Docs there (README/HOSTS/DEPLOYMENT/KUBERNETES/SECRETS) are still useful background.
-
-**Use mise tasks** for common operations:
-
-```bash
-# Build all Ignition files (incremental)
-mise run ucore:build
-
-# Build single Ignition file
-mise run ucore:build-single <name>
-
-# Download Fedora CoreOS ISO (cached)
-mise run ucore:download-iso
-
-# Create custom install ISO
-mise run ucore:customize-iso <host>
-
-# Create and auto-install VM, then wait until SSH-ready (full chain)
-mise run ucore:vm [hostname]
-
-# Create VM without waiting (orchestrated by ucore:vm)
-mise run ucore:create [hostname]
-
-# Wait for a VM to finish installing and become SSH-ready
-mise run ucore:vm-wait [hostname]
-
-# Connect to existing VM
-mise run ucore:vm-connect [hostname]
-
-# Print rendered Ignition config to stdout (pipe-friendly)
-mise run ucore:render [hostname] | jq .
-
-# Clean up VMs and disks (prompts for confirmation)
-mise run ucore:clean [hostname]
-
-# View available tasks
-mise tasks
-
-# View task dependencies
-mise tasks deps ucore:vm
-```
+**Use mise tasks** for common operations: `mise tasks` lists everything.
 
 **Flatcar test VMs** (raw qemu, no libvirt). All tasks take a host argument
 (`test` = scratch config, `mouse` = mirrors the production host; default `mouse`):
@@ -174,15 +127,15 @@ mise run flatcar:clean test
 
 Notes:
 
-- Destructive tasks (`ucore:clean`, `flatcar:clean`, `tf:apply`) prompt for confirmation before running
-- `[hostname]` args default to `mouse` (`UCORE_HOST` / `FLATCAR_HOST` env vars override)
+- Destructive tasks (`flatcar:clean`, `tf:apply`) prompt for confirmation before running
+- `[hostname]` args default to `mouse` (`FLATCAR_HOST` env var overrides)
 - `tf:plan`/`tf:apply` take a workspace (`cloudflare|backblaze|tf-cloud`) and pass extra args through to terraform: `mise run tf:plan cloudflare -target=x`
 - Shared shell helpers for tasks live in `.mise/lib/common.sh` — includes `log`/`die` and `download_artifact <url> <sha256|sha512|https-checksum-url> <dest>` (checksum-verified atomic downloads; use it for all artifact downloads instead of relying on mise `outputs` caching)
 
 **Manual Butane compilation** (if needed):
 
 ```bash
-butane --pretty --strict --files-dir . < infra/ucore/butane/hosts/mouse.bu > infra/ucore/ignition/mouse.ign
+butane --pretty --strict --files-dir . < infra/flatcar/butane/hosts/mouse.bu > infra/flatcar/ignition/mouse.ign
 ```
 
 ### Terraform (Current - Migrating to Pulumi)
@@ -279,7 +232,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 ### Finding Configuration
 
 - **Migration plan/decisions**: `REFACTOR_PLANS.md`
-- **Host settings**: `infra/flatcar/butane/` (active), `infra/ucore/butane/` (legacy)
+- **Host settings**: `infra/flatcar/butane/`
 - **Kubernetes**: `infra/k0s/mouse.yaml` (prod), `infra/k0s/test.yaml` (scratch)
 - **Cloud resources**: `infra/terraform/*/` (maintenance) or `infra/pulumi/` (in progress)
 - **Shared secrets**: `infra/shared/domains.sops.yaml`
@@ -295,7 +248,7 @@ This project has **two active migrations**:
 **uCore → Flatcar + k0s + Cilium (Host Migration)**
 
 - Tracked in `REFACTOR_PLANS.md` — check the phase checklist before starting host work
-- Flatcar configs live in `infra/flatcar/`; uCore (`infra/ucore/`) is legacy/maintenance
+- Flatcar configs live in `infra/flatcar/` (uCore fully decommissioned 2026-08-13; git history has the old configs)
 - Workloads (rustfs, netdata) move from quadlets into the cluster
 - Validate everything with `mise run flatcar:bootstrap <host>`
 
@@ -334,11 +287,12 @@ This project has **two active migrations**:
 - View task definitions in `.mise/tasks/`
 - Use `mise tasks deps <task>` to see dependencies
 
-**uCore build failures**:
+**Flatcar build failures**:
 
-- Use `mise run ucore:build --force` to rebuild
 - Check Butane syntax: `butane --strict < file.bu`
-- Review build outputs in `ignition/` directory
+- Review build outputs in `infra/flatcar/ignition/`
+- Boot loops: check `.vm/<host>-console.log` for `ignition-files ... res=failed`
+  (see the Ignition limits section in REFACTOR_PLANS.md)
 
 **SOPS decryption errors**:
 
@@ -365,7 +319,7 @@ This project has **two active migrations**:
 
 - [REFACTOR_PLANS.md](REFACTOR_PLANS.md) - **Flatcar migration plan, decisions, lessons**
 - [Main README](README.md) - Project overview
-- [uCore docs](infra/ucore/) - Legacy architecture (README/HOSTS/DEPLOYMENT/KUBERNETES/SECRETS)
+- uCore docs/configs: decommissioned — see git history before 2026-08-13 if needed
 
 ### External Resources
 
@@ -383,7 +337,7 @@ This project has **two active migrations**:
 
 1. **Context is key**: This is a homelab, not production enterprise infrastructure
 2. **Personal project**: Single-user system, optimize for maintainability over scale
-3. **Flatcar is primary**: All host configuration work goes to `infra/flatcar/`; uCore is legacy
+3. **Flatcar is primary**: All host configuration work goes to `infra/flatcar/`
 4. **Read REFACTOR_PLANS.md**: Migration phases, decisions log, and Ignition gotchas live there
 5. **Use mise tasks**: Check `.mise/tasks/` and suggest mise commands, not raw commands
 6. **IaC migration in progress**: New cloud resources → Pulumi (Go-based stubs at `infra/pulumi/`)

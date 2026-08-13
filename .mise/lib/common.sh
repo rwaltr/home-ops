@@ -115,15 +115,4 @@ vm_user() {
   esac
 }
 
-# Verify virsh is installed and the system libvirt connection works.
-check_virsh() {
-  command -v virsh &>/dev/null || die "virsh not found. Install libvirt:
-  Fedora: sudo dnf install libvirt virt-manager
-  Arch:   sudo pacman -S libvirt virt-manager
-  Ubuntu: sudo apt install libvirt-daemon-system virt-manager"
 
-  virsh --connect qemu:///system list --all &>/dev/null || die "Cannot connect to libvirt system. Make sure libvirtd is running:
-  sudo systemctl start libvirtd"
-
-  log "libvirt is available (system mode)"
-}

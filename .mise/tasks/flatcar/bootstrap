@@ -2,7 +2,7 @@
 #MISE description="Full test env from scratch: boot → (seed tank) → verify → k0s + Cilium + nginx"
 #USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host to build"
 
-# Orchestrator task (same pattern as ucore:vm). Assumes a clean slate —
+# Orchestrator task. Assumes a clean slate —
 # run flatcar:clean <host> first if the VM or disks already exist.
 
 set -euo pipefail

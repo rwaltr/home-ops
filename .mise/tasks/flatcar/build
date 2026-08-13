@@ -16,7 +16,7 @@ compile() {
     local tmp_file err_file
     tmp_file=$(mktemp) err_file=$(mktemp)
     # --files-dir is the repo root so `local: infra/flatcar/ignition/base.ign`
-    # merge references resolve (same convention as infra/ucore)
+    # merge references resolve
     if ! butane --pretty --strict --files-dir "${MISE_PROJECT_ROOT}" < "${src}" > "${tmp_file}" 2> "${err_file}"; then
         log "ERROR: Failed to build ${src##*/}"
         cat "${err_file}" >&2
@@ -38,5 +38,6 @@ compile "${BUTANE_DIR}/test.bu" "${IGN_DIR}/test.ign"
 for host_bu in "${BUTANE_DIR}"/hosts/*.bu; do
     [ -e "${host_bu}" ] || continue
     name=$(basename "${host_bu}" .bu)
+    [ "${name}" = "template" ] && continue   # skeleton for new hosts, not a real config
     compile "${host_bu}" "${IGN_DIR}/${name}.ign"
 done

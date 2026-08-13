@@ -5,7 +5,7 @@
 
 # rwaltr/home-ops
 
-_Universal Blue uCore homelab infrastructure with Terraform/Pulumi cloud management_
+_Flatcar + k0s + Cilium homelab infrastructure with Terraform/Pulumi cloud management_
 
 </div>
 
@@ -21,40 +21,32 @@ _Universal Blue uCore homelab infrastructure with Terraform/Pulumi cloud managem
 
 ## 📖 Overview
 
-This is a monorepo to manage my personal homelab infrastructure. Running Universal Blue uCore (Fedora CoreOS-based immutable OS) on the main host ("mouse") with Terraform/Pulumi for cloud resource management. The infrastructure provides object storage (RustFS), monitoring (Netdata), and backup capabilities (Backblaze B2).
+This is a monorepo to manage my personal homelab infrastructure. Running Flatcar Container Linux (immutable OS) on the main host ("mouse") with a single-node k0s + Cilium cluster, and Terraform/Pulumi for cloud resource management. The infrastructure provides object storage (RustFS), monitoring (Netdata), and backup capabilities (Backblaze B2).
+
+Migration plan and decisions: [REFACTOR_PLANS.md](REFACTOR_PLANS.md)
 
 ## 🔧 Infrastructure Components
 
-### 🔵 uCore
+### 🚗 Flatcar
 
-Universal Blue uCore provides immutable, container-first host configuration. Configuration in `infra/ucore/` using Butane → Ignition.
+Flatcar Container Linux provides immutable, container-first host configuration. Configured in `infra/flatcar/` using Butane → Ignition: shared `base.bu` (users, tailscale, mDNS, update policy) merged into per-host configs. ZFS via the official systemd-sysext; the tank pool is created by hand and **imported** by Ignition.
 
-- [uCore Overview](infra/ucore/README.md)
-- [Container Architecture](infra/ucore/CONTAINERS.md)
-- [Deployment Strategies](infra/ucore/DEPLOYMENT.md)
-
-Entry point: `infra/ucore/butane/`
-
-### 🚗 Flatcar (active experiment)
-
-Flatcar Container Linux test VMs for evaluating a uCore replacement. Raw qemu (no libvirt) VMs with ZFS via systemd-sysext and a k0s + Cilium cluster smoke test. Tasks take a host argument (`test` = scratch VM, `mouse` = mirrors the production host):
+Raw qemu (no libvirt) test VMs validate every config end-to-end. Tasks take a host argument (`test` = scratch VM, `mouse` = mirrors the production host):
 
 ```bash
-mise run flatcar:vm test      # build ignition, download image, boot VM
-mise run flatcar:verify test  # verify ZFS sysext, pool, VLAN over SSH
-mise run flatcar:k0s test     # install k0s + Cilium, nginx smoke test
-mise run flatcar:vm mouse     # boot the mouse config (import-only ZFS)
-mise run flatcar:seed mouse   # hand-create tank like bare metal, then reboot
-mise run flatcar:clean test   # destroy VM and disks
+mise run flatcar:bootstrap mouse  # full env: boot → seed tank → verify → k0s + Cilium + nginx
+mise run flatcar:vm test          # build ignition, download image, boot VM
+mise run flatcar:verify test      # verify ZFS sysext, pool, VLAN over SSH
+mise run flatcar:k0s test         # install k0s + Cilium, nginx smoke test
+mise run flatcar:seed mouse       # hand-create tank like bare metal, then reboot
+mise run flatcar:clean test       # destroy VM and disks
 ```
 
 Entry point: `infra/flatcar/butane/`
 
 ### ☸️ Kubernetes (k0s)
 
-Single-node k0s cluster planned for mouse. Configuration managed via k0sctl.
-
-- [Kubernetes on uCore](infra/ucore/KUBERNETES.md)
+Single-node k0s cluster on mouse (v1.36, Cilium kube-proxy replacement), managed via k0sctl configs in `infra/k0s/`. GitOps layout (Flux + helmfile bootstrap, modeled on onedr0p/home-ops) is the next migration phase — see REFACTOR_PLANS.md.
 
 Entry point: `infra/k0s/`
 
@@ -80,15 +72,17 @@ Age-based secrets management for encrypting sensitive configuration values inlin
 
 ## 🖥️ Current Host
 
-### mouse (uCore)
+### mouse (Flatcar)
 
 Primary infrastructure host running:
 
-- **Storage**: ZFS pools
-- **Object Storage**: RustFS (S3-compatible, Rust-based)
-- **Monitoring**: Netdata for system metrics
+- **Storage**: ZFS tank pool (raidz1×2, mounted at /var/tank)
+- **Kubernetes**: single-node k0s + Cilium
+- **Object Storage**: RustFS (S3-compatible, moving in-cluster)
+- **Monitoring**: Netdata (moving in-cluster)
+- **Access**: Tailscale + mDNS (`mouse.local`)
 
-Configuration: `infra/ucore/butane/hosts/mouse.bu`
+Configuration: `infra/flatcar/butane/hosts/mouse.bu`
 
 ## 🌐 Cloud Integrations
 
@@ -116,15 +110,15 @@ S3-compatible backup storage for long-term data retention
 
 | Tool       | Use                        | Active |
 | ---------- | -------------------------- | ------ |
-| uCore      | Operating System           | ☑️     |
-| Flatcar    | Operating System (testing) | 🚧     |
+| Flatcar    | Operating System           | ☑️     |
+| k0s        | Kubernetes (single-node)   | ☑️     |
+| Cilium     | CNI (kube-proxy replacement)| ☑️    |
 | SOPS       | Secrets Management         | ☑️     |
 | Terraform  | Cloud Resource Management  | ☑️     |
 | Pulumi     | Cloud Resource Management  | 🚧     |
 | ZFS        | Storage & Snapshots        | ☑️     |
 | RustFS     | S3-compatible Storage      | ☑️     |
 | Netdata    | System Monitoring          | ☑️     |
-| k0s        | Kubernetes (single-node)   | 🚧     |
 | Pre-commit | Code Quality Automation    | ☑️     |
 | mise       | Task Runner & Tool Mgmt    | ☑️     |
 

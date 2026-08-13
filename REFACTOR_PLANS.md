@@ -95,12 +95,15 @@ the management VLAN but must directly serve a second VLAN.
     task bounces it post-Cilium; VM serial upgraded to socket+logfile (interactive debug
     via `socat - UNIX-CONNECT:.vm/<host>-serial.sock`); base.bu carries 4 SSH keys —
     the 3 from uCore base.bu + this workstation (zirconium-bisync)
-- [ ] **Phase 1: Host layer** — retire `infra/ucore/` (flatcar base+hosts layout exists), provision bare-metal mouse
+- [ ] **Phase 1: Bare-metal mouse** — provision real hardware with `infra/flatcar/ignition/mouse.ign`
+  (install media/approach TBD: flatcar-install vs knuckle-style ISO), `k0sctl apply -c infra/k0s/mouse.yaml`
+  - [x] uCore decommissioned (2026-08-13): `infra/ucore/`, `ucore:*` tasks, `kyz-0.yml`,
+    FCOS ISO, `check_virsh` all removed; `hosts/template.bu` ported to Flatcar
 - [ ] **Phase 2: Bootstrap** — helmfile DAG: cilium → coredns → cert-manager → external-secrets → flux-operator/instance (model: `~/src/onedr0p/home-ops/bootstrap/helmfile/`)
 - [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: alerts, backup, zeroscale
 - [ ] **Phase 4: Networking** — Cilium BGP resources, Envoy Gateway internal/external, cert-manager, external-dns (Cloudflare)
 - [ ] **Phase 5: Workloads** — migrate rustfs/netdata quadlets into cluster; remaining apps
-- [ ] **Phase 6: Automation** — Renovate (home-operations presets, tiered automerge), CI (butane validate, image pull check), decommission uCore
+- [ ] **Phase 6: Automation** — Renovate (home-operations presets, tiered automerge), CI (butane validate, image pull check)
 
 ## Lessons from onedr0p/home-ops review
 
@@ -160,5 +163,5 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 - [ ] Router ASN / node ASN assignment
 - [x] ~~Which VLAN ID is the "served" VLAN?~~ → **30 (iot) + 40 (cameras), both reached
   via k8s (home-assistant/macvlan or BGP), NOT configured on the host** (2026-08-13)
-- [ ] `infra/k0s/kyz-0.yml` is superseded by `mouse.yaml` (stale IP 192.168.88.232) — delete during Phase 1 cleanup?
-- [ ] Do other hosts stay on uCore, or does everything move to Flatcar?
+- [x] ~~`infra/k0s/kyz-0.yml` superseded by `mouse.yaml`~~ → deleted with uCore decom (2026-08-13)
+- [x] ~~Do other hosts stay on uCore, or does everything move to Flatcar?~~ → everything moves; uCore decommissioned 2026-08-13

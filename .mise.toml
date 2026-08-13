@@ -27,10 +27,10 @@ helm = "latest"
 # Tasks are file-based tasks in .mise/tasks/ — `mise tasks` is the index.
 # Shared shell helpers live in .mise/lib/common.sh.
 # Tips:
-#   - View dependency tree: mise tasks deps ucore:vm
-#   - Watch for changes:   mise watch ucore:build
+#   - View dependency tree: mise tasks deps flatcar:bootstrap
+#   - Watch for changes:   mise watch flatcar:build
 #   - Pass extra args to underlying tools: mise run tf:plan cloudflare -target=x
-#   - Destructive tasks (ucore:clean, tf:apply) prompt for confirmation
+#   - Destructive tasks (flatcar:clean, tf:apply) prompt for confirmation
 
 [env]
 _.file = ".env"

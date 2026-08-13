@@ -13,6 +13,5 @@ bin/
 terraform.tfstate*
 .vm/
 
-# uCore Ignition files (contain secrets like SSH keys)
-infra/ucore/ignition/*.ign
+# Ignition files (contain secrets like SSH keys)
 infra/flatcar/ignition/*.ign
