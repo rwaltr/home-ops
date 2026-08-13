@@ -38,10 +38,6 @@ It manages:
 │   │   ├── cloudflare/    # DNS & domain management
 │   │   ├── backblaze/     # B2 backup storage
 │   │   └── tf-cloud/      # Terraform Cloud config
-│   ├── pulumi/            # 🚀 Future IaC (stubs created)
-│   │   ├── backblaze/     # B2 provisioning (Go, has initial code)
-│   │   ├── cloudflare/    # DNS management (stub)
-│   │   └── tf-cloud/      # TF Cloud management (stub)
 │   └── shared/            # Shared config (domains.sops.yaml)
 ├── .mise/
 │   ├── lib/common.sh      # Shared task helpers (log/die/download_artifact/vm_ports/vm_user)
@@ -67,7 +63,7 @@ It manages:
 ### In-Progress
 
 - **Flatcar migration**: Phases 0–0.5 done (validation + mouse config); see REFACTOR_PLANS.md
-- **Pulumi**: Modern IaC with Go — stubs at `infra/pulumi/`, backblaze has initial code
+- **Pulumi**: Modern IaC with Go — no code yet (early stubs pruned); create `infra/pulumi/` when starting
 - **GitOps layout**: Flux + helmfile bootstrap modeled on onedr0p/home-ops (Phase 2+)
 
 ## 📝 Working with This Repository
@@ -157,23 +153,10 @@ terraform plan
 terraform apply
 ```
 
-### Pulumi (In Progress)
+### Pulumi (Planned — no code yet)
 
-**Location**: `infra/pulumi/`
-
-Three stubs exist, all using Go runtime:
-
-- `backblaze/` — Has `main.go` and `go.mod` with initial provisioning code
-- `cloudflare/` — Stub (`Pulumi.yaml` only)
-- `tf-cloud/` — Stub (`Pulumi.yaml` only)
-
-**Workflow**:
-
-```bash
-cd infra/pulumi/<stack>
-pulumi preview
-pulumi up
-```
+Early Go stubs were pruned (2026-06); recreate `infra/pulumi/` when this migration
+gets active. Intended layout: `backblaze/`, `cloudflare/`, `tf-cloud/`, Go runtime.
 
 **Migration strategy**:
 
@@ -234,7 +217,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **Migration plan/decisions**: `REFACTOR_PLANS.md`
 - **Host settings**: `infra/flatcar/butane/`
 - **Kubernetes**: `infra/k0s/mouse.yaml` (prod), `infra/k0s/test.yaml` (scratch)
-- **Cloud resources**: `infra/terraform/*/` (maintenance) or `infra/pulumi/` (in progress)
+- **Cloud resources**: `infra/terraform/*/` (maintenance; Pulumi planned, no code yet)
 - **Shared secrets**: `infra/shared/domains.sops.yaml`
 - **SOPS config**: `.sops.yaml`
 - **TODOs**: `git grep "TODO:"`
@@ -256,7 +239,7 @@ This project has **two active migrations**:
 
 - Existing Terraform workspaces remain in maintenance mode
 - **Prefer Pulumi for new cloud resources** when possible
-- Pulumi stubs already exist at `infra/pulumi/` (Go-based)
+- No code yet — create `infra/pulumi/` (Go) when starting
 - Both tools coexist during transition
 
 ### Testing Requirements

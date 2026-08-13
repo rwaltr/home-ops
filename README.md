@@ -60,11 +60,7 @@ Terraform manages cloud resources (maintenance mode — migrating to Pulumi):
 
 ### 🚀 Pulumi
 
-Pulumi stubs created for migrating cloud resources from Terraform (Go-based):
-
-- **Backblaze**: B2 provisioning (`infra/pulumi/backblaze/`) — has initial Go code
-- **Cloudflare**: DNS management (`infra/pulumi/cloudflare/`) — stub
-- **Terraform Cloud**: Workspace management (`infra/pulumi/tf-cloud/`) — stub
+Pulumi planned for migrating cloud resources from Terraform (Go). Early stubs were pruned; `infra/pulumi/` will be recreated when this migration becomes active.
 
 ### 🔐 SOPS
 
