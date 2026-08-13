@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Print a host's rendered Ignition config to stdout (pipe-friendly)"
+#MISE quiet=true
+#USAGE arg "[hostname]" env="UCORE_HOST" default="mouse" help="Host to render"
+
+# Intentionally does NOT depend on ucore:build — dependency output would
+# pollute stdout. Build first with: mise run ucore:build
+
+set -euo pipefail
+
+IGNITION_FILE="${MISE_PROJECT_ROOT}/infra/ucore/ignition/${usage_hostname?}.ign"
+
+if [ ! -f "${IGNITION_FILE}" ]; then
+    echo "Error: ${IGNITION_FILE} not found — run 'mise run ucore:build' first" >&2
+    exit 1
+fi
+
+cat "${IGNITION_FILE}"

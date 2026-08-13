@@ -10,7 +10,7 @@ spec:
       user: rwaltr
       port: 22
       keyPath: null
-    role: controller
+    role: controller+worker
   options:
     wait:
       enabled: true

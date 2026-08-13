@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Run Terraform plan for a specific directory"
-#MISE arg "<dir>" help="Terraform directory name (e.g., 'cloudflare', 'backblaze', 'tf-cloud')"
+#MISE description="Run Terraform plan for a workspace"
+#USAGE arg "<dir>" help="Terraform workspace" {
+#USAGE   choices "cloudflare" "backblaze" "tf-cloud"
+#USAGE }
+#USAGE arg "[tf-args]" varargs help="Extra args passed to terraform (e.g. -target=x)"
 
-if [ -z "$1" ]; then
-  echo "Error: Please specify a directory (cloudflare, backblaze, tf-cloud)"
-  exit 1
-fi
+set -euo pipefail
 
-terraform -chdir="infra/terraform/$1" plan
+terraform -chdir="${MISE_PROJECT_ROOT}/infra/terraform/${usage_dir?}" plan ${usage_tf_args:-}

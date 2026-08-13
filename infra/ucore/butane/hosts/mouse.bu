@@ -6,7 +6,6 @@ ignition:
   config:
     merge:
       - local: infra/ucore/ignition/base.ign
-      - local: infra/ucore/ignition/storage.ign
 
 storage:
   files:

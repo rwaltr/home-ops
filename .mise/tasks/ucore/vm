@@ -1,127 +1,22 @@
 #!/usr/bin/env bash
-#MISE description="Create and auto-install uCore VM"
-#MISE depends=["ucore:build", "ucore:download-iso"]
+#MISE description="Create and auto-install uCore VM, then wait until it is SSH-ready"
+#MISE depends=[{ task = "ucore:create", args = ["{{usage.hostname}}"], env = { UCORE_FORCE = '{{usage.force | default(value="")}}' } }]
+#MISE depends_post=[{ task = "ucore:vm-wait", args = ["{{usage.hostname}}"] }]
 #USAGE flag "--force" help="Force recreate VM even if it exists"
-#USAGE arg "[hostname]" help="Host to install" default="mouse"
+#USAGE arg "[hostname]" env="UCORE_HOST" default="mouse" help="Host to install"
+
+# Orchestrator task. The real work happens in the dependency chain:
+#   ucore:build + ucore:download-iso → ucore:customize-iso → ucore:create → (this) → ucore:vm-wait
 
 set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
 
-HOSTNAME="${usage_hostname?}"
-FORCE="${usage_force:-false}"
-VM_NAME="ucore-${HOSTNAME}-test"
-VM_DIR="${MISE_PROJECT_ROOT}/.vm"
-# VMs always use /dev/vda, so ISO is device-specific
-CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-vda-autoinstall.iso"
-DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}.qcow2"
-ZFS_DISK_PATH="${VM_DIR}/ucore-${HOSTNAME}-zfs.qcow2"
+VM_NAME="ucore-${usage_hostname?}-test"
 
-check_virsh() {
-    if ! command -v virsh &> /dev/null; then
-        echo "Error: virsh not found. Install libvirt:"
-        echo "  Arch: sudo pacman -S libvirt virt-manager"
-        echo "  Fedora: sudo dnf install libvirt virt-manager"
-        echo "  Ubuntu: sudo apt install libvirt-daemon-system virt-manager"
-        exit 1
-    fi
-    
-    if ! virsh --connect qemu:///system list --all &> /dev/null; then
-        echo "Error: Cannot connect to libvirt system. Make sure libvirtd is running:"
-        echo "  sudo systemctl start libvirtd"
-        echo ""
-        echo "Note: Using system connection requires sudo for some operations."
-        exit 1
-    fi
-    
-    echo "✓ libvirt is available (system mode)"
-}
-
-create_disks() {
-    if [ ! -f "${DISK_PATH}" ]; then
-        echo "Creating main disk (40GB)..."
-        qemu-img create -f qcow2 "${DISK_PATH}" 40G
-        echo "✓ Created ${DISK_PATH}"
-    else
-        echo "✓ Main disk already exists"
-    fi
-    
-    if [ ! -f "${ZFS_DISK_PATH}" ]; then
-        echo "Creating ZFS disk (20GB)..."
-        qemu-img create -f qcow2 "${ZFS_DISK_PATH}" 20G
-        echo "✓ Created ${ZFS_DISK_PATH}"
-    else
-        echo "✓ ZFS disk already exists"
-    fi
-}
-
-echo "==================================="
-echo "uCore VM: ${HOSTNAME}"
-echo "==================================="
-echo ""
-
-# Check if VM already exists
-if virsh --connect qemu:///system list --all --name 2>/dev/null | grep -q "^${VM_NAME}$"; then
-    if [ "${FORCE}" != "true" ]; then
-        echo "❌ VM '${VM_NAME}' already exists!"
-        echo ""
-        echo "Options:"
-        echo "  1. Connect to existing VM:"
-        echo "     mise run ucore:vm-connect ${HOSTNAME}"
-        echo ""
-        echo "  2. Force recreate (destroys existing VM):"
-        echo "     mise run ucore:vm -- ${HOSTNAME} --force"
-        echo ""
-        echo "  3. Clean up and recreate:"
-        echo "     mise run ucore:clean ${HOSTNAME}"
-        echo "     mise run ucore:vm ${HOSTNAME}"
-        exit 1
-    else
-        echo "⚠️  Force recreating VM '${VM_NAME}'..."
-        echo ""
-        mise run ucore:clean "${HOSTNAME}"
-        echo ""
-    fi
+if command -v virt-manager &>/dev/null; then
+    log "Opening virt-manager console for ${VM_NAME}..."
+    virt-manager --connect qemu:///system --show-domain-console "${VM_NAME}" &>/dev/null &
+else
+    log "virt-manager not found. Watch install progress with:"
+    log "  virsh --connect qemu:///system console ${VM_NAME}"
 fi
-
-echo "Creating custom ISO for ${HOSTNAME}..."
-mise run ucore:customize-iso "${HOSTNAME}"
-
-echo ""
-create_disks
-check_virsh
-
-echo ""
-echo "Creating and starting VM: ${VM_NAME}"
-echo ""
-
-virt-install \
-    --connect qemu:///system \
-    --name "${VM_NAME}" \
-    --memory 4096 \
-    --vcpus 2 \
-    --os-variant fedora-coreos-stable \
-    --disk "path=${DISK_PATH},format=qcow2,bus=virtio" \
-    --disk "path=${ZFS_DISK_PATH},format=qcow2,bus=virtio" \
-    --network network=default,model=virtio \
-    --graphics spice,listen=127.0.0.1 \
-    --console pty,target_type=serial \
-    --noautoconsole \
-    --cdrom "${CUSTOM_ISO_PATH}" \
-    --boot cdrom,hd
-
-echo ""
-echo "✓ VM created and installation started"
-echo ""
-echo "Installation process:"
-echo "  1. Fedora CoreOS installs to /dev/vda (1-2 min)"
-echo "  2. System reboots and applies Ignition config"
-echo "  3. System rebases to uCore (5-10 min)"
-echo "  4. System reboots into uCore"
-echo "  5. All services start automatically"
-echo ""
-echo "Opening virt-manager GUI..."
-virt-manager --connect qemu:///system --show-domain-console "${VM_NAME}" &
-
-echo ""
-echo "Monitor via GUI (opened) or console:"
-echo "  virsh --connect qemu:///system console ${VM_NAME}"
-echo ""

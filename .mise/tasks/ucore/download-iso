@@ -3,22 +3,14 @@
 #MISE outputs=[".vm/fedora-coreos-stable.iso"]
 
 set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
 
-VM_DIR="${MISE_PROJECT_ROOT}/.vm"
-ISO_NAME="fedora-coreos-stable.iso"
-ISO_PATH="${VM_DIR}/${ISO_NAME}"
+ISO_PATH="${MISE_PROJECT_ROOT}/.vm/fedora-coreos-stable.iso"
 
-mkdir -p "${VM_DIR}"
-
-if [ -f "${ISO_PATH}" ]; then
-    echo "✓ ISO already exists at ${ISO_PATH}"
-    exit 0
-fi
-
-echo "Downloading Fedora CoreOS stable ISO..."
+# Fetch stream metadata for the download URL and expected checksum
 STREAM="stable"
-ISO_URL=$(curl -s "https://builds.coreos.fedoraproject.org/streams/${STREAM}.json" | \
-    python3 -c "import sys, json; print(json.load(sys.stdin)['architectures']['x86_64']['artifacts']['metal']['formats']['iso']['disk']['location'])")
+STREAM_JSON=$(curl -sf "https://builds.coreos.fedoraproject.org/streams/${STREAM}.json")
+ISO_URL=$(echo "${STREAM_JSON}" | python3 -c "import sys, json; print(json.load(sys.stdin)['architectures']['x86_64']['artifacts']['metal']['formats']['iso']['disk']['location'])")
+ISO_SHA256=$(echo "${STREAM_JSON}" | python3 -c "import sys, json; print(json.load(sys.stdin)['architectures']['x86_64']['artifacts']['metal']['formats']['iso']['disk']['sha256'])")
 
-curl -L -o "${ISO_PATH}" "${ISO_URL}"
-echo "✓ Downloaded ISO to ${ISO_PATH}"
+download_artifact "${ISO_URL}" "${ISO_SHA256}" "${ISO_PATH}"

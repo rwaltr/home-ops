@@ -4,6 +4,7 @@
 #MISE outputs=["infra/ucore/ignition/*.ign"]
 
 set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
 
 BUTANE_DIR="${MISE_PROJECT_ROOT}/infra/ucore/butane"
 HOSTS_DIR="${BUTANE_DIR}/hosts"
@@ -13,26 +14,34 @@ mkdir -p "${OUTPUT_DIR}"
 
 build_butane() {
     local butane_file="$1"
-    local basename=$(basename "${butane_file}" .bu)
+    local basename
+    basename=$(basename "${butane_file}" .bu)
     local output_file="${OUTPUT_DIR}/${basename}.ign"
-    
-    echo "Building ${basename}.bu → ${basename}.ign"
-    
-    if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${output_file}" 2>&1; then
-        echo "Error: Failed to build ${butane_file}"
-        cat "${output_file}" 2>/dev/null || true
+    local tmp_file err_file
+    tmp_file=$(mktemp) err_file=$(mktemp)
+
+    log "Building ${basename}.bu → ${basename}.ign"
+
+    # Write to a temp file so butane errors never poison the tracked output
+    if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${tmp_file}" 2> "${err_file}"; then
+        log "ERROR: Failed to build ${butane_file}"
+        cat "${err_file}" >&2
+        rm -f "${tmp_file}" "${err_file}"
         return 1
     fi
-    
-    if [ ! -s "${output_file}" ]; then
-        echo "Error: Output file is empty"
+    rm -f "${err_file}"
+
+    if [ ! -s "${tmp_file}" ]; then
+        log "ERROR: Output file is empty"
+        rm -f "${tmp_file}"
         return 1
     fi
-    
-    echo "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"
+
+    mv "${tmp_file}" "${output_file}"
+    log "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"
 }
 
-echo "Building all Butane configs..."
+log "Building all Butane configs..."
 
 for butane_file in "${BUTANE_DIR}"/*.bu; do
     if [ -f "${butane_file}" ]; then
@@ -46,6 +55,4 @@ for butane_file in "${HOSTS_DIR}"/*.bu; do
     fi
 done
 
-echo ""
-echo "All Ignition files built successfully!"
-echo "Output directory: ${OUTPUT_DIR}"
+log "✓ All Ignition files built successfully (${OUTPUT_DIR})"

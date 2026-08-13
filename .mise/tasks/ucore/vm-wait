@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#MISE description="Wait for uCore VM to finish installing and become SSH-ready"
+#USAGE arg "[hostname]" env="UCORE_HOST" default="mouse" help="Host to wait for"
+
+# Install flow: Fedora CoreOS installs → boots → applies Ignition →
+# rebase-to-ucore.service rebases to uCore (5-10 min) → touches
+# /var/lib/ucore-rebased → reboots into uCore. We poll for that marker,
+# then for SSH to come back after the final reboot.
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+VM_NAME="ucore-${usage_hostname?}-test"
+
+SSH_OPTS=(-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes)
+
+# Overall deadline: 20 minutes from now
+DEADLINE=$((SECONDS + 1200))
+check_deadline() {
+    if [ ${SECONDS} -ge ${DEADLINE} ]; then
+        die "Timed out after 20m waiting for ${VM_NAME} — check the console: virsh --connect qemu:///system console ${VM_NAME}"
+    fi
+}
+
+log "Waiting for VM '${VM_NAME}' to get an IP address..."
+VM_IP=""
+until [ -n "${VM_IP}" ]; do
+    check_deadline
+    VM_IP=$(virsh --connect qemu:///system domifaddr "${VM_NAME}" 2>/dev/null | grep -oP '(\d{1,3}\.){3}\d{1,3}' | head -1 || true)
+    sleep 5
+done
+log "VM IP: ${VM_IP}"
+
+log "Waiting for uCore rebase to complete (typically 5-10 min)..."
+until ssh "${SSH_OPTS[@]}" "rwaltr@${VM_IP}" 'test -f /var/lib/ucore-rebased' 2>/dev/null; do
+    check_deadline
+    sleep 10
+done
+
+log "Rebase detected, waiting for final boot..."
+sleep 20
+until ssh "${SSH_OPTS[@]}" "rwaltr@${VM_IP}" true 2>/dev/null; do
+    check_deadline
+    sleep 5
+done
+
+log "✓ ${VM_NAME} is ready — ssh rwaltr@${VM_IP}"

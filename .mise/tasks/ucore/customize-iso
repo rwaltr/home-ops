@@ -1,28 +1,16 @@
 #!/usr/bin/env bash
 #MISE description="Create custom auto-install ISO for a host"
-#MISE arg "<hostname>" help="Host to create ISO for"
-#MISE arg "[device]" help="Target install device (default: /dev/vda)"
 #MISE depends=["ucore:build", "ucore:download-iso"]
 #MISE sources=["infra/ucore/ignition/*.ign", ".vm/fedora-coreos-stable.iso"]
 #MISE outputs=[".vm/fedora-coreos-*-autoinstall.iso"]
+#USAGE arg "<hostname>" help="Host to create ISO for"
+#USAGE arg "[device]" default="/dev/vda" help="Target install device (e.g. /dev/nvme0n1, /dev/sda)"
 
 set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
 
-if [ -z "${1:-}" ]; then
-    echo "Error: Please specify a hostname"
-    echo "Usage: mise run ucore:customize-iso <hostname> [device]"
-    echo "  hostname: Host to create ISO for (required)"
-    echo "  device:   Target install device (optional, default: /dev/vda)"
-    echo ""
-    echo "Examples:"
-    echo "  mise run ucore:customize-iso mouse"
-    echo "  mise run ucore:customize-iso mouse /dev/nvme0n1"
-    echo "  mise run ucore:customize-iso mouse /dev/sda"
-    exit 1
-fi
-
-HOSTNAME="$1"
-TARGET_DEVICE="${2:-/dev/vda}"
+HOSTNAME="${usage_hostname?}"
+TARGET_DEVICE="${usage_device?}"
 VM_DIR="${MISE_PROJECT_ROOT}/.vm"
 IGNITION_DIR="${MISE_PROJECT_ROOT}/infra/ucore/ignition"
 ISO_NAME="fedora-coreos-stable.iso"
@@ -34,20 +22,14 @@ CUSTOM_ISO_PATH="${VM_DIR}/fedora-coreos-${HOSTNAME}-${DEVICE_SLUG}-autoinstall.
 IGNITION_FILE="${IGNITION_DIR}/${HOSTNAME}.ign"
 
 if [ ! -f "${ISO_PATH}" ]; then
-    echo "Error: Base ISO not found at ${ISO_PATH}"
-    echo "Run 'mise run ucore:download-iso' first"
-    exit 1
+    die "Base ISO not found at ${ISO_PATH} — run 'mise run ucore:download-iso' first"
 fi
 
 if [ ! -f "${IGNITION_FILE}" ]; then
-    echo "Error: Ignition file not found at ${IGNITION_FILE}"
-    echo "Run 'mise run ucore:build' first"
-    exit 1
+    die "Ignition file not found at ${IGNITION_FILE} — run 'mise run ucore:build' first"
 fi
 
-echo "Customizing ISO for ${HOSTNAME}..."
-echo "  - Target device: ${TARGET_DEVICE}"
-echo "  - Ignition config: ${IGNITION_FILE}"
+log "Customizing ISO for ${HOSTNAME} (device: ${TARGET_DEVICE}, ignition: ${IGNITION_FILE})"
 
 podman run --rm --privileged \
     -v "${VM_DIR}:/data" \
@@ -59,4 +41,4 @@ podman run --rm --privileged \
     -o "/data/fedora-coreos-${HOSTNAME}-${DEVICE_SLUG}-autoinstall.iso" \
     "/data/${ISO_NAME}"
 
-echo "✓ Created custom auto-install ISO: ${CUSTOM_ISO_PATH}"
+log "✓ Created custom auto-install ISO: ${CUSTOM_ISO_PATH}"

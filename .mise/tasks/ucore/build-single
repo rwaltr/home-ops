@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 #MISE description="Build a single Ignition file from Butane config"
-#MISE arg "<config-name>" help="Name of the config file (without .bu extension)"
+#USAGE arg "<config-name>" help="Name of the config file (without .bu extension)"
 
 set -euo pipefail
-
-if [ -z "${1:-}" ]; then
-    echo "Error: Please specify a config name"
-    echo "Usage: mise run ucore:build-single <config-name>"
-    exit 1
-fi
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
 
 BUTANE_DIR="${MISE_PROJECT_ROOT}/infra/ucore/butane"
 HOSTS_DIR="${BUTANE_DIR}/hosts"
@@ -16,7 +11,7 @@ OUTPUT_DIR="${MISE_PROJECT_ROOT}/infra/ucore/ignition"
 
 mkdir -p "${OUTPUT_DIR}"
 
-config_name="$1"
+config_name="${usage_config_name?}"
 butane_file="${BUTANE_DIR}/${config_name}.bu"
 
 if [ ! -f "${butane_file}" ]; then
@@ -24,24 +19,28 @@ if [ ! -f "${butane_file}" ]; then
 fi
 
 if [ ! -f "${butane_file}" ]; then
-    echo "Error: ${config_name}.bu not found in butane/ or butane/hosts/"
-    exit 1
+    die "${config_name}.bu not found in butane/ or butane/hosts/"
 fi
 
 basename=$(basename "${butane_file}" .bu)
 output_file="${OUTPUT_DIR}/${basename}.ign"
 
-echo "Building ${basename}.bu → ${basename}.ign"
+log "Building ${basename}.bu → ${basename}.ign"
 
-if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${output_file}" 2>&1; then
-    echo "Error: Failed to build ${butane_file}"
-    cat "${output_file}" 2>/dev/null || true
+# Write to a temp file so butane errors never poison the tracked output
+tmp_file=$(mktemp) err_file=$(mktemp)
+if ! butane --strict --pretty --files-dir "${MISE_PROJECT_ROOT}" < "${butane_file}" > "${tmp_file}" 2> "${err_file}"; then
+    log "ERROR: Failed to build ${butane_file}"
+    cat "${err_file}" >&2
+    rm -f "${tmp_file}" "${err_file}"
     exit 1
 fi
+rm -f "${err_file}"
 
-if [ ! -s "${output_file}" ]; then
-    echo "Error: Output file is empty"
-    exit 1
+if [ ! -s "${tmp_file}" ]; then
+    rm -f "${tmp_file}"
+    die "Output file is empty"
 fi
 
-echo "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"
+mv "${tmp_file}" "${output_file}"
+log "✓ Generated ${output_file} ($(wc -l < "${output_file}") lines)"
