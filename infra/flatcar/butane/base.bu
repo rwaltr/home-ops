@@ -1,0 +1,105 @@
+variant: flatcar
+version: 1.1.0
+# Base Flatcar configuration shared across hosts.
+# Ported from uCore base.bu. Merge into host configs via butane merge:
+#   ignition.config.merge: [ { local: infra/flatcar/ignition/base.ign } ]
+
+passwd:
+  groups:
+    - name: nopasswd
+      system: false
+  users:
+    - name: rwaltr
+      home_dir: /home/rwaltr
+      groups:
+        - wheel
+        - sudo
+        - nopasswd
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILc1vnF56JRCttjbG8pl+0amUr95iqtdGW7f4zrbFscE
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILgrWwVTp28NLTZiSVyG2Xz6i/QC/MUICdcwdNTMZK59
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLxslWwoL1QrccIpaWTGwqJ1pL7Di3jnKg3CeEOLQFP
+        # this workstation (zirconium-bisync, daily driver)
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBBiknSKU6ZlCmfz7xOm6lZqlLACT3IRnASyRh12X62v
+
+storage:
+  files:
+    - path: /etc/sudoers.d/nopasswd-group
+      mode: 0440
+      contents:
+        inline: |
+          # Allow members of nopasswd group passwordless sudo access
+          %nopasswd ALL=(ALL) NOPASSWD: ALL
+      user:
+        name: root
+      group:
+        name: root
+
+    # mDNS responder so <hostname>.local resolves (IPv6-only friendly shortcut).
+    # systemd-resolved is Flatcar's default; this enables its mDNS support.
+    # Note: needs MulticastDNS=yes on the link too (see host networkd units).
+    - path: /etc/systemd/resolved.conf.d/mdns.conf
+      mode: 0644
+      contents:
+        inline: |
+          [Resolve]
+          MulticastDNS=yes
+
+    # Bakery tailscaled.service requires this env file (no `-` prefix in the unit)
+    - path: /etc/default/tailscaled
+      mode: 0644
+      contents:
+        inline: |
+          PORT="41641"
+          FLAGS=""
+
+    # Bakery tailscale sysext version + sha256 (bump together; Renovate later)
+    - path: /etc/flatcar/tailscale-sysext.env
+      mode: 0644
+      contents:
+        inline: |
+          TAILSCALE_VERSION=1.102.2
+          TAILSCALE_SHA256=ba66da479554dde197fead88866e87887f4b7b91dfca12ddc4b5771e9a4a062b
+
+systemd:
+  units:
+    # update-engine auto-reboots by default. Unacceptable on a single-node cluster.
+    # /etc/flatcar/update.conf exists in the base image and Ignition FAILS to
+    # overwrite it (ignition-files error, verified 2026-08-13) — write it post-boot.
+    - name: update-strategy-off.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Disable automatic reboots for OS updates
+
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/sh -c "printf 'REBOOT_STRATEGY=off\n' > /etc/flatcar/update.conf"
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # Download the tailscale bakery sysext at boot (idempotent, hash-verified).
+    # Flatcar's systemd-sysupdate does NOT discover custom components
+    # (verified 2026-08-13), so bakery sysexts use plain download units.
+    # NOTE: tailscaled.service can't be Ignition-enabled (unit only exists after
+    # the sysext merges) — enable it post-merge here.
+    - name: tailscale-sysext-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Download tailscale sysext from flatcar sysext-bakery
+        Wants=network-online.target
+        After=network-online.target
+        ConditionPathExists=!/etc/extensions/tailscale.raw
+
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/flatcar/tailscale-sysext.env
+        ExecStart=/bin/sh -c "curl -sfL -o /etc/extensions/tailscale.raw https://github.com/flatcar/sysext-bakery/releases/download/tailscale-v$${TAILSCALE_VERSION}/tailscale-v$${TAILSCALE_VERSION}-x86-64.raw"
+        ExecStartPost=/bin/sh -c "echo \"$${TAILSCALE_SHA256}  /etc/extensions/tailscale.raw\" | sha256sum -c"
+        ExecStartPost=/usr/bin/systemd-sysext refresh
+        ExecStartPost=/usr/bin/systemctl enable --now tailscaled.service
+
+        [Install]
+        WantedBy=multi-user.target

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#MISE description="Hand-create the tank pool in a VM (mirrors bare metal: ZFS is created by hand, imported by Ignition)"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host VM to seed"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+read -r SSH_PORT _ <<<"$(vm_ports "${HOST}")"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 -o BatchMode=yes -p ${SSH_PORT}"
+TARGET="$(vm_user "${HOST}")@127.0.0.1"
+
+# Only meaningful for hosts whose butane IMPORTS (never creates) the pool
+case "${HOST}" in
+    mouse) ;;
+    *) die "seed only applies to import-style hosts (mouse). '${HOST}' creates its pool via butane." ;;
+esac
+
+if [ ! -f "${VM_DIR}/${HOST}.pid" ] || ! kill -0 "$(cat "${VM_DIR}/${HOST}.pid")" 2>/dev/null; then
+    die "VM not running. Start with: mise run flatcar:vm ${HOST}"
+fi
+
+log "Waiting for SSH..."
+SECONDS=0
+until ssh ${SSH_OPTS} "${TARGET}" true 2>/dev/null; do
+    [ "${SECONDS}" -gt 300 ] && die "Timed out waiting for SSH after 5m"
+    sleep 5
+done
+log "✓ SSH up after ${SECONDS}s"
+
+SSH="ssh ${SSH_OPTS} ${TARGET}"
+
+if ${SSH} "sudo zpool status tank" >/dev/null 2>&1; then
+    log "✓ tank already exists — nothing to do"
+    exit 0
+fi
+
+# Mirror production: mountpoint /var/tank (legacy-style, matches live mouse)
+log "Creating tank on /dev/vdb (mountpoint=/var/tank)..."
+${SSH} "sudo zpool create -O mountpoint=/var/tank tank /dev/vdb"
+${SSH} "sudo zfs create tank/k8s"   # mirrors live mouse's empty k8s dataset
+${SSH} "sudo zpool status tank | head -6"
+
+log "Powering off — next boot exercises the Ignition import path (zpool import -a)"
+${SSH} "sudo systemctl poweroff" || true
+sleep 5
+rm -f "${VM_DIR}/${HOST}.pid" "${VM_DIR}/${HOST}.monitor"
+log "✓ Seeded. Boot again with: mise run flatcar:vm ${HOST}"

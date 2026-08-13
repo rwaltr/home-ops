@@ -1,0 +1,148 @@
+variant: flatcar
+version: 1.1.0
+# Flatcar test configuration
+# Validates: ZFS sysext, VLAN subinterfaces, k0sctl readiness
+# Reference: https://www.flatcar.org/docs/latest/setup/storage/zfs/
+#            https://www.flatcar.org/docs/latest/provisioning/sysext/
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILc1vnF56JRCttjbG8pl+0amUr95iqtdGW7f4zrbFscE
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILgrWwVTp28NLTZiSVyG2Xz6i/QC/MUICdcwdNTMZK59
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLxslWwoL1QrccIpaWTGwqJ1pL7Di3jnKg3CeEOLQFP
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBBiknSKU6ZlCmfz7xOm6lZqlLACT3IRnASyRh12X62v # zirconium-bisync
+
+storage:
+  files:
+    # Enable the official Flatcar ZFS sysext (built in Flatcar CI, dm-verity
+    # signed, downloaded from release servers at boot, version-locked to OS)
+    - path: /etc/flatcar/enabled-sysext.conf
+      mode: 0644
+      contents:
+        inline: |
+          zfs
+
+    # --- VLAN: served VLAN 40 (placeholder ID, adjust to real one) ---
+    # Trunk port on switch; management VLAN untagged, VLAN 40 tagged.
+    # No host IP on vlan40 — it's a macvlan master for Multus later.
+    - path: /etc/systemd/network/25-vlan40.netdev
+      mode: 0644
+      contents:
+        inline: |
+          [NetDev]
+          Name=vlan40
+          Kind=vlan
+
+          [VLAN]
+          Id=40
+    - path: /etc/systemd/network/25-vlan40.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=vlan40
+
+          [Network]
+          DHCP=no
+          LinkLocalAddressing=no
+    # Primary interface: keep DHCP (management), attach VLAN.
+    # Lowest-named matching .network wins over Flatcar's zz-default.network.
+    - path: /etc/systemd/network/25-primary.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=eth0 enp0s3 enp1s0 ens3 eno1
+
+          [Network]
+          DHCP=yes
+          VLAN=vlan40
+
+    # Node name matters: k0s/k8s identity derives from it; "localhost" is a bad default
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: |
+          flatcar-test
+
+    # Bakery tailscaled.service requires this env file (no `-` prefix in the unit)
+    - path: /etc/default/tailscaled
+      mode: 0644
+      contents:
+        inline: |
+          PORT="41641"
+          FLAGS=""
+
+    # Bakery tailscale sysext version + sha256 (bump together; Renovate later)
+    - path: /etc/flatcar/tailscale-sysext.env
+      mode: 0644
+      contents:
+        inline: |
+          TAILSCALE_VERSION=1.102.2
+          TAILSCALE_SHA256=ba66da479554dde197fead88866e87887f4b7b91dfca12ddc4b5771e9a4a062b
+
+systemd:
+  units:
+    # Download the tailscale bakery sysext at boot (idempotent, hash-verified).
+    # NOTE: Flatcar's systemd-sysupdate doesn't discover custom components
+    # (verified 2026-08-13), so we manage bakery sysexts with plain download units.
+    - name: tailscale-sysext-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Download tailscale sysext from flatcar sysext-bakery
+        Wants=network-online.target
+        After=network-online.target
+        ConditionPathExists=!/etc/extensions/tailscale.raw
+
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/flatcar/tailscale-sysext.env
+        ExecStart=/bin/sh -c "curl -sfL -o /etc/extensions/tailscale.raw https://github.com/flatcar/sysext-bakery/releases/download/tailscale-v$${TAILSCALE_VERSION}/tailscale-v$${TAILSCALE_VERSION}-x86-64.raw"
+        ExecStartPost=/bin/sh -c "echo \"$${TAILSCALE_SHA256}  /etc/extensions/tailscale.raw\" | sha256sum -c"
+        ExecStartPost=/usr/bin/systemd-sysext refresh
+        ExecStartPost=/usr/bin/systemctl enable --now tailscaled.service
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # Lesson from knuckle: update-engine auto-reboots by default. Unacceptable on a
+    # single-node cluster. NOTE: /etc/flatcar/update.conf exists in the base image and
+    # Ignition FAILS to overwrite it (ignition-files error, verified 2026-08-13) —
+    # so we write it via a oneshot unit instead.
+    - name: update-strategy-off.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Disable automatic reboots for OS updates
+
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/sh -c "printf 'REBOOT_STRATEGY=off\n' > /etc/flatcar/update.conf"
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # NOTE: tailscaled.service can't be enabled here — the unit only exists after
+    # the tailscale sysext merges, and Ignition fails on enabling missing units.
+    # The install unit enables it after merging instead.
+
+
+    # Create test ZFS pool on the second disk (idempotent)
+    - name: zpool-create-tank.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Create test ZFS pool on /dev/vdb
+        After=systemd-sysext.service multi-user.target
+        Wants=systemd-sysext.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/bin/sh -c "zpool list tank >/dev/null 2>&1 || zpool create tank /dev/vdb"
+
+        [Install]
+        WantedBy=multi-user.target

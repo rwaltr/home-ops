@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#MISE description="Full test env from scratch: boot → (seed tank) → verify → k0s + Cilium + nginx"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host to build"
+
+# Orchestrator task (same pattern as ucore:vm). Assumes a clean slate —
+# run flatcar:clean <host> first if the VM or disks already exist.
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+
+mise run flatcar:vm "${HOST}"
+
+# Import-style hosts need the pool hand-created first (mirrors bare metal),
+# then a reboot so Ignition exercises the import path
+case "${HOST}" in
+    mouse)
+        mise run flatcar:seed "${HOST}"
+        mise run flatcar:vm "${HOST}"
+        ;;
+esac
+
+mise run flatcar:verify "${HOST}"
+mise run flatcar:k0s "${HOST}"
+
+log "✓ ${HOST} test environment ready"
+log "  SSH:        mise run flatcar:vm-connect ${HOST}"
+log "  kubectl:    export KUBECONFIG=${MISE_PROJECT_ROOT}/.vm/${HOST}.kubeconfig"
+log "  Tear down:  mise run flatcar:clean ${HOST}"

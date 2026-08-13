@@ -1,0 +1,82 @@
+variant: flatcar
+version: 1.1.0
+# Host configuration for 'mouse' — ZFS storage node + single-node k0s.
+# Build: mise run flatcar:build  (merges infra/flatcar/ignition/base.ign)
+#
+# Reality notes (from live mouse, 2026-08-13):
+#   - mgmt: DHCP on 10.10.0.0/16 (reservation 10.10.0.105), NIC igc/enp88s0
+#   - ZFS: 'tank' created by hand (raidz1 x2, 6x 5.5T), mountpoint /var/tank —
+#     this config IMPORTS, never creates
+#   - VLANs 30 (iot) / 40 (cameras) are NOT on the host; k8s reaches them
+#     (home-assistant/macvlan or BGP, phase 4)
+
+ignition:
+  config:
+    merge:
+      - local: infra/flatcar/ignition/base.ign
+
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: |
+          mouse
+
+    # ZFS hostid — must match the pool's creator host or import needs -f
+    - path: /etc/hostid
+      mode: 0644
+      contents:
+        inline: |
+          1e1719e4
+
+    # Official Flatcar ZFS sysext (rides OS updates, no pinning needed)
+    - path: /etc/flatcar/enabled-sysext.conf
+      mode: 0644
+      contents:
+        inline: |
+          zfs
+
+    # Primary NIC: DHCP on the mgmt network + per-link mDNS (mouse.local).
+    # Glob match: real NIC is enp88s0, qemu VM is enp1s0/eth0 — either way
+    # the "first non-loopback" link gets this.
+    - path: /etc/systemd/network/25-primary.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=en* eth*
+
+          [Network]
+          DHCP=yes
+          MulticastDNS=yes
+          LLMNR=yes
+
+          [DHCPv4]
+          UseDNS=yes
+          UseRoutes=yes
+
+systemd:
+  units:
+    # Import the existing 'tank' pool + mount its datasets.
+    # Production pool was created by hand; never create here.
+    # Idempotent: import -a / mount -a are no-ops when already done.
+    # Runs after sysext merge so zpool/zfs binaries exist.
+    - name: zfs-import-tank.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Import existing ZFS pools and mount datasets
+        # After sysext merge so /usr/bin/zpool exists (proven pattern from
+        # flatcar-test: multi-user.target is late enough)
+        After=systemd-sysext.service
+        Wants=systemd-sysext.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/zpool import -a
+        ExecStart=/usr/bin/zfs mount -a
+
+        [Install]
+        WantedBy=multi-user.target

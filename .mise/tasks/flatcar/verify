@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+#MISE description="Verify a Flatcar test VM (sysext, ZFS, network, host-specific checks)"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host VM to verify"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+read -r SSH_PORT _ <<<"$(vm_ports "${HOST}")"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 -o BatchMode=yes -p ${SSH_PORT}"
+TARGET="$(vm_user "${HOST}")@127.0.0.1"
+
+if [ ! -f "${VM_DIR}/${HOST}.pid" ] || ! kill -0 "$(cat "${VM_DIR}/${HOST}.pid")" 2>/dev/null; then
+    die "VM not running. Start with: mise run flatcar:vm ${HOST}"
+fi
+
+log "Waiting for SSH on 127.0.0.1:${SSH_PORT}..."
+SECONDS=0
+until ssh ${SSH_OPTS} "${TARGET}" true 2>/dev/null; do
+    [ "${SECONDS}" -gt 300 ] && die "Timed out waiting for SSH after 5m"
+    sleep 5
+done
+log "✓ SSH up after ${SECONDS}s"
+
+SSH="ssh ${SSH_OPTS} ${TARGET}"
+
+echo ""
+echo "=== Identity ==="
+${SSH} "hostname; grep -E '^(NAME|VERSION)=' /etc/os-release"
+
+echo ""
+echo "=== Update strategy (expect REBOOT_STRATEGY=off) ==="
+${SSH} "cat /etc/flatcar/update.conf" || log "❌ update.conf missing"
+
+echo ""
+echo "=== Sysext status ==="
+${SSH} "systemd-sysext list 2>/dev/null || systemd-sysext" || log "❌ sysext listing failed"
+
+echo ""
+echo "=== Tailscale (expect tailscaled active, version printed) ==="
+${SSH} "systemctl is-active tailscaled; tailscale version | head -1" || log "❌ tailscale not running"
+
+echo ""
+echo "=== ZFS pool ==="
+${SSH} "sudo zpool status tank 2>&1 | head -8" || log "❌ tank not imported"
+
+# Host-specific checks
+case "${HOST}" in
+    test)
+        echo ""
+        echo "=== test: VLAN interface (expect vlan40) ==="
+        ${SSH} "ip -d link show vlan40" || log "❌ vlan40 missing"
+        ;;
+    mouse)
+        echo ""
+        echo "=== mouse: hostid (expect 1e1719e4) ==="
+        ${SSH} "cat /etc/hostid"
+        echo ""
+        echo "=== mouse: tank mountpoint (expect /var/tank) ==="
+        ${SSH} "zfs get -H -o value mountpoint tank; df -h /var/tank | tail -1" || log "❌ tank not mounted at /var/tank"
+        echo ""
+        echo "=== mouse: mDNS responder (mouse.local) ==="
+        ${SSH} "resolvectl mdns 2>/dev/null || true; ss -ulnp | grep 5353 || echo '❌ nothing on UDP 5353'"
+        echo ""
+        echo "=== mouse: network (expect DHCP on primary NIC) ==="
+        ${SSH} "networkctl list --no-pager; ip -4 -br addr show | grep -v tailscale"
+        ;;
+esac
+
+echo ""
+log "Done. Test reboot persistence:"
+log "  ssh -p ${SSH_PORT} ${TARGET} 'sudo systemctl reboot'"
+log "  mise run flatcar:verify ${HOST}   # run again after it comes back"

@@ -1,0 +1,33 @@
+# k0sctl config for 'mouse' — production single-node cluster on Flatcar.
+# Validated against flatcar-test (2026-08-13):
+#   - NO --profile flatcar (breaks controller+worker; unknown worker profile
+#     wedges the kubelet install — silent, k0s crash-loops on controller lease)
+#   - provider: custom + kubeProxy disabled for Cilium kube-proxy replacement
+#
+# VM testing: the mouse:k0s task renders a copy with the VM's ssh address.
+# Bare metal: address is mouse's mgmt DHCP reservation.
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: mouse
+spec:
+  hosts:
+    - role: controller+worker
+      ssh:
+        address: 10.10.0.105
+        port: 22
+        user: rwaltr
+        keyPath: ~/.ssh/id_ed25519
+      noTaints: true
+  k0s:
+    version: v1.36.3+k0s.2
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: ClusterConfig
+      metadata:
+        name: mouse
+      spec:
+        network:
+          provider: custom    # Cilium installed out-of-band (mouse:k0s task / phase 2 helmfile)
+          kubeProxy:
+            disabled: true    # Cilium kubeProxyReplacement

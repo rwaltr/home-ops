@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#MISE description="Destroy a Flatcar test VM and its disks"
+#MISE confirm="Destroy Flatcar VM and disks for {{usage.hostname}}?"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host VM to destroy"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+PIDFILE="${VM_DIR}/${HOST}.pid"
+
+if [ -f "${PIDFILE}" ]; then
+    PID=$(cat "${PIDFILE}")
+    if kill -0 "${PID}" 2>/dev/null; then
+        log "Stopping VM (pid ${PID})..."
+        kill "${PID}" || true
+        for _ in $(seq 1 10); do
+            kill -0 "${PID}" 2>/dev/null || break
+            sleep 1
+        done
+        kill -9 "${PID}" 2>/dev/null || true
+    fi
+    rm -f "${PIDFILE}" "${VM_DIR}/${HOST}.monitor"
+fi
+
+rm -f "${VM_DIR}/${HOST}.qcow2" \
+      "${VM_DIR}/${HOST}-zfs.qcow2" \
+      "${VM_DIR}/${HOST}.kubeconfig" \
+      "${VM_DIR}/${HOST}.k0sctl.yaml" \
+      "${VM_DIR}/${HOST}-console.log"
+
+log "✓ Cleaned up ${HOST} (base image cached in ${VM_DIR})"

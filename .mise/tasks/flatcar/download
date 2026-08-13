@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#MISE description="Download Flatcar QEMU image (cached)"
+#MISE outputs=[".vm/flatcar_production_qemu_image.img"]
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+IMG_NAME="flatcar_production_qemu_image.img"
+IMG_PATH="${VM_DIR}/${IMG_NAME}"
+RELEASE_BASE="https://stable.release.flatcar-linux.net/amd64-usr/current"
+
+mkdir -p "${VM_DIR}"
+
+# Can't checksum-verify the decompressed .img against the .bz2 DIGESTS, so an
+# existing .img is trusted as-is. Downloads and decompression are atomic, so
+# a .img in place is always complete.
+if [ -f "${IMG_PATH}" ]; then
+    log "✓ Image already exists at ${IMG_PATH}"
+    exit 0
+fi
+
+download_artifact "${RELEASE_BASE}/${IMG_NAME}.bz2" "${RELEASE_BASE}/${IMG_NAME}.bz2.DIGESTS" "${VM_DIR}/${IMG_NAME}.bz2"
+
+log "Decompressing..."
+TMP_IMG=$(mktemp "${VM_DIR}/.flatcar-img.XXXXXX")
+if ! bunzip2 -c "${VM_DIR}/${IMG_NAME}.bz2" > "${TMP_IMG}"; then
+    rm -f "${TMP_IMG}"
+    die "bunzip2 failed"
+fi
+mv "${TMP_IMG}" "${IMG_PATH}"
+rm -f "${VM_DIR}/${IMG_NAME}.bz2"
+log "✓ Image at ${IMG_PATH}"

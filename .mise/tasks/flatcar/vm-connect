@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="SSH into a running Flatcar test VM (extra args passed to ssh)"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host VM to connect to"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+read -r SSH_PORT _ <<<"$(vm_ports "${HOST}")"
+SSH_USER="$(vm_user "${HOST}")"
+
+if [ ! -f "${VM_DIR}/${HOST}.pid" ] || ! kill -0 "$(cat "${VM_DIR}/${HOST}.pid")" 2>/dev/null; then
+    die "VM not running. Start with: mise run flatcar:vm ${HOST}"
+fi
+
+exec ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${SSH_PORT}" "${SSH_USER}@127.0.0.1" "$@"

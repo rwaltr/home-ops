@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#MISE description="Install k0s + Cilium on a Flatcar test VM and smoke-test with nginx"
+#USAGE flag "--skip-k0s" help="Skip k0sctl apply (cluster already installed)"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host VM to install k0s on"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+K0SCTL_SRC="${MISE_PROJECT_ROOT}/infra/k0s/${HOST}.yaml"
+K0SCTL_CONFIG="${VM_DIR}/${HOST}.k0sctl.yaml"
+export KUBECONFIG="${VM_DIR}/${HOST}.kubeconfig"
+read -r SSH_PORT API_PORT <<<"$(vm_ports "${HOST}")"
+
+[ -f "${K0SCTL_SRC}" ] || die "No k0sctl config for host '${HOST}' at ${K0SCTL_SRC}"
+
+if [ ! -f "${VM_DIR}/${HOST}.pid" ] || ! kill -0 "$(cat "${VM_DIR}/${HOST}.pid")" 2>/dev/null; then
+    die "VM not running. Start with: mise run flatcar:vm ${HOST}"
+fi
+
+# Render the production k0sctl config for the VM: replace the ssh address/port
+# with the qemu user-net forwards. Everything else (user, k0s spec) is validated
+# exactly as it will run on bare metal.
+sed -e "s/address: .*/address: 127.0.0.1/" \
+    -e "s/port: .*/port: ${SSH_PORT}/" \
+    "${K0SCTL_SRC}" > "${K0SCTL_CONFIG}"
+log "Rendered ${K0SCTL_CONFIG} from ${K0SCTL_SRC} (address → 127.0.0.1:${SSH_PORT})"
+
+# Fresh VMs have fresh host keys; k0sctl uses the real known_hosts
+ssh-keygen -R "[127.0.0.1]:${SSH_PORT}" >/dev/null 2>&1 || true
+
+if [ "${usage_skip_k0s:-false}" != "true" ]; then
+    log "=== k0sctl apply (this downloads k0s in the VM, takes a few minutes) ==="
+    k0sctl apply --config "${K0SCTL_CONFIG}" --no-wait
+
+    log "=== Fetching kubeconfig ==="
+    k0sctl kubeconfig --config "${K0SCTL_CONFIG}" > "${KUBECONFIG}"
+    chmod 600 "${KUBECONFIG}"
+fi
+
+# k0sctl points the kubeconfig at :6443, but each VM forwards the API on
+# its own host-side port (test: 6443, mouse: 16443) — rewrite it
+[ -f "${KUBECONFIG}" ] && sed -i "s|https://127.0.0.1:6443|https://127.0.0.1:${API_PORT}|" "${KUBECONFIG}"
+
+log "=== Waiting for node to register (will stay NotReady until Cilium) ==="
+for i in $(seq 1 60); do
+    kubectl get nodes --no-headers 2>/dev/null | grep -q . && break
+    sleep 5
+done
+kubectl get nodes
+
+echo ""
+# NOTE: k8sServiceHost=127.0.0.1:7445 from onedr0p's config is Talos KubePrism —
+# k0s has no equivalent unless nodeLocalLoadBalancing is enabled. Use the direct
+# API address (10.0.2.15 is the qemu user-net IP of any of these VMs).
+log "=== Installing Cilium (kube-proxy replacement, direct API address) ==="
+helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
+helm repo update cilium >/dev/null
+helm upgrade --install cilium cilium/cilium \
+    --namespace kube-system \
+    --set kubeProxyReplacement=true \
+    --set k8sServiceHost=10.0.2.15 \
+    --set k8sServicePort=6443 \
+    --set operator.replicas=1 \
+    --wait --timeout 5m
+
+# konnectivity-agent can get stuck in NetworkNotReady backoff from before the
+# CNI came up (single node, CNI installed out-of-band) — bounce it so
+# port-forward/exec work
+kubectl delete pod -n kube-system -l k8s-app=konnectivity-agent --wait=false 2>/dev/null || true
+
+echo ""
+log "=== Cluster status ==="
+kubectl get nodes -o wide
+kubectl get pods -A
+
+echo ""
+log "=== nginx smoke test ==="
+kubectl create deployment nginx --image=nginx:alpine --replicas=1 2>/dev/null || true
+kubectl wait --for=condition=Available deployment/nginx --timeout=180s
+kubectl get pods -o wide -l app=nginx
+
+log "Testing HTTP via port-forward..."
+kubectl port-forward deployment/nginx 8888:80 >/dev/null 2>&1 &
+PF_PID=$!
+trap 'kill ${PF_PID} 2>/dev/null || true' EXIT
+sleep 3
+if curl -sf http://127.0.0.1:8888/ | grep -q "Welcome to nginx"; then
+    log "✓ nginx responding over the pod network — Cilium datapath works"
+else
+    die "❌ nginx not responding"
+fi
+
+echo ""
+log "✓ k0s + Cilium + nginx smoke test passed for ${HOST}"
+log "  kubeconfig: ${KUBECONFIG}"

@@ -1,0 +1,27 @@
+# k0sctl config for the Flatcar test VM (mise run flatcar:vm)
+# Single node: controller+worker, Cilium as CNI (custom provider), no kube-proxy
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: test
+spec:
+  hosts:
+    - role: controller+worker
+      ssh:
+        address: 127.0.0.1
+        port: 2223
+        user: core
+        keyPath: ~/.ssh/id_ed25519
+      noTaints: true
+  k0s:
+    version: v1.36.3+k0s.2
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: ClusterConfig
+      metadata:
+        name: test
+      spec:
+        network:
+          provider: custom    # Cilium installed out-of-band (flatcar:k0s task)
+          kubeProxy:
+            disabled: true    # Cilium kubeProxyReplacement

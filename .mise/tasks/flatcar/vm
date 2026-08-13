@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#MISE description="Create and boot a Flatcar test VM (raw qemu, no libvirt)"
+#MISE depends=["flatcar:build", "flatcar:download"]
+#USAGE flag "--force" help="Force recreate VM even if it exists"
+#USAGE arg "[hostname]" env="FLATCAR_HOST" default="mouse" help="Host config to boot (infra/flatcar/butane/<host>.bu or hosts/<host>.bu)"
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+HOST="${usage_hostname?}"
+FORCE="${usage_force:-false}"
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+BASE_IMG="${VM_DIR}/flatcar_production_qemu_image.img"
+DISK_PATH="${VM_DIR}/${HOST}.qcow2"
+ZFS_DISK_PATH="${VM_DIR}/${HOST}-zfs.qcow2"
+IGN_PATH="${MISE_PROJECT_ROOT}/infra/flatcar/ignition/${HOST}.ign"
+PIDFILE="${VM_DIR}/${HOST}.pid"
+MONITOR="${VM_DIR}/${HOST}.monitor"
+read -r SSH_PORT API_PORT <<<"$(vm_ports "${HOST}")"
+SSH_USER="$(vm_user "${HOST}")"
+
+[ -f "${IGN_PATH}" ] || die "No ignition for host '${HOST}' at ${IGN_PATH}"
+
+if [ -f "${PIDFILE}" ] && kill -0 "$(cat "${PIDFILE}")" 2>/dev/null; then
+    if [ "${FORCE}" != "true" ]; then
+        log "❌ VM already running (pid $(cat "${PIDFILE}"))"
+        echo "  SSH:      ssh -p ${SSH_PORT} ${SSH_USER}@127.0.0.1"
+        echo "  Recreate: mise run flatcar:vm ${HOST} -- --force"
+        exit 1
+    fi
+    # Call the clean script directly: `mise run` would hit its confirm prompt,
+    # which aborts in non-interactive (scripted) runs
+    usage_hostname="${HOST}" bash "${MISE_PROJECT_ROOT}/.mise/tasks/flatcar/clean"
+fi
+
+if [ ! -f "${DISK_PATH}" ]; then
+    log "Creating VM disk from Flatcar base image..."
+    cp --reflink=auto "${BASE_IMG}" "${DISK_PATH}"
+    qemu-img resize "${DISK_PATH}" 20G >/dev/null
+    log "✓ System disk ready"
+fi
+
+if [ ! -f "${ZFS_DISK_PATH}" ]; then
+    log "Creating ZFS disk (10GB, empty)..."
+    qemu-img create -f qcow2 "${ZFS_DISK_PATH}" 10G >/dev/null
+    log "✓ ZFS disk ready"
+fi
+
+log "Starting ${HOST} VM (SSH ${SSH_USER}@127.0.0.1:${SSH_PORT}, API 127.0.0.1:${API_PORT})..."
+/usr/bin/qemu-system-x86_64 \
+    -machine q35,accel=kvm \
+    -cpu host \
+    -m 4096 \
+    -smp 2 \
+    -drive "file=${DISK_PATH},format=qcow2,if=virtio" \
+    -drive "file=${ZFS_DISK_PATH},format=qcow2,if=virtio" \
+    -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22,hostfwd=tcp:127.0.0.1:${API_PORT}-:6443" \
+    -device virtio-net-pci,netdev=n0 \
+    -fw_cfg "name=opt/org.flatcar-linux/config,file=${IGN_PATH}" \
+    -display none \
+    -chardev "socket,id=ser0,path=${VM_DIR}/${HOST}-serial.sock,server=on,wait=off,logfile=${VM_DIR}/${HOST}-console.log" \
+    -serial chardev:ser0 \
+    -daemonize \
+    -pidfile "${PIDFILE}" \
+    -monitor "unix:${MONITOR},server,nowait"
+
+log "✓ VM started (pid $(cat "${PIDFILE}"))"
+log "First boot downloads the ZFS sysext; give it a minute or two."
+case "${HOST}" in
+    mouse) log "Fresh ZFS disk? mise run flatcar:seed ${HOST}  (hand-creates tank like bare metal), then boot again" ;;
+esac
+log "Then: mise run flatcar:verify ${HOST}"
