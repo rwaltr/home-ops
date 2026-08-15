@@ -137,6 +137,56 @@ VIPs to the router over BGP (see [REFACTOR_PLANS.md](REFACTOR_PLANS.md)). The
 router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients, IoT,
 and servers. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
 
+## 💾 Storage
+
+<details>
+  <summary>Click here to see the storage layout</summary>
+
+```mermaid
+flowchart TD
+    nvme["🚀 Kingston 1TB NVMe<br/>Flatcar OS · xfs"]
+
+    subgraph das["🗄️ TerraMaster DAS · USB 3.0 · 6× 6TB"]
+        subgraph rz0["raidz1-0"]
+            sdc["sdc"]
+            sdd["sdd"]
+            sde["sde"]
+        end
+        subgraph rz1["raidz1-1"]
+            sda["sda"]
+            sdb["sdb"]
+            sdf["sdf"]
+        end
+    end
+
+    rz0 & rz1 --- tank[("tank · 32.7T raw<br/>10.0T used · 30%")]
+
+    tank --> nas["tank/nas · 6.64T<br/>media library + pictures"]
+    tank --> home["tank/home/rwaltr · 36.8G"]
+    tank --> k8s["tank/k8s · empty<br/>reserved → OpenEBS LocalPV"]
+    tank --> svc["tank/services · empty<br/>reserved → in-cluster services"]
+```
+
+</details>
+
+All data lives on `tank` — two 3-wide raidz1 vdevs across six 6TB drives in a
+USB-attached TerraMaster DAS (each disk on its own ASMedia SATA bridge). The
+Flatcar OS runs on a separate 1TB NVMe. Every dataset uses lz4 compression with
+`atime=off` and `xattr=sa`.
+
+| Dataset           | Mountpoint             | Used  | Purpose                          |
+| ----------------- | ---------------------- | ----- | -------------------------------- |
+| tank              | /var/tank              | 6.69T | Pool root                        |
+| tank/nas/library  | /var/tank/nas/library  | 6.63T | Media, games, books, music       |
+| tank/nas/pictures | /var/tank/nas/pictures | 14.4G | Photo library                    |
+| tank/home/rwaltr  | /var/tank/home/rwaltr  | 36.8G | Home directory                   |
+| tank/k8s          | /var/tank/k8s          | —     | Reserved for OpenEBS ZFS LocalPV |
+| tank/services     | /var/tank/services     | —     | Reserved for in-cluster services |
+
+Pool health is automated with a monthly scrub timer and `zfs-zed` for events.
+Backups are kopiur-style snapshots to RustFS (S3) once the cluster lands — see
+[REFACTOR_PLANS.md](REFACTOR_PLANS.md).
+
 ## ☁️ Cloud Integrations
 
 - **Cloudflare** — DNS and domain management (familylegacy, legacy, prof, public zones)
