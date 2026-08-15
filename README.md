@@ -107,8 +107,10 @@ flowchart TD
 
     sw --> ap["📶 ap1-132l · CAPsMAN<br/>10.10.0.104"]
     sw --> mouse["🖥️ mouse · Flatcar + k0s"]
-    sw --> cams["🎥 Reolink cams<br/>VLAN 40"]
-    sw --> iot["🏠 IoT · VLAN 30"]
+
+    ap -- "IoT SSID" --> iot["🏠 IoT · VLAN 30"]
+    ap -- "primary SSID (WPA3)" --> wificlients["📱 WiFi clients · VLAN 20"]
+    ap -. "access-list MAC override" .-> cams["🎥 cams · VLAN 40"]
 
     mouse -. "planned: Cilium BGP<br/>LB VIPs as /32s" .-> br
 ```
@@ -136,6 +138,13 @@ is static, reserved for the k0s cluster where Cilium will announce LoadBalancer
 VIPs to the router over BGP (see [REFACTOR_PLANS.md](REFACTOR_PLANS.md)). The
 router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients, IoT,
 and servers. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
+
+WiFi is served by a CAPsMAN-managed AP with two SSIDs — a primary WPA3 SSID
+that lands in clients, and an IoT SSID that lands in IoT. The neat part: a
+per-MAC access-list overrides the SSID's default VLAN at association time, so
+devices join whichever SSID they can handle but still get sorted into the right
+segment — the WiFi cameras associate normally yet land in the cameras VLAN, and
+the LG TV on the IoT SSID gets upgraded to clients.
 
 ## 💾 Storage
 
