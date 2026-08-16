@@ -124,20 +124,16 @@ v4, so external access is via Tailscale. IPv6 is **ULA-only**
 delegates no prefix, so v6 stays internal. The router is `.1` / `::1` on every
 segment.
 
-| VLAN | Name      | IPv4         | IPv6 (ULA)             | DHCP/RA | Purpose                        |
-| ---- | --------- | ------------ | ---------------------- | ------- | ------------------------------ |
-| 10   | mgmt      | 10.10.0.0/24 | fdad:207a:f1ab:10::/64 | ✔      | Network gear + `mouse` host    |
-| 20   | clients   | 10.20.0.0/24 | fdad:207a:f1ab:20::/64 | ✔      | TVs, phones, laptops           |
-| 30   | iot       | 10.30.0.0/23 | fdad:207a:f1ab:30::/64 | ✔      | Appliances and robots          |
-| 40   | cameras   | 10.40.0.0/24 | fdad:207a:f1ab:40::/64 | ✔      | Reolink cameras                |
-| 50   | servers   | 10.50.0.0/24 | fdad:207a:f1ab:50::/64 | ✖      | Cluster services / Cilium VIPs |
-| 60   | untrusted | 10.60.0.0/24 | fdad:207a:f1ab:60::/64 | ✔      | Guest — upstream DNS only      |
+| VLAN | Name      | IPv4         | IPv6 (ULA)             | DHCP/RA | Purpose                     |
+| ---- | --------- | ------------ | ---------------------- | ------- | --------------------------- |
+| 10   | mgmt      | 10.10.0.0/24 | fdad:207a:f1ab:10::/64 | ✔      | Network gear + `mouse` host |
+| 20   | clients   | 10.20.0.0/24 | fdad:207a:f1ab:20::/64 | ✔      | TVs, phones, laptops        |
+| 30   | iot       | 10.30.0.0/23 | fdad:207a:f1ab:30::/64 | ✔      | Appliances and robots       |
+| 40   | cameras   | 10.40.0.0/24 | fdad:207a:f1ab:40::/64 | ✔      | Reolink cameras             |
+| 60   | untrusted | 10.60.0.0/24 | fdad:207a:f1ab:60::/64 | ✔      | Guest — upstream DNS only   |
 
-VLAN 50 gets no DHCPv4 and no router advertisements by design — addressing there
-is static, reserved for the k0s cluster where Cilium will announce LoadBalancer
-VIPs to the router over BGP (see [REFACTOR_PLANS.md](REFACTOR_PLANS.md)). The
-router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients, IoT,
-and servers. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
+The router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients
+and IoT. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
 
 WiFi is served by a CAPsMAN-managed AP with two SSIDs — a primary WPA3 SSID
 that lands in clients, and an IoT SSID that lands in IoT. The neat part: a
