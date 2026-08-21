@@ -1,0 +1,15 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/helmfile
+
+# Cilium — first release of the bootstrap DAG. Everything downstream (incl.
+# Flux itself) needs pod networking, so Cilium cannot be Flux-installed.
+# After bootstrap, Flux adopts and owns this release
+# (k8s/kyz/apps/kube-system/cilium/ once Phase 3 lands).
+
+releases:
+  - name: cilium
+    namespace: kube-system
+    chart: cilium/cilium
+    version: 1.18.0
+    values:
+      - values/cilium.yaml.gotmpl

@@ -21,6 +21,8 @@ go = "latest"
 "github:coreos/butane" = "latest"
 "github:home-operations/flate" = "latest"
 helm = "latest"
+helmfile = "latest"
+kustomize = "latest"
 # usage CLI: shell completions for task args/flags (#USAGE specs)
 "github:jdx/usage" = "latest"
 

@@ -4,8 +4,8 @@
 #     wedges the kubelet install — silent, k0s crash-loops on controller lease)
 #   - provider: custom + kubeProxy disabled for Cilium kube-proxy replacement
 #
-# VM testing: the mouse:k0s task renders a copy with the VM's ssh address.
-# Bare metal: address is mouse's mgmt DHCP reservation.
+# VM testing: the flatcar:k0s task renders a copy with the VM's ssh address.
+# Bare metal: mouse is static 10.10.0.10 (MAC-matched networkd unit).
 apiVersion: k0sctl.k0sproject.io/v1beta1
 kind: Cluster
 metadata:
@@ -14,7 +14,7 @@ spec:
   hosts:
     - role: controller+worker
       ssh:
-        address: 10.10.0.105
+        address: 10.10.0.10
         port: 22
         user: rwaltr
         keyPath: ~/.ssh/id_ed25519

@@ -74,8 +74,11 @@ the management VLAN but must directly serve a second VLAN.
   - [x] `infra/flatcar/butane/base.bu` (rwaltr+keys+sudoers, tailscale sysext units,
     update-strategy-off, resolved mDNS drop-in) + `hosts/mouse.bu` (hostname, hostid
     1e1719e4, ZFS sysext, **import-only** tank unit, DHCP+mDNS on NIC glob)
-  - [x] Live-mouse facts baked in: mgmt DHCP on 10.10.0.0/16 (10.10.0.105), igc NIC,
-    tank = raidz1×2 6×5.5T at /var/tank; VLANs 30/40 NOT on host (k8s reaches them)
+  - [x] Live-mouse facts baked in: mgmt on 10.10.0.0/16, igc NIC (i226-LM, MAC
+    58:47:ca:74:fb:1c), tank = raidz1×2 6×5.5T at /var/tank; VLANs 30/40 NOT on host
+  - [x] Bare-metal addressing: **static 10.10.0.10** via MAC-matched networkd unit
+    (20-mouse-static.network); unknown NICs (VMs) fall through to DHCP (25-primary).
+    Old uCore DHCP lease .105 dies with uCore — no cutover conflict
   - [x] mDNS: systemd-resolved responder (`MulticastDNS=yes`) — no avahi needed;
     mouse.local verified listening on UDP 5353 v4+v6 (end-to-end LAN test needs bare
     metal — qemu user-net blocks multicast)
@@ -95,11 +98,122 @@ the management VLAN but must directly serve a second VLAN.
     task bounces it post-Cilium; VM serial upgraded to socket+logfile (interactive debug
     via `socat - UNIX-CONNECT:.vm/<host>-serial.sock`); base.bu carries 4 SSH keys —
     the 3 from uCore base.bu + this workstation (zirconium-bisync)
-- [ ] **Phase 1: Bare-metal mouse** — provision real hardware with `infra/flatcar/ignition/mouse.ign`
-  (install media/approach TBD: flatcar-install vs knuckle-style ISO), `k0sctl apply -c infra/k0s/mouse.yaml`
+- [ ] **Phase 1: Bare-metal mouse** — provision real hardware
   - [x] uCore decommissioned (2026-08-13): `infra/ucore/`, `ucore:*` tasks, `kyz-0.yml`,
     FCOS ISO, `check_virsh` all removed; `hosts/template.bu` ported to Flatcar
-- [ ] **Phase 2: Bootstrap** — helmfile DAG: cilium → coredns → cert-manager → external-secrets → flux-operator/instance (model: `~/src/onedr0p/home-ops/bootstrap/helmfile/`)
+  - [x] Hardware recon (2026-08-13): MS-01 (i9, 20c/31G), boot = nvme0n1 954GB (OS-only,
+    nothing to preserve), pool = sda–sdf whole-disk vdevs (never touched by install),
+    UEFI, i226-LM = AMT/vPro port (left 2.5G, carries mgmt), X710 SFP+ ×2 unused
+
+  **Runbook** (console session; ~30 min):
+  0. **AMT first** (one-time, pays off forever): BIOS (Del) → ME enabled; MEBx (Ctrl+P,
+     default pw `admin`, forced change) → enable AMT + KVM → network **static 10.10.0.106**
+     (AMT-over-DHCP is flaky on i226-LM). Then `https://10.10.0.106:16993` + MeshCommander
+     KVM/IDE-R = remote console + virtual-media ISO boot for all future reinstalls
+  1. Pre-flight: `mise run flatcar:build`; Flatcar stable ISO → USB (or AMT IDE-R);
+     confirm backups (6.7T pool isn't touched, but disk-selection mistakes are final)
+  2. Boot live env → DHCP → `scp infra/flatcar/ignition/mouse.ign core@<ip>:`
+  3. `lsblk` — target is **nvme0n1 ONLY** (954GB; the six 5.5T are the pool)
+  4. `sudo flatcar-install -d /dev/nvme0n1 -i mouse.ign` → reboot, remove media
+  5. First boot applies Ignition (hostname, hostid, keys, tailscale, mDNS, update-off,
+     zfs sysext) → `zfs-import-tank` imports the existing pool to /var/tank
+  6. Verify from workstation: `ssh rwaltr@10.10.0.10` — zpool status (6/6 ONLINE),
+     df /var/tank, tailscaled active; `sudo tailscale up` (NEW tailnet identity —
+     delete the old mouse node); mouse.local via mDNS
+  7. `k0sctl apply --config infra/k0s/mouse.yaml`; Cilium helm with
+     `k8sServiceHost=10.10.0.10` (NOT the VM's 10.0.2.15); then Phase 2 owns cluster state
+  8. Rollback: reinstall uCore from git history the same way; pool imports identically
+
+  **How the install ACTUALLY went down (2026-08-16)** — none of the designed paths
+  survived contact; what worked was disassembly:
+  1. kexec into the PXE live env boots fine, but it's hostile unattended: no autologin
+     on the generic path (`flatcar.autologin` didn't take), and Ignition's URL fetch
+     needs BOTH the right arg (`ignition.config.url`, not `flatcar.ignition.config.url`)
+     AND `ip=dhcp` (dracut skips initramfs networking otherwise) — never got a fetch
+  2. `flatcar-install` from running uCore (RAM-resident fedora container) **completed
+     the full image dd** before failing on `rereadpt`/`wipefs` — kernel won't reload
+     the partition table of the disk the OS runs from. KEY INSIGHT: dd happens BEFORE
+     those steps; the "failure" left a complete Flatcar disk missing only `config.ign`
+  3. Winning move: write `config.ign` into the OEM partition via **loop device at
+     absolute sector offset** (`losetup -o $((sector*512)) --sizelimit ... -f /dev/nvme0n1`)
+     — bypasses the stale in-memory partition table entirely. Then `sysrq b` reboot
+  4. First boot: Ignition read config.ign from the OEM partition (no URL fetch!),
+     applied mouse.ign, came up at static 10.10.0.10. ✅
+
+  **Lessons:**
+  - **Export the pool BEFORE pulling disks** — a suspended pool wedges any sync()-caller
+    (incl. kexec's pre-load sync) in zil_commit forever
+  - flatcar-install order of ops: dd image → rereadpt → wipefs → mount OEM → cp config.ign.
+    A failure late in that list may still leave a fully-imaged disk — read the script
+    before assuming failure
+  - `losetup --offset/--sizelimit` edits partitions on busy disks (kernel table be damned)
+  - The PXE live env is for PXE. Via kexec it's a login wall with extra steps
+  - AMT KVM + IDE-R + stunnel bridge = the insurance that made all risk-taking free
+  - Corrupted /etc/containers/policy.json (NUL padding) = interrupted write during a
+    power-cycle; only image pulls notice
+
+  **AMT access from Linux** (validated 2026-08-16): AMT = static 10.10.0.9 on the
+  i226-LM port (left 2.5G), TLS-only (16992 plain is filtered; 16993/16995 open).
+  Gotcha: its TLS stack needs **legacy renegotiation** (pre-RFC5746) which OpenSSL 3
+  refuses — and node.js (MeshCommander) ignores OPENSSL_CONF, so it can't be fixed
+  client-side. Solution: **stunnel TLS bridge** on localhost, MeshCommander talks plain:
+
+  ```
+  # /tmp/amt-stunnel.conf — bridges BOTH port pairs (WS-Man + KVM/IDE-R)
+  foreground = yes
+  pid =
+  [amt-wsman]
+  client = yes
+  accept = 127.0.0.1:16992
+  connect = 10.10.0.9:16993
+  options = ALLOW_UNSAFE_LEGACY_RENEGOTIATION
+  [amt-redir]
+  client = yes
+  accept = 127.0.0.1:16994
+  connect = 10.10.0.9:16995
+  options = ALLOW_UNSAFE_LEGACY_RENEGOTIATION
+  ```
+
+  ```bash
+  podman run -d --name amt-bridge --rm --network host \
+    -v /tmp/amt-stunnel.conf:/etc/stunnel/stunnel.conf:ro,Z \
+    docker.io/library/debian:trixie-slim bash -c \
+    "apt-get update -qq && apt-get install -y -qq stunnel4 >/dev/null 2>&1 && stunnel /etc/stunnel/stunnel.conf"
+
+  # MeshCommander web UI (node): host networking so its 127.0.0.1 bind is reachable
+  podman run -d --name meshcommander --rm --network host \
+    docker.io/library/node:22-slim bash -c \
+    "cd /tmp && npm install meshcommander --no-audit --no-fund --loglevel=error && node node_modules/meshcommander"
+  # → http://localhost:3000, Add Computer = 127.0.0.1, admin + MEBx pw, TLS OFF
+  ```
+
+  Direct curl works with an OPENSSL_CONF allowing UnsafeLegacyRenegotiation (SECLEVEL=1).
+  AMT DHCP mode = shared host IP (snoops host's DHCP) — host is static, so AMT must be static.
+
+  **SOL (Serial-over-LAN)** — documented, NOT yet enabled in mouse.bu:
+  the ME exposes a virtual UART as ttyS0; AMT side is already live (16995 open).
+  To use it later: add to the host .bu (flatcar variant supports kernel_arguments,
+  verified 2026-08-16):
+  ```yaml
+  kernel_arguments:
+    should_exist:
+      - console=ttyS0,115200n8
+  ```
+  systemd auto-spawns serial-getty on console= ports, so that's the whole OS side.
+  Client: `amtterm -h 127.0.0.1 -u admin -p <MEBx pw>` (amtterm pkg) through the
+  stunnel bridge's plain 16994 side. Bonus: enable BIOS "Serial Console Redirection"
+  for POST/GRUB visibility too. Use case: text-only remote console in tmux,
+  loggable/scriptable, no KVM protocol needed.
+
+  **PXE (researched, NOT chosen for n=1)**: Flatcar publishes PXE kernel+initrd
+  (`flatcar_production_pxe.vmlinuz` / `_image.cpio.gz`); iPXE script boots it with
+  `flatcar.ignition.config.url=http://<server>/mouse.ign` (http/https/tftp). Needs DHCP
+  next-server+bootfile (router-dependent) or ProxyDHCP dnsmasq on an always-on device —
+  mouse is the only server, so that's the workstation (chicken-egg). Middle ground:
+  flash tiny iPXE USB → chainload HTTP script, no DHCP changes. But AMT IDE-R covers
+  the same remote-boot need with zero infrastructure → **AMT > PXE for a single node**.
+  Revisit PXE if a second node appears.
+- [ ] **Phase 2: Bootstrap** — BUILT at `k8s/kyz/bootstrap/helmfile/` (rendered against live cluster, not yet applied). DAG: cilium → coredns → cert-manager → external-secrets → onepassword-connect → flux-operator/instance. Secrets: 1Password Connect + ESO — `op inject` seeds the Connect creds at bootstrap (`OP_SERVICE_ACCOUNT_TOKEN` env, prompted; no SOPS for k8s). Layout decision: `k8s/<site>/` (kyz = this site; future sites sit beside it). Run: `mise run kyz:bootstrap mouse` — needs 1P item `1password` in vault `home-ops` with OP_SESSION_JSON + OP_CONNECT_TOKEN. Model: `~/src/onedr0p/home-ops/bootstrap/helmfile/`
 - [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: alerts, backup, zeroscale
 - [ ] **Phase 4: Networking** — Cilium BGP resources, Envoy Gateway internal/external, cert-manager, external-dns (Cloudflare)
 - [ ] **Phase 5: Workloads** — migrate rustfs/netdata quadlets into cluster; remaining apps

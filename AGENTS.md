@@ -32,7 +32,7 @@ It manages:
 │   │   │   └── hosts/     # Per-host configs (mouse.bu)
 │   │   └── ignition/      # Generated .ign files (gitignored)
 │   ├── k0s/               # ☸️ k0sctl cluster definitions
-│   │   ├── mouse.yaml     # Production single-node cluster (10.10.0.105)
+│   │   ├── mouse.yaml     # Production single-node cluster (10.10.0.10)
 │   │   └── test.yaml      # Scratch VM cluster
 │   ├── terraform/         # 🔄 Current IaC (maintenance mode)
 │   │   ├── cloudflare/    # DNS & domain management

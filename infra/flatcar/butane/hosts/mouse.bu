@@ -4,7 +4,8 @@ version: 1.1.0
 # Build: mise run flatcar:build  (merges infra/flatcar/ignition/base.ign)
 #
 # Reality notes (from live mouse, 2026-08-13):
-#   - mgmt: DHCP on 10.10.0.0/16 (reservation 10.10.0.105), NIC igc/enp88s0
+#   - mgmt: static 10.10.0.10 on 10.10.0.0/16 (MAC-matched; was DHCP .105 on uCore),
+#     NIC igc/enp88s0 (i226-LM, also the AMT/vPro port)
 #   - ZFS: 'tank' created by hand (raidz1 x2, 6x 5.5T), mountpoint /var/tank —
 #     this config IMPORTS, never creates
 #   - VLANs 30 (iot) / 40 (cameras) are NOT on the host; k8s reaches them
@@ -37,9 +38,24 @@ storage:
         inline: |
           zfs
 
-    # Primary NIC: DHCP on the mgmt network + per-link mDNS (mouse.local).
-    # Glob match: real NIC is enp88s0, qemu VM is enp1s0/eth0 — either way
-    # the "first non-loopback" link gets this.
+    # Bare-metal NIC (i226-LM, matched by MAC): static 10.10.0.10.
+    # Sorts before 25-primary.network so it wins on the real hardware;
+    # the qemu VM's virtio MAC doesn't match and falls through to DHCP.
+    - path: /etc/systemd/network/20-mouse-static.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          MACAddress=58:47:ca:74:fb:1c
+
+          [Network]
+          Address=10.10.0.10/24
+          Gateway=10.10.0.1
+          DNS=10.10.0.1
+          MulticastDNS=yes
+          LLMNR=yes
+
+    # Fallback: any other NIC (VMs, new hardware) gets DHCP + mDNS.
     - path: /etc/systemd/network/25-primary.network
       mode: 0644
       contents:

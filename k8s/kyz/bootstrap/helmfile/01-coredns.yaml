@@ -1,0 +1,10 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/helmfile
+
+releases:
+  - name: coredns
+    namespace: kube-system
+    chart: oci://ghcr.io/coredns/charts/coredns
+    version: 1.43.3
+    values:
+      - values/coredns.yaml.gotmpl

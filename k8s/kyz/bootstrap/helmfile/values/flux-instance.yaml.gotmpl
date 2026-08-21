@@ -1,0 +1,20 @@
+instance:
+  distribution:
+    version: 2.x
+    registry: ghcr.io/fluxcd
+  cluster:
+    networkPolicy: false
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  sync:
+    kind: GitRepository
+    url: https://github.com/rwaltr/home-ops
+    ref: refs/heads/master
+    path: k8s/kyz/flux/cluster
+    interval: 1h
+    # pullSecret: set post-bootstrap once a GitHub credential lives in 1Password
+  kustomize:
+    patches: []

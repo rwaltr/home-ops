@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Download Flatcar live ISO for bare-metal install (cached, checksum-verified)"
+#MISE outputs=[".vm/flatcar_production_iso_image.iso"]
+
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+VM_DIR="${MISE_PROJECT_ROOT}/.vm"
+ISO_NAME="flatcar_production_iso_image.iso"
+RELEASE_BASE="https://stable.release.flatcar-linux.net/amd64-usr/current"
+
+mkdir -p "${VM_DIR}"
+download_artifact "${RELEASE_BASE}/${ISO_NAME}" "${RELEASE_BASE}/${ISO_NAME}.DIGESTS" "${VM_DIR}/${ISO_NAME}"

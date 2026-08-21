@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#MISE description="Bootstrap k0s cluster on bare metal: secrets (op inject) → helmfile DAG → flux"
+#USAGE arg "[host]" help="Target host" default="mouse" {
+#USAGE   choices "mouse"
+#USAGE }
+
+set -euo pipefail
+source "$MISE_CONFIG_ROOT/.mise/lib/common.sh"
+
+HOST="${usage_host:-${usage_hostname:-${FLATCAR_HOST:-mouse}}}"
+KYZ_DIR="$MISE_CONFIG_ROOT/k8s/kyz"
+export KUBECONFIG="$MISE_CONFIG_ROOT/.vm/${HOST}-prod.kubeconfig"
+
+[ -f "$KUBECONFIG" ] || die "kubeconfig not found: $KUBECONFIG (run: k0sctl kubeconfig --config infra/k0s/$HOST.yaml > $KUBECONFIG)"
+
+log "Bootstrapping cluster: $HOST"
+
+# --- Preflight: node reachable ---
+kubectl get node "$HOST" &>/dev/null || die "node '$HOST' not reachable via $KUBECONFIG"
+
+# --- 1Password bootstrap secrets (op inject) ---
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  log "OP_SERVICE_ACCOUNT_TOKEN not set — paste it (input hidden):"
+  read -rsp "  token: " OP_SERVICE_ACCOUNT_TOKEN; echo
+  export OP_SERVICE_ACCOUNT_TOKEN
+fi
+
+op whoami &>/dev/null || die "op not authenticated (check OP_SERVICE_ACCOUNT_TOKEN)"
+
+log "Creating namespaces + seeding 1Password Connect secret (op inject)"
+for ns in external-secrets cert-manager flux-system; do
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply --server-side -f - >/dev/null
+done
+op inject -i "$KYZ_DIR/bootstrap/secrets/secret.yaml" \
+  | kubectl apply --server-side --force-conflicts -f - \
+  || die "op inject failed — does item '1password' exist in vault 'home-ops' with OP_SESSION_JSON + OP_CONNECT_TOKEN?"
+unset OP_SERVICE_ACCOUNT_TOKEN
+
+# --- helmfile DAG ---
+log "Running helmfile bootstrap DAG (cilium → coredns → cert-manager → external-secrets → onepassword-connect → flux)"
+cd "$KYZ_DIR/bootstrap/helmfile"
+
+# k8sServiceHost = the apiserver host (no port), extracted robustly from the kubeconfig server URL
+CLUSTER_HOST="$(kubectl config view --minify -o jsonpath='{.clusters[0].server}' | python3 -c 'import sys,urllib.parse; print(urllib.parse.urlparse(sys.stdin.read().strip()).hostname)')"
+log "Cilium k8sServiceHost: $CLUSTER_HOST"
+
+HF_ARGS=(--interactive=false --state-values-set "cluster.endpoint=$CLUSTER_HOST,cluster.podCIDR=10.244.0.0/16,cluster.dnsIP=10.96.0.10")
+
+helmfile "${HF_ARGS[@]}" -f 00-cilium.yaml sync
+
+# node should now become Ready
+kubectl wait --for=condition=Ready node/"$HOST" --timeout=180s || log "WARN: node not Ready yet — cilium still converging"
+
+for f in 01-coredns.yaml 02-cert-manager.yaml 03-external-secrets.yaml 04-onepassword-connect.yaml 05-flux-operator.yaml 06-flux-instance.yaml; do
+  log "Applying $f"
+  helmfile "${HF_ARGS[@]}" -f "$f" sync
+done
+
+log "Bootstrap complete. Flux needs a git source next (GitHub creds → 1P item → ExternalSecret)."
+kubectl get pods -A --no-headers | grep -cv "Running\|Completed" | xargs -I{} log "Pods not yet Running/Completed: {}"

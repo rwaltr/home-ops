@@ -63,6 +63,14 @@ storage:
 
 systemd:
   units:
+    # systemd-sysupdate manages nothing on Flatcar (update-engine owns OS updates;
+    # sysupdate reads no sysupdate.d — verified 2026-08-13). Its daily reboot-check
+    # exits 1 and pollutes `systemctl --failed`; mask the reboot pair.
+    - name: systemd-sysupdate-reboot.timer
+      mask: true
+    - name: systemd-sysupdate-reboot.service
+      mask: true
+
     # update-engine auto-reboots by default. Unacceptable on a single-node cluster.
     # /etc/flatcar/update.conf exists in the base image and Ignition FAILS to
     # overwrite it (ignition-files error, verified 2026-08-13) — write it post-boot.
