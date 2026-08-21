@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#MISE description="Create a 1Password service account (30d expiry) and store its token in gnome-keyring"
+#USAGE flag "-r --rotate" help="Replace the stored token with a fresh service account"
+#USAGE option "-e --expires" help="Token expiry (e.g. 30d, 4w, 24h)" default="30d"
+
+set -euo pipefail
+source "$MISE_CONFIG_ROOT/.mise/lib/common.sh"
+
+ATTRS="service op-sa vault home-ops"
+LABEL="1Password home-ops service account"
+SA_NAME="home-ops-mise"
+EXPIRES="${usage_expires:-30d}"
+
+command -v secret-tool >/dev/null || die "secret-tool not found (install libsecret)"
+
+# Requires an interactive `op` sign-in (your personal account) to mint service accounts.
+op whoami &>/dev/null || die "op not signed in — run: op signin --shell fish | source"
+
+if [ -z "${usage_rotate:-}" ] && secret-tool lookup $ATTRS >/dev/null 2>&1; then
+  log "Token already stored (use --rotate to replace)"
+  exit 0
+fi
+
+log "Creating service account '$SA_NAME' (vault home-ops: read_items,write_items, expires $EXPIRES)"
+TOKEN="$(op service-account create "$SA_NAME" \
+  --vault home-ops:read_items,write_items \
+  --expires-in "$EXPIRES" \
+  --raw)" || die "service account creation failed"
+[ -n "$TOKEN" ] || die "empty token returned"
+
+printf '%s' "$TOKEN" | secret-tool store --label="$LABEL" $ATTRS
+unset TOKEN
+
+STORED="$(secret-tool lookup $ATTRS)"
+[ -n "$STORED" ] || die "stored token not readable back"
+log "Stored in gnome-keyring: secret-tool lookup $ATTRS"
+log "k8s:bootstrap (and any op call) will use it automatically for the next $EXPIRES"
