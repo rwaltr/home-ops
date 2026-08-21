@@ -6,7 +6,7 @@ rebuild.
 
 ```sh
 export OP_SERVICE_ACCOUNT_TOKEN=ops_...   # 1P service account, scoped to the home-ops vault
-mise run kyz:bootstrap mouse
+mise run k8s:bootstrap mouse
 ```
 
 ## What it does
