@@ -13,12 +13,26 @@ metadata:
 spec:
   hosts:
     - role: controller+worker
+      installFlags:
+        - --disable-components=coredns,metrics-server
       ssh:
         address: 10.10.0.10
         port: 22
         user: rwaltr
         keyPath: ~/.ssh/id_ed25519
       noTaints: true
+      files:
+        - name: spgel.toml
+          data: |
+            version = 3
+
+            [plugins."io.containerd.cri.v1.images".registry]
+            config_path = "/etc/containerd/certs.d"
+
+            [plugins."io.containerd.cri.v1.images"]
+            discard_unpacked_layers = false
+          dstDir: /etc/k0s/containerd.d/
+          perm: "0644"
   k0s:
     version: v1.36.3+k0s.2
     config:
@@ -28,6 +42,6 @@ spec:
         name: mouse
       spec:
         network:
-          provider: custom    # Cilium installed out-of-band (mouse:k0s task / phase 2 helmfile)
+          provider: custom # Cilium installed out-of-band (mouse:k0s task / phase 2 helmfile)
           kubeProxy:
-            disabled: true    # Cilium kubeProxyReplacement
+            disabled: true # Cilium kubeProxyReplacement

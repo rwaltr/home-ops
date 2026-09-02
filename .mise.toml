@@ -25,6 +25,7 @@ helmfile = "latest"
 kustomize = "latest"
 # usage CLI: shell completions for task args/flags (#USAGE specs)
 "github:jdx/usage" = "latest"
+helm-diff = { version = "latest", bin = "diff", bin_path = "diff/bin", rename_exe = "helm-diff" }
 
 # Tasks are file-based tasks in .mise/tasks/ — `mise tasks` is the index.
 # Shared shell helpers live in .mise/lib/common.sh.

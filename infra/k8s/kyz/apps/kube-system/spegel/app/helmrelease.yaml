@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: spegel
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: spegel
+  interval: 1h
+  values:
+    grafanaDashboard:
+      enabled: true
+      mode: GrafanaOperator
+      grafanaOperator:
+        matchLabels:
+          dashboards: grafana
+    service:
+      registry:
+        hostPort: 29999
+    serviceMonitor:
+      enabled: true
+    spegel:
+      containerdSock: /run/k0s/containerd.sock
+      containerdRegistryConfigPath: /etc/containerd/certs.d
+      containerdContentPath: /var/lib/k0s/containerd/io.containerd.content.v1.content
