@@ -2,9 +2,9 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: o11y
+
 resources:
-  # - ./envoy.yaml
-  # - ./grafanadashboard.yaml
-  - ./helmrelease.yaml
-  # - ./o11y.yaml
-  - ./ocirepository.yaml
+  - ./namespace.yaml
+  - ./grafana-operator/ks.yaml
+  - ./kube-prometheus-stack/ks.yaml
