@@ -23,7 +23,7 @@ spec:
       sync:
         kind: GitRepository
         url: https://github.com/rwaltr/home-ops
-        ref: refs/heads/main
+        ref: refs/heads/master
         path: infra/k8s/kyz
         interval: 1h
       kustomize:
