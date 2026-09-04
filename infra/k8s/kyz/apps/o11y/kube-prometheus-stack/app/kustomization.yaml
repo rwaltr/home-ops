@@ -3,9 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./alertmanagerconfig.yaml
+  # TODO: create alertmanagerconfig.yaml and re-enable
+  # - ./alertmanagerconfig.yaml
   - ./externalsecret.yaml
-  - ./grafanadashboard.yaml
+  # TODO: create grafanadashboard.yaml and re-enable
+  # - ./grafanadashboard.yaml
   - ./helmrelease.yaml
   - ./ocirepository.yaml
 configMapGenerator:
