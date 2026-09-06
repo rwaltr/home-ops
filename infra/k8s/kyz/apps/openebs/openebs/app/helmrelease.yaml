@@ -1,0 +1,60 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openebs
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: openebs
+  install:
+    disableHooks: true
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    disableHooks: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    localpv-provisioner:
+      localpv:
+        image:
+          registry: quay.io/
+      hostpathClass:
+        enabled: false
+      helperPod:
+        image:
+          registry: quay.io/
+    openebs-crds:
+      csi:
+        volumeSnapshots:
+          enabled: true
+          keep: true
+    zfs-localpv:
+      zfsNode:
+        # Flatcar: /home is on the state partition and may not persist;
+        # /var is writable and safe for encryption keys.
+        encrKeysDir: /var/openebs-zfs-keys
+    lvm-localpv:
+      enabled: false
+    mayastor:
+      enabled: false
+    engines:
+      local:
+        lvm:
+          enabled: false
+        zfs:
+          enabled: true
+      replicated:
+        mayastor:
+          enabled: false
+    loki:
+      enabled: false
+    alloy:
+      enabled: false
+    minio:
+      enabled: false
