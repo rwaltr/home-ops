@@ -26,6 +26,7 @@ spec:
           registry: quay.io/
       hostpathClass:
         enabled: true
+        isDefaultClass: false
       helperPod:
         image:
           registry: quay.io/
