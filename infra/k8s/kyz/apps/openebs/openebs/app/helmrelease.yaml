@@ -20,12 +20,17 @@ spec:
       strategy: rollback
       retries: 3
   values:
+    # Only the hostpath local provisioner is in use. The DAS (tank) is kept
+    # for bulk media / hand-managed datasets and intentionally NOT exposed
+    # as a StorageClass; the zfs CSI is disabled until a dedicated local
+    # pool exists.
     localpv-provisioner:
       localpv:
         image:
           registry: quay.io/
       hostpathClass:
         enabled: true
+        # not the default class on purpose
         isDefaultClass: false
       helperPod:
         image:
@@ -35,11 +40,9 @@ spec:
         volumeSnapshots:
           enabled: true
           keep: true
-    zfs-localpv:
-      zfsNode:
-        # Flatcar: /home is on the state partition and may not persist;
-        # /var is writable and safe for encryption keys.
-        encrKeysDir: /var/openebs-zfs-keys
+    # zfs-localpv is gated by engines.local.zfs (see Chart.yaml conditions),
+    # not a zfs-localpv.enabled key. Left disabled until a dedicated local pool
+    # exists; the tank pool stays outside the PVC lifecycle by design.
     lvm-localpv:
       enabled: false
     mayastor:
@@ -49,7 +52,7 @@ spec:
         lvm:
           enabled: false
         zfs:
-          enabled: true
+          enabled: false
       replicated:
         mayastor:
           enabled: false
