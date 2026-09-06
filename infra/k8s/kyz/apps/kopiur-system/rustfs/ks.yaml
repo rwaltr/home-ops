@@ -16,3 +16,4 @@ spec:
   wait: true
   dependsOn:
     - name: external-secrets
+      namespace: external-secrets
