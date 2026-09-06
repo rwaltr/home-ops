@@ -11,5 +11,5 @@ allowVolumeExpansion: true
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 parameters:
-  poolname: "tank/k8s/local"
+  poolname: "tank"
   fstype: "zfs"
