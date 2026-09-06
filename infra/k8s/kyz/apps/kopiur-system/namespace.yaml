@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: _
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    # kopiur tenancy gate + ESO credential fanout target (ClusterExternalSecret
+    # kopiur-rustfs). kopiur-system must carry it too: the managed Maintenance
+    # mover runs here and needs the repo credentials.
+    kopiur.home-operations.com/repo: cluster-kopia

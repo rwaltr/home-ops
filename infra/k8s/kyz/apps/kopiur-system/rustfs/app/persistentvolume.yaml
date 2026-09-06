@@ -1,0 +1,33 @@
+---
+# Static PV backing RustFS with the tank/backup/k8s dataset (USB DAS on mouse).
+# hostPath is deliberate: the zpool is imported and mounted by Ignition, and the
+# tank pool must stay outside the PVC/StorageClass lifecycle.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rustfs-tank-backup
+spec:
+  capacity:
+    # Nominal — hostPath capacity is not enforced, sized to the pool
+    storage: 30Ti
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: rustfs-data
+    namespace: kopiur-system
+  hostPath:
+    # tank/backup/k8s dataset (created by hand on the host)
+    path: /var/tank/backup/k8s
+    type: Directory
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - mouse

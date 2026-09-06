@@ -7,6 +7,7 @@ resources:
   - ./apps/cert-manager
   - ./apps/external-secrets
   - ./apps/flux-system
+  - ./apps/kopiur-system
   - ./apps/kube-system
   - ./apps/network
   - ./apps/o11y

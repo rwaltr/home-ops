@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustfs-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Ti
+  # No dynamic provisioning: pre-bound to the static rustfs-tank-backup PV
+  storageClassName: ""
+  volumeName: rustfs-tank-backup

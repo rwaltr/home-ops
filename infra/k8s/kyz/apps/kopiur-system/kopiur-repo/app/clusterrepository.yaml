@@ -1,0 +1,43 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/clusterrepository_v1alpha1.json
+# Shared kopia repository on the tank DAS (via in-cluster RustFS over plain HTTP
+# — kopia encrypts client-side before upload, so HTTP never exposes backup data).
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: ClusterRepository
+metadata:
+  name: cluster-kopia
+spec:
+  backend:
+    s3:
+      bucket: kopia # created by the rustfs-init-buckets Job
+      prefix: "" # dedicated bucket — kopia repo lives at the bucket root
+      endpoint: rustfs-svc.kopiur-system.svc.cluster.local:9000
+      region: us-east-1
+      tls:
+        disableTls: true # in-cluster RustFS is plain HTTP
+      auth:
+        secretRef:
+          name: kopiur-rustfs
+          namespace: kopiur-system
+  encryption:
+    passwordSecretRef:
+      name: kopiur-rustfs
+      namespace: kopiur-system
+      key: KOPIA_PASSWORD
+  create:
+    enabled: true
+  parameters:
+    epoch:
+      # Compaction trails two epochs behind; at kopia's 24h default this repo's
+      # index blobs only ever grow (lesson from upstream users).
+      minDuration: 6h
+  bootstrap:
+    failurePolicy:
+      # Opening a repo can take ~90s (index-blob merge); the 120s default
+      # deadline kills the connect and blocks the maintenance that would fix it.
+      activeDeadlineSeconds: 600
+  # Tenancy: namespaces carrying this label may back up to this repository
+  allowedNamespaces:
+    selector:
+      matchLabels:
+        kopiur.home-operations.com/repo: cluster-kopia

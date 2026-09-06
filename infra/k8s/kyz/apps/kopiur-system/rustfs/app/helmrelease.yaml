@@ -1,0 +1,50 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rustfs
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: rustfs
+      version: 1.0.0-rc.5
+      sourceRef:
+        kind: HelmRepository
+        name: rustfs
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    replicaCount: 1
+    mode:
+      standalone:
+        enabled: true
+        existingClaim:
+          dataClaim: rustfs-data
+      distributed:
+        enabled: false
+    # Credentials come from 1Password via the rustfs-credentials ExternalSecret
+    secret:
+      existingSecret: rustfs-credentials
+    config:
+      rustfs:
+        # stdout logging only — avoids the chart's separate logs PVC
+        obs_log_directory: ""
+        console_enable: "true"
+    ingress:
+      enabled: false
+    nodeSelector:
+      # Tank (DAS) is attached to mouse. Hardcoded until node labels/feature
+      # detection exist — rustfs follows the pool wherever it lands.
+      kubernetes.io/hostname: mouse
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
