@@ -24,6 +24,10 @@ spec:
       containers:
         - name: mc
           image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          env:
+            # mc writes ~/.mc; without HOME it targets /.mc (not writable at UID 10001)
+            - name: HOME
+              value: /tmp
           envFrom:
             - secretRef:
                 name: rustfs-credentials
@@ -38,3 +42,9 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
