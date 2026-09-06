@@ -26,7 +26,7 @@ the management VLAN but must directly serve a second VLAN.
 | Ingress | **Envoy Gateway** (Gateway API) | Two Gateways (internal/external) with pinned VIPs via `lbipam.cilium.io/ips`; apps attach via app-template `route:` |
 | GitOps | **Flux** (flux-operator + flux-instance) | onedr0p layout: single root ks → `kubernetes/apps`, Kustomize components for cross-cutting concerns |
 | Charts | **bjw-s app-template via OCIRepository** for all apps | One values schema, digest-pinned images |
-| Storage | **OpenEBS ZFS LocalPV** on host pool | Already chosen; no rook-ceph (single node) |
+| Storage | **OpenEBS localpv-provisioner hostpath** on OS NVMe (non-default class) | ~~ZFS LocalPV~~ rejected: `poolname` must be a zpool (topology match), and tank stays outside the PVC lifecycle by design |
 | Backups | kopiur-style snapshots → **RustFS** (S3) | Our RustFS is the S3 backend, like onedr0p's expanse |
 | VLAN L2 needs | Multus + macvlan NAD **only** for discovery-dependent apps (home-assistant class) | BGP/routed VIPs cover everything else |
 
@@ -36,6 +36,35 @@ the management VLAN but must directly serve a second VLAN.
   need. Requires `socketLB.hostNamespaceOnly: true` + `cni.exclusive: false` with
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
+
+### Additional decisions (2026-09-06)
+
+- **Storage: hostpath only, tank stays out of PVC lifecycle** — ZFS-LocalPV rejected
+  after live testing: `poolname` must name a **zpool** (dataset paths like
+  `tank/k8s/local` fail topology matching → `no available topology found`), so CSI
+  PVs would land as `tank/pvc-*` at the pool root with no way to quarantine them.
+  `openebs-hostpath` (NVMe, non-default) is the sole class; durable bulk data is
+  hand-managed on tank. Trade-off accepted: hostpath PVs are node-pinned,
+  snapshot-less, and on the OS disk — all fine for disposable/scratch-tier data.
+- **Backups: kopiur + kopia → in-cluster RustFS on `tank/backup/k8s`** — validated
+  end-to-end (seed → Snapshot → wipe PVC → Restore → sha256 match). RustFS runs
+  in `kopiur-system`, standalone mode, static hostPath PV to the dataset, pinned to
+  mouse until node labels exist (follows the DAS). Plain HTTP in-cluster is safe:
+  kopia encrypts client-side (`KOPIA_PASSWORD`) before upload.
+- **`copyMethod: Direct` is mandatory on every SnapshotPolicy** — hostpath storage
+  has no CSI snapshot stack; kopiur fails closed rather than silently reading live
+  volumes. DB workloads get `beforeSnapshot` hooks when they land.
+- **Cred fanout pattern** — one 1Password item (`kopia` vault `home-ops`: RUSTFS
+  keys + KOPIA_PASSWORD) feeds RustFS itself and, via a ClusterExternalSecret,
+  every namespace labeled `kopiur.home-operations.com/repo: cluster-kopia`.
+  Onboarding an app = label the ns + SnapshotPolicy/SnapshotSchedule manifests.
+  (kopiur's own credentialProjection avoided — no cluster-wide secrets RBAC needed.)
+- **RustFS bucket created by hand** (`mc mb`, one-shot) — kopia needs the bucket
+  pre-bootstrap; a Git-managed bootstrap Job proved more moving parts than value.
+- **Flux lesson: never delete an object mid-health-check** — the kustomize-controller
+  assessment goroutine (59m timeout) keeps running against the deleted object and
+  overwrites status on the recreated CR; `rollout restart` of kustomize-controller
+  is the fix.
 
 ### Additional decisions (2026-08-13)
 

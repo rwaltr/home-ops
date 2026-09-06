@@ -16,7 +16,7 @@
 
 ## 📖 Overview
 
-Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster; cloud resources are managed with Terraform (migrating to Pulumi). Services include object storage (RustFS), monitoring (Netdata), and backups (Backblaze B2).
+Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform (migrating to Pulumi). In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
 
 > 🗺️ Migration plan, decisions log, and lessons: **[REFACTOR_PLANS.md](REFACTOR_PLANS.md)**
 
@@ -30,6 +30,7 @@ Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
 | ------------------ | ------------------------------------------------------------ |
 | `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)        |
 | `infra/k0s/`       | k0sctl cluster definitions                                   |
+| `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks)    |
 | `infra/terraform/` | Cloudflare, Backblaze B2, Terraform Cloud (maintenance mode) |
 | `infra/shared/`    | Shared SOPS-encrypted config                                 |
 | `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)            |
@@ -53,7 +54,13 @@ mise run flatcar:clean test       # destroy VM and disks
 
 ### ☸️ Kubernetes (k0s)
 
-Single-node k0s cluster on mouse (v1.36, Cilium as kube-proxy replacement), managed via k0sctl configs in `infra/k0s/`. GitOps layout (Flux + helmfile bootstrap, modeled on [onedr0p/home-ops](https://github.com/onedr0p/home-ops)) is the next migration phase.
+Single-node k0s cluster on mouse (v1.36, Cilium as kube-proxy replacement), managed via k0sctl configs in `infra/k0s/`. The cluster is **Flux GitOps** (flux-operator + flux-instance) rooted at `infra/k8s/kyz` — app groups under `apps/` with per-app Kustomizations.
+
+Key platform apps:
+
+- **Storage** — OpenEBS localpv-provisioner, `openebs-hostpath` class (non-default, NVMe) — the tank pool deliberately stays outside the PVC lifecycle
+- **Backups** — [kopiur](https://github.com/home-operations/kopiur) + kopia → in-cluster RustFS (S3) on `tank/backup/k8s` (see [apps/kopiur-system](infra/k8s/kyz/apps/kopiur-system/README.md))
+- **Secrets** — 1Password Connect + External Secrets (`kopia`, `pushover`, … items in vault `home-ops`)
 
 ### 🌐 Terraform
 
@@ -75,13 +82,14 @@ Age-based secrets management — sensitive values are encrypted inline alongside
 
 **mouse** (Flatcar) — primary infrastructure host:
 
-| Role           | Details                                   |
-| -------------- | ----------------------------------------- |
-| Storage        | ZFS tank pool (raidz1×2, `/var/tank`)     |
-| Kubernetes     | single-node k0s + Cilium                  |
-| Object Storage | RustFS (S3-compatible, moving in-cluster) |
-| Monitoring     | Netdata (moving in-cluster)               |
-| Access         | Tailscale + mDNS (`mouse.local`)          |
+| Role           | Details                                    |
+| -------------- | ------------------------------------------ |
+| Storage        | ZFS tank pool (raidz1×2, `/var/tank`)      |
+| Kubernetes     | single-node k0s + Cilium                   |
+| Object Storage | RustFS (S3-compatible, in-cluster)        |
+| Backups        | kopiur + kopia → RustFS on tank           |
+| Monitoring     | Netdata (moving in-cluster)                |
+| Access         | Tailscale + mDNS (`mouse.local`)           |
 
 Config: `infra/flatcar/butane/hosts/mouse.bu`
 
@@ -168,7 +176,7 @@ flowchart TD
 
     tank --> nas["tank/nas · 6.64T<br/>media library + pictures"]
     tank --> home["tank/home/rwaltr · 36.8G"]
-    tank --> k8s["tank/k8s · empty<br/>reserved → OpenEBS LocalPV"]
+    tank --> backup["tank/backup/k8s · kopia repo<br/>via in-cluster RustFS"]
     tank --> svc["tank/services · empty<br/>reserved → in-cluster services"]
 ```
 
@@ -185,12 +193,17 @@ Flatcar OS runs on a separate 1TB NVMe. Every dataset uses lz4 compression with
 | tank/nas/library  | /var/tank/nas/library  | 6.63T | Media, games, books, music       |
 | tank/nas/pictures | /var/tank/nas/pictures | 14.4G | Photo library                    |
 | tank/home/rwaltr  | /var/tank/home/rwaltr  | 36.8G | Home directory                   |
-| tank/k8s          | /var/tank/k8s          | —     | Reserved for OpenEBS ZFS LocalPV |
+| tank/backup/k8s   | /var/tank/backup/k8s   | —     | kopia repository (via RustFS)   |
 | tank/services     | /var/tank/services     | —     | Reserved for in-cluster services |
 
 Pool health is automated with a monthly scrub timer and `zfs-zed` for events.
-Backups are kopiur-style snapshots to RustFS (S3) once the cluster lands — see
-[REFACTOR_PLANS.md](REFACTOR_PLANS.md).
+Workload PVCs use OpenEBS hostpath on the OS NVMe (non-default class) — tank
+stays out of the PVC lifecycle by design. PVC backups run via **kopiur +
+kopia** into the in-cluster RustFS backed by `tank/backup/k8s`, validated
+end-to-end (backup → wipe → restore → checksum match) — see
+[apps/kopiur-system](infra/k8s/kyz/apps/kopiur-system/README.md). The 3-2-1
+offsite leg (mirror to Backblaze B2) is planned via kopiur's
+`RepositoryReplication`.
 
 ## ☁️ Cloud Integrations
 
@@ -204,12 +217,16 @@ Backups are kopiur-style snapshots to RustFS (S3) once the cluster lands — see
 | Flatcar    | Operating System             | ✅               |
 | k0s        | Kubernetes (single-node)     | ✅               |
 | Cilium     | CNI (kube-proxy replacement) | ✅               |
+| Flux       | GitOps                       | ✅               |
+| OpenEBS    | Hostpath local storage       | ✅               |
+| kopiur     | PVC backups (kopia-native)   | ✅               |
+| RustFS     | S3-compatible Storage        | ✅               |
+| 1Password  | Secrets (Connect + ESO)      | ✅               |
 | ZFS        | Storage & Snapshots          | ✅               |
 | SOPS       | Secrets Management           | ✅               |
 | Terraform  | Cloud Resource Management    | ✅ (maintenance) |
 | Pulumi     | Cloud Resource Management    | 🚧 planned       |
-| RustFS     | S3-compatible Storage        | ✅               |
-| Netdata    | System Monitoring            | ✅               |
+| Netdata    | System Monitoring            | 🚧 planned       |
 | mise       | Task Runner & Tool Mgmt      | ✅               |
 | Pre-commit | Code Quality Automation      | ✅               |
 
