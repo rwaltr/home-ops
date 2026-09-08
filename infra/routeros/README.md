@@ -39,11 +39,10 @@ blocks are list edits, not rule edits:
 add address=10.10.100.0/24 comment="Cilium LB VIPs (BGP)" list=v4-k8s-vips
 ```
 
-Related pre-existing lists (planned 2026-07-31, currently unused):
-`v4-k8s-pods` (10.90.0.0/16), `v4-k8s-services` (10.91.0.0/16),
-`v4-k8s-lb` (10.92.0.0/16). **TODO(align):** decide whether the live VIP pool
-(10.10.100.0/24) should migrate to the planned `v4-k8s-lb` space — would
-change the Cilium pool + kube-api VIP + these rules together.
+Related k8s lists (reconciled to the live cluster 2026-09-08):
+`v4-k8s-pods` (10.42.0.0/16, k0s pod CIDR), `v4-k8s-services` (10.96.0.0/12,
+k0s service CIDR). The pre-planned `v4-k8s-lb` (10.92.0.0/16) was removed —
+superseded by `v4-k8s-vips` above.
 
 ## Firewall: zone access to the VIP space
 
