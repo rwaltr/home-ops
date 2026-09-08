@@ -106,7 +106,8 @@ metadata:
     kubernetes.io/service-name: kube-api
 addressType: IPv4
 endpoints:
-  - address: 10.10.0.10
+  - addresses:
+      - 10.10.0.10
 ports:
   - name: https
     port: 6443
