@@ -41,6 +41,11 @@ spec:
       metadata:
         name: mouse
       spec:
+        api:
+          sans:
+            - 10.10.0.10
+            - 10.10.100.10 # kube-api LB VIP (Cilium BGP)
+            - k8s.kyz.rwalt.pro # future external-dns hostname
         network:
           provider: custom # Cilium installed out-of-band (mouse:k0s task / phase 2 helmfile)
           kubeProxy:
