@@ -101,6 +101,40 @@ Onboarding a restricted zone's service = one accept in the shared chain
 (e.g. `add chain=k8s-vips comment="cameras -> frigate vip" action=accept
 dst-address=10.10.100.21 in-interface=vlan40-cameras`).
 
+### Same-VLAN v6 hairpin: the conntrack exception
+
+Cilium LB uses DSR: replies leave the node **directly at L2** to the client.
+When client and node share a VLAN (mgmt here), the router forwards the SYN but
+never sees the SYN-ACK — its conntrack marks the client's follow-up packets
+`invalid` and `defconf: drop invalid` eats them until retransmit timeout
+(≈6.6s on every new connection). Cross-VLAN clients are symmetric and immune.
+v4 is immune only because RouterOS v4 conntrack tracks loosely; v6 does not.
+
+This is the documented "routing triangle" problem — cilium/cilium#34972
+(MikroTik users, same signature), MikroTik forum t=171177, r/kubernetes BGP
+VIP threads. Chosen fix (Option A below): a scoped `accept invalid` for the
+mgmt hairpin to the v6 VIP list only:
+
+```routeros
+/ipv6/firewall/filter
+add action=accept chain=forward \
+    comment="mgmt hairpin -> k8s v6 vips: DSR replies bypass router (asymmetric in conntrack) - see cilium#34972" \
+    connection-state=invalid dst-address-list=v6-k8s-vips \
+    in-interface=vlan10-mgmt out-interface=vlan10-mgmt
+```
+
+(placed before `defconf: drop invalid`). Alternatives considered:
+- **B — router src-NAT on the hairpin**: fully symmetric flows, no invalid
+  packets, but services lose real client IPs and replies take an extra hop
+- **C — per-client static routes**: works but unmanageable for phones/IoT
+- **D — dedicated service VLAN for cluster + VIPs**: the structurally correct
+  fix; revisit when a second node joins
+
+Verified: 6.6s → ~3ms first-byte on fresh v6 connections from same-VLAN
+clients. The exception is safe-to-spoof only in a narrow sense: a packet must
+already have been routed by this router toward a Cilium LB service port on the
+VIP list to reach this rule at all.
+
 ## Verify
 
 ```routeros
@@ -113,6 +147,8 @@ From any mgmt/clients host once peered (ping to a VIP is NOT expected to
 answer — Cilium only forwards the service's TCP/UDP port):
 
 ```sh
-nc -zv 10.10.100.10 6443                          # kube-api v4 VIP
+nc -zv 10.10.100.20 80                                  # e2e-http v4 VIP
+curl "http://[fdad:207a:f1ab:100::20]/"                # e2e-http v6 VIP
+nc -zv 10.10.100.10 6443                               # kube-api v4 VIP
 kubectl --server=https://[fdad:207a:f1ab:100::10]:6443 get --raw=/healthz
 ```

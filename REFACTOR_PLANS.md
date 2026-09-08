@@ -60,6 +60,14 @@ the management VLAN but must directly serve a second VLAN.
   semantics) that RouterOS won't forward plain-Ethernet v6 via — v6 VIPs
   silently died at the router. Fix: v4 session (10.10.0.1) for v4 /32s,
   v6 session (`fdad:207a:f1ab:10::1`) for v6 /128s, native next-hops.
+- **DSR hairpin conntrack trap (same-VLAN clients)**: Cilium LB replies go
+  L2-direct to same-VLAN clients, so the router's conntrack sees half a flow
+  and v6 `drop invalid` eats client packets until retransmit timeout — every
+  fresh same-VLAN v6 connection stalled 6.6s. RouterOS v4 conntrack is loose
+  (why v4 was immune); v6 has no loose knob. Fixed with a scoped
+  `accept connection-state=invalid` for the mgmt→v6-VIP hairpin (cilium#34972,
+  MikroTik t=171177 — the documented "routing triangle" problem). Structural
+  fix (dedicated service VLAN) deferred until a second node joins.
 - **kube-api via dual VIPs** (10.10.100.10 + `fdad:207a:f1ab:100::10`):
   selectorless Service + manual EndpointSlices (k0s apiserver is host-managed,
   not a pod). ETP=Local needs `nodeName` + `ready: true` on the slices or
