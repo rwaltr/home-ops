@@ -54,5 +54,5 @@ spec:
             disabled: true # Cilium kubeProxyReplacement
           dualStack:
             enabled: true
-            IPv6podCIDR: fdad:207a:f1ab:42::/64 # mirrors 10.42.0.0/16
+            IPv6podCIDR: fdad:207a:f1ab:244::/64 # mirrors 10.244.0.0/16
             IPv6serviceCIDR: fdad:207a:f1ab:96::/108 # mirrors 10.96.0.0/12
