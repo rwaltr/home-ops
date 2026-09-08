@@ -33,7 +33,7 @@ spec:
     enableIPv6BIGTCP: true
     ipv6:
       enabled: true
-    ipv6NativeRoutingCIDR: fdad:207a:f1ab:244::/64
+    ipv6NativeRoutingCIDR: fdad:207a:f1ab:244::/108 # k0s IPv6 pod CIDR (per-node /117 slices)
     endpointRoutes:
       enabled: true
     envoy:
