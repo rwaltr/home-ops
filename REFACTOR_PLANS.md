@@ -37,6 +37,36 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-08, dual-stack + BGP VIPs)
+
+- **Dual-stack over ULA** (no ISP delegation; `fdad:207a:f1ab::/48`): pods in
+  `fdad:207a:f1ab:244::/108` (in the :244 block mirroring k0s's 10.244 v4 pod
+  CIDR), services in `fdad:207a:f1ab:96::/108`, LB VIPs in
+  `fdad:207a:f1ab:100::/64`. mouse got a static v6 (`:10::10`) **alongside**
+  SLAAC (both coexist; networkd `IPv6AcceptRA=yes`).
+- **k0s gotchas found the hard way**:
+  - dual-stack node-IP autodetection does a DNS lookup of the bare hostname —
+    needs a static `mouse` A/AAAA in the router's DNS or k0s crash-loops
+  - k0s hardcodes `--node-cidr-mask-size-ipv6=117`; kube-controller-manager
+    rejects pod CIDRs with a prefix smaller than /101 (117-16) — the VLAN-style
+    /64 convention cannot be a pod CIDR; a /108 inside the :244 hextet works
+  - nodeipam never *appends* a second family to an existing node — converting
+    to dual-stack requires deleting the Node object (pods get garbage-collected
+    and recreated by their controllers) so the kubelet re-registers fresh
+  - k0s's real pod CIDR is 10.244.0.0/16 (NOT 10.42 — the onedr0p template
+    carried k3s values; `ipv4NativeRoutingCIDR` corrected)
+- **Cilium BGP needs per-family sessions with this MikroTik**: a v4-transport
+  session advertising v6 NLRI gives a `::ffff:` v4-mapped next-hop (6PE
+  semantics) that RouterOS won't forward plain-Ethernet v6 via — v6 VIPs
+  silently died at the router. Fix: v4 session (10.10.0.1) for v4 /32s,
+  v6 session (`fdad:207a:f1ab:10::1`) for v6 /128s, native next-hops.
+- **kube-api via dual VIPs** (10.10.100.10 + `fdad:207a:f1ab:100::10`):
+  selectorless Service + manual EndpointSlices (k0s apiserver is host-managed,
+  not a pod). ETP=Local needs `nodeName` + `ready: true` on the slices or
+  Cilium won't advertise. Router firewall: zone-based default-deny needs the
+  VIP blocks in address-lists + mgmt/clients accepts + a shared `k8s-vips`
+  chain for iot/cameras (untrusted disabled).
+
 ### Additional decisions (2026-09-06)
 
 - **Storage: hostpath only, tank stays out of PVC lifecycle** — ZFS-LocalPV rejected
