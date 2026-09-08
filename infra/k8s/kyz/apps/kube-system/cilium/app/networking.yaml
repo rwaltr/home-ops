@@ -33,6 +33,9 @@ spec:
           - { key: somekey, operator: NotIn, values: ["never-used-value"] }
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgppeerconfig_v2.json
+# v4 session (transport 10.10.0.1) — v4 NLRI only. A v4-transport session
+# carrying v6 NLRI yields a v4-mapped next-hop (::ffff:) that RouterOS
+# cannot use for plain-Ethernet v6 forwarding — hence the separate v6 session.
 apiVersion: cilium.io/v2
 kind: CiliumBGPPeerConfig
 metadata:
@@ -48,6 +51,18 @@ spec:
       advertisements:
         matchLabels:
           advertise: bgp
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgppeerconfig_v2.json
+# v6 session (transport fdad:207a:f1ab:10::1) — v6 NLRI only, native next-hop.
+apiVersion: cilium.io/v2
+kind: CiliumBGPPeerConfig
+metadata:
+  name: l3-bgp-peer-config-v6
+spec:
+  timers:
+    holdTimeSeconds: 9
+    keepAliveTimeSeconds: 3
+  families:
     - afi: ipv6
       safi: unicast
       advertisements:
@@ -55,7 +70,10 @@ spec:
           advertise: bgp
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgpclusterconfig_v2.json
-# Peering: mouse (Cilium, AS 64513) <-> gateway-132l (MikroTik, AS 64512, 10.10.0.1).
+# Peering: mouse (Cilium, AS 64513) <-> gateway-132l (MikroTik, AS 64512).
+# Two sessions, one per family, each with a native next-hop:
+#   v4 transport 10.10.0.1 -> v4 VIP /32s
+#   v6 transport fdad:207a:f1ab:10::1 -> v6 VIP /128s
 # RouterOS side is hand-applied — see infra/routeros/README.md
 apiVersion: cilium.io/v2
 kind: CiliumBGPClusterConfig
@@ -74,6 +92,11 @@ spec:
           peerAddress: 10.10.0.1
           peerConfigRef:
             name: l3-bgp-peer-config
+        - name: mikrotik-v6
+          peerASN: 64512
+          peerAddress: fdad:207a:f1ab:10::1
+          peerConfigRef:
+            name: l3-bgp-peer-config-v6
 ---
 # kube-apiserver via stable LAN VIPs (v4 + v6).
 # k0s runs the apiserver on the host (not an API-visible pod), so the Service
