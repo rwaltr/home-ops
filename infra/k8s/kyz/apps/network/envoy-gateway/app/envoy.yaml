@@ -38,8 +38,6 @@ spec:
     namespace: network
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.networking.k8s.io/gateway_v1.json
-# TODO(dual-stack): append `,fdad:207a:f1ab:100::11` to lbipam.cilium.io/ips
-#   once k0s dualStack + Cilium ipv6 are live.
 # TODO(networking): TLS listener certificateRef needs the wildcard secret from
 #   the certificates app (cert-manager DNS-01; blocked on 1P `cloudflare` item)
 #   and an external-dns hostname annotation (*.kyz.rwalt.pro) once external-dns
@@ -52,7 +50,7 @@ spec:
   gatewayClassName: envoy
   infrastructure:
     annotations:
-      lbipam.cilium.io/ips: 10.10.100.11
+      lbipam.cilium.io/ips: 10.10.100.11,fdad:207a:f1ab:100::11
   listeners:
     - name: http
       protocol: HTTP

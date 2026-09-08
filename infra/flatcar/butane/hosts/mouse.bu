@@ -50,6 +50,9 @@ storage:
 
           [Network]
           Address=10.10.0.10/24
+          Address=fdad:207a:f1ab:10::10/64
+          # SLAAC alongside the static address — RA also provides the v6 default route
+          IPv6AcceptRA=yes
           Gateway=10.10.0.1
           DNS=10.10.0.1
           MulticastDNS=yes

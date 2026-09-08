@@ -12,9 +12,7 @@ spec:
   allowFirstLastIPs: "No"
   blocks:
     - cidr: 10.10.100.0/24
-    # IPv6 ULA VIP space. Inert until the cluster is dual-stack (k0s +
-    # Cilium v6): no service requests a v6 VIP until the kube-api/envoy
-    # TODOs are enabled.
+    # IPv6 ULA VIP space (dual-stack).
     - cidr: fdad:207a:f1ab:100::/64
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgpadvertisement_v2.json
@@ -77,22 +75,23 @@ spec:
           peerConfigRef:
             name: l3-bgp-peer-config
 ---
-# kube-apiserver via a stable LAN VIP (10.10.100.10).
+# kube-apiserver via stable LAN VIPs (v4 + v6).
 # k0s runs the apiserver on the host (not an API-visible pod), so the Service
-# is selectorless with a manual EndpointSlice below.
-# TODO(dual-stack): append `,fdad:207a:f1ab:100::10` to the annotation and add
-#   an IPv6 EndpointSlice pointing at mouse's static v6 (fdad:207a:f1ab:10::10,
-#   butane change) once k0s dualStack + Cilium ipv6 are live.
+# is selectorless with manual EndpointSlices below.
 apiVersion: v1
 kind: Service
 metadata:
   name: kube-api
   annotations:
-    lbipam.cilium.io/ips: 10.10.100.10
+    lbipam.cilium.io/ips: 10.10.100.10,fdad:207a:f1ab:100::10
     # TODO(networking): enable once external-dns installs — k8s.kyz.rwalt.pro
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Local
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
   ports:
     - name: https
       port: 6443
@@ -110,6 +109,23 @@ endpoints:
       - 10.10.0.10
     # ETP=Local: Cilium only announces the VIP on nodes with ready local
     # endpoints; a selectorless slice needs these explicit
+    nodeName: mouse
+    ready: true
+ports:
+  - name: https
+    port: 6443
+    protocol: TCP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kube-api-v6
+  labels:
+    kubernetes.io/service-name: kube-api
+addressType: IPv6
+endpoints:
+  - addresses:
+      - fdad:207a:f1ab:10::10
     nodeName: mouse
     ready: true
 ports:

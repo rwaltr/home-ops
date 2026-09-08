@@ -30,6 +30,10 @@ spec:
     dashboards:
       enabled: true
     enableIPv4BIGTCP: true
+    enableIPv6BIGTCP: true
+    ipv6:
+      enabled: true
+    ipv6NativeRoutingCIDR: fdad:207a:f1ab:42::/64
     endpointRoutes:
       enabled: true
     envoy:

@@ -44,9 +44,15 @@ spec:
         api:
           sans:
             - 10.10.0.10
+            - fdad:207a:f1ab:10::10
             - 10.10.100.10 # kube-api LB VIP (Cilium BGP)
+            - fdad:207a:f1ab:100::10 # kube-api LB VIP v6 (Cilium BGP)
             - k8s.kyz.rwalt.pro # future external-dns hostname
         network:
           provider: custom # Cilium installed out-of-band (mouse:k0s task / phase 2 helmfile)
           kubeProxy:
             disabled: true # Cilium kubeProxyReplacement
+          dualStack:
+            enabled: true
+            IPv6podCIDR: fdad:207a:f1ab:42::/64 # mirrors 10.42.0.0/16
+            IPv6serviceCIDR: fdad:207a:f1ab:96::/108 # mirrors 10.96.0.0/12
