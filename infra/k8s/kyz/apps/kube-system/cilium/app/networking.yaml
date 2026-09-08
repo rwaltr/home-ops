@@ -1,5 +1,9 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumloadbalancerippool_v2.json
+# LB VIP space for k8s services. No dedicated VLAN: Cilium announces VIPs to
+# the MikroTik as /32s (v4) and /128s (v6) over BGP, and the router routes
+# them toward mouse. Any VLAN can reach them. VIP subnets use ID 100
+# ("service space"), matching the VLAN-ID addressing convention.
 apiVersion: cilium.io/v2
 kind: CiliumLoadBalancerIPPool
 metadata:
@@ -7,7 +11,11 @@ metadata:
 spec:
   allowFirstLastIPs: "No"
   blocks:
-    - cidr: 192.168.69.0/24
+    - cidr: 10.10.100.0/24
+    # IPv6 ULA VIP space. Inert until the cluster is dual-stack (k0s +
+    # Cilium v6): no service requests a v6 VIP until the kube-api/envoy
+    # TODOs are enabled.
+    - cidr: fdad:207a:f1ab:100::/64
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgpadvertisement_v2.json
 apiVersion: cilium.io/v2
@@ -33,6 +41,7 @@ metadata:
   name: l3-bgp-peer-config
 spec:
   timers:
+    # Fast LAN failover: dead peer detected in <10s
     holdTimeSeconds: 9
     keepAliveTimeSeconds: 3
   families:
@@ -41,8 +50,15 @@ spec:
       advertisements:
         matchLabels:
           advertise: bgp
+    - afi: ipv6
+      safi: unicast
+      advertisements:
+        matchLabels:
+          advertise: bgp
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cilium.io/ciliumbgpclusterconfig_v2.json
+# Peering: mouse (Cilium, AS 64513) <-> gateway-132l (MikroTik, AS 64512, 10.10.0.1).
+# RouterOS side is hand-applied — see infra/routeros/README.md
 apiVersion: cilium.io/v2
 kind: CiliumBGPClusterConfig
 metadata:
@@ -53,26 +69,45 @@ spec:
       kubernetes.io/os: linux
   bgpInstances:
     - name: cilium
-      localASN: 64514
+      localASN: 64513
       peers:
-        - name: unifi
-          peerASN: 64513
-          peerAddress: 192.168.1.1
+        - name: mikrotik
+          peerASN: 64512
+          peerAddress: 10.10.0.1
           peerConfigRef:
             name: l3-bgp-peer-config
 ---
+# kube-apiserver via a stable LAN VIP (10.10.100.10).
+# k0s runs the apiserver on the host (not an API-visible pod), so the Service
+# is selectorless with a manual EndpointSlice below.
+# TODO(dual-stack): append `,fdad:207a:f1ab:100::10` to the annotation and add
+#   an IPv6 EndpointSlice pointing at mouse's static v6 (fdad:207a:f1ab:10::10,
+#   butane change) once k0s dualStack + Cilium ipv6 are live.
 apiVersion: v1
 kind: Service
 metadata:
   name: kube-api
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: k8s.turbo.ac
-    lbipam.cilium.io/ips: 192.168.69.120
+    lbipam.cilium.io/ips: 10.10.100.10
+    # TODO(networking): enable once external-dns installs — k8s.kyz.rwalt.pro
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Local
-  selector:
-    k8s-app: kube-apiserver
-    tier: control-plane
   ports:
-    - port: 6443
+    - name: https
+      port: 6443
+      protocol: TCP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kube-api
+  labels:
+    kubernetes.io/service-name: kube-api
+addressType: IPv4
+endpoints:
+  - address: 10.10.0.10
+ports:
+  - name: https
+    port: 6443
+    protocol: TCP
