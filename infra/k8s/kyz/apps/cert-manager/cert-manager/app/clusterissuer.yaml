@@ -18,4 +18,4 @@ spec:
               key: CLOUDFLARE_DNS_TOKEN
         selector:
           dnsZones:
-            - rwaltr.pro
+            - rwalt.pro

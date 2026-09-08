@@ -23,7 +23,7 @@ spec:
     #   httpRoute:
     #     enabled: true
     #     hostnames:
-    #       - flux-operator.rwaltr.pro
+    #       - flux-operator.rwalt.pro
     #     parentRefs:
     #       - name: envoy-internal
     #         namespace: network
