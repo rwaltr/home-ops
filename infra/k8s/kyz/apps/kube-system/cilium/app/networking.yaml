@@ -108,6 +108,10 @@ addressType: IPv4
 endpoints:
   - addresses:
       - 10.10.0.10
+    # ETP=Local: Cilium only announces the VIP on nodes with ready local
+    # endpoints; a selectorless slice needs these explicit
+    nodeName: mouse
+    ready: true
 ports:
   - name: https
     port: 6443
