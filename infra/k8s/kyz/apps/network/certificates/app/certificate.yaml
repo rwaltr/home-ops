@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cert-manager.io/certificate_v1.json
+# Wildcard for the k8s site (kyz.rwalt.pro) — serves the envoy Gateways and any
+# in-cluster service terminating TLS directly. Shortlived profile matches the
+# ClusterIssuer (letsencrypt-production); cert-manager renews continuously.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kyz-rwalt-pro
+spec:
+  dnsNames:
+    - kyz.rwalt.pro
+    - "*.kyz.rwalt.pro"
+  duration: 160h
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  secretName: tls-wildcard
+  usages:
+    - digital signature

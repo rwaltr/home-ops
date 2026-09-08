@@ -38,10 +38,9 @@ spec:
     namespace: network
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.networking.k8s.io/gateway_v1.json
-# TODO(networking): TLS listener certificateRef needs the wildcard secret from
-#   the certificates app (cert-manager DNS-01; blocked on 1P `cloudflare` item)
-#   and an external-dns hostname annotation (*.kyz.rwalt.pro) once external-dns
-#   installs.
+# TODO(networking): add external-dns hostname annotations (*.kyz.rwalt.pro)
+#   once external-dns installs — the TLS secret below comes from the
+#   certificates app (Certificate/kyz-rwalt-pro → tls-wildcard).
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
