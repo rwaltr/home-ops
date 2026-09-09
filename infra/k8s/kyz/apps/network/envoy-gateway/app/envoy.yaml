@@ -21,6 +21,17 @@ spec:
               memory: 512Mi
       envoyService:
         externalTrafficPolicy: Local
+        # The generated Service is v4 by default — dual-stack it so the IPv6
+        # endpointslice (and therefore the v6 VIP announcement under
+        # ETP=Local) exists.
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ipFamilyPolicy: PreferDualStack
+              ipFamilies:
+                - IPv4
+                - IPv6
   shutdown:
     drainTimeout: 180s
 ---
