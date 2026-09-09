@@ -37,6 +37,25 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-09, home-assistant + apps/default)
+
+- **First homelab app**: HA in the `default` ns (onedr0p convention for
+  homelab/media apps), internal-only route `homeassistant.waltr.tech`
+  (envoy-internal, k8s-gateway DNS only — no public record). Image:
+  ghcr.io/home-operations/home-assistant, digest-pinned.
+- **This HA build has no /healthz** (404) — readiness probe uses
+  `/manifest.json` (unauthenticated 200). Pod CIDR for proxy trust:
+  `10.244.0.0/24` + `fdad:207a:f1ab:244::/117` (Cilium native-routing, /24
+  not /16).
+- **HA 2026.9 http integration config is store-based, not YAML**: YAML is
+  migrated ONCE into `.storage/http` (stable/pending pair with a 5-minute
+  trial), then **ignored on every boot**. To change http config after first
+  boot: delete `/config/.storage/http` and restart (re-migration), or use the
+  UI. YAML http block breaks in HA 2027.2 — after migration remove it from
+  configuration.yaml or live with the repair issue.
+- Deferred: Multus/macvlan NAD for LAN mDNS/SSDP discovery (the exact
+  "discovery-dependent app class" from the original decision).
+
 ### Additional decisions (2026-09-09, o11y: grafana + dashboards)
 
 - **Grafana via grafana-operator v5 instance CR** (onedr0p pattern): the
