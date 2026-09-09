@@ -1,0 +1,49 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k8s-gateway
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: k8s-gateway
+      version: 3.7.2
+      sourceRef:
+        kind: HelmRepository
+        name: k8s-gateway
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    # Internal split-DNS resolver: serves kyz.rwalt.pro from cluster resources
+    # (Gateway/HTTPRoute hostnames + annotated/LB Services) with the Cilium
+    # BGP VIPs. Router conditionally forwards kyz.rwalt.pro here — see
+    # infra/routeros/README.md. Public zone records are external-dns's job.
+    domain: kyz.rwalt.pro
+    watchedResources:
+      - Gateway
+      - HTTPRoute
+      - Service
+    ttl: 300
+    service:
+      type: LoadBalancer
+      annotations:
+        lbipam.cilium.io/ips: 10.10.100.53,fdad:207a:f1ab:100::53
+      ipFamilyPolicy: PreferDualStack
+      ipFamilies:
+        - IPv4
+        - IPv6
+      useTcp: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi

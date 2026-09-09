@@ -107,7 +107,8 @@ metadata:
   name: kube-api
   annotations:
     lbipam.cilium.io/ips: 10.10.100.10,fdad:207a:f1ab:100::10
-    # TODO(networking): enable once external-dns installs — k8s.kyz.rwalt.pro
+    # Served by the in-cluster k8s-gateway (split DNS) — internal only
+    coredns.io/hostname: k8s.kyz.rwalt.pro
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Local
