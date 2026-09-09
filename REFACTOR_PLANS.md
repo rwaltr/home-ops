@@ -37,6 +37,29 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-09, TLS)
+
+- **TLS path (working end-to-end)**: 1P `cloudflare` item (CLOUDFLARE_DNS_TOKEN,
+  scoped DNS-edit on rwalt.pro) → ESO secret → ClusterIssuer
+  `letsencrypt-production` (DNS-01, shortlived profile) → `Certificate/kyz-rwalt-pro`
+  (`kyz.rwalt.pro` + `*.kyz.rwalt.pro`, ECDSA P-256, 160h, rotation Always) →
+  Secret `tls-wildcard` → `envoy-internal` Gateway. Verified: Prometheus served
+  over public LE TLS through the Gateway on BOTH VIP families.
+- **Pre-existing `rwaltr.pro` typo** was in the ClusterIssuer zone selector —
+  domain is `rwalt.pro`. Certificates with the wrong zone would silently fail
+  the DNS-01 solver selector.
+- **envoy-gateway dual-stack needs THREE fixes** (all found live): 1) generated
+  Service is single-stack → StrategicMerge `patch` in EnvoyProxy
+  `envoyService` sets `ipFamilyPolicy: PreferDualStack` (no IPv6 EndpointSlice
+  → ETP=Local correctly withholds the v6 VIP announcement); 2) Envoy binds
+  `0.0.0.0` by default → `EnvoyProxy.spec.ipFamily: DualStack` binds `::` with
+  v4-compat (otherwise v6 traffic DNATs to the pod and gets RST at the last
+  hop); 3) template `turbo.ac` hostnames/`ceph-block` storageClass in
+  konflate + kube-prometheus-stack values → `kyz.rwalt.pro` + `openebs-hostpath`.
+- Test recipe until external-dns lands: `curl --resolve
+  <host>:443:10.10.100.11 https://<host>/` (v4) and `--resolve
+  <host>:443:[fdad:207a:f1ab:100::11]` (v6).
+
 ### Additional decisions (2026-09-08, dual-stack + BGP VIPs)
 
 - **Dual-stack over ULA** (no ISP delegation; `fdad:207a:f1ab::/48`): pods in
