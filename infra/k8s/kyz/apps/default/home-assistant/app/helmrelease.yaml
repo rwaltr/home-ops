@@ -38,7 +38,9 @@ spec:
                 custom: true
                 spec:
                   httpGet:
-                    path: /healthz
+                    # NOTE: this HA build has no /healthz (404s) — manifest.json is
+                    # served unauthenticated and always 200 once the webserver is up
+                    path: /manifest.json
                     port: &port 8123
                   periodSeconds: 10
                   timeoutSeconds: 5
