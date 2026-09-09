@@ -49,27 +49,31 @@ add address=10.10.0.10 comment="mouse · Flatcar host" name=mouse
 add address=fdad:207a:f1ab:10::10 comment="mouse · v6" name=mouse
 ```
 
-## Split DNS: kyz.rwalt.pro → in-cluster resolver
+## Split DNS: waltr.tech (ops zone) → in-cluster resolver
 
-`kyz.rwalt.pro` is served by the in-cluster k8s-gateway (CoreDNS plugin) at
-VIP `10.10.100.53` / `fdad:207a:f1ab:100::53`; it answers from Gateway/
-HTTPRoute/Service resources. Conditional forward on the router —
-**`match-subdomain=yes` is required** (without it only the exact name forwards,
-subdomains NXDOMAIN):
+`waltr.tech` is the k8s ops zone — served internally by the in-cluster
+k8s-gateway (CoreDNS plugin) at VIP `10.10.100.53` /
+`fdad:207a:f1ab:100::53`; it answers from Gateway/HTTPRoute/Service
+resources. Conditional forward on the router — **`match-subdomain=yes` is
+required** (without it only the exact name forwards, subdomains NXDOMAIN):
 
 ```routeros
 /ip/dns/static
-add type=FWD name=kyz.rwalt.pro forward-to=10.10.100.53 match-subdomain=yes comment="k8s internal DNS (split)"
-add type=FWD name=kyz.rwalt.pro forward-to=fdad:207a:f1ab:100::53 match-subdomain=yes comment="k8s internal DNS (split, v6)"
+add type=FWD name=waltr.tech forward-to=10.10.100.53 match-subdomain=yes comment="k8s internal DNS (waltr.tech ops zone)"
+add type=FWD name=waltr.tech forward-to=fdad:207a:f1ab:100::53 match-subdomain=yes comment="k8s internal DNS (waltr.tech ops zone, v6)"
 ```
 
 Public records for the same names are published by external-dns to the
-Cloudflare `rwalt.pro` zone (internal VIPs are public — CGNAT makes them
-unreachable from outside; acceptable). `k8s.kyz.rwalt.pro` (kube-api) is
-internal-only: annotated `coredns.io/hostname` on the Service serves it via
-k8s-gateway, and external-dns's source (`gateway-httproute`) never publishes
-plain Services. Tailscale clients get the same view via the tailscale
-operator (future phase).
+Cloudflare `waltr.tech` zone; publicly-exposed services route through the
+cloudflare tunnel (attach the HTTPRoute to `envoy-external`, the record then
+targets `external.waltr.tech` → tunnel CNAME). Internal VIPs in public DNS
+(CGNAAT makes them unreachable from outside) is accepted. `k8s.waltr.tech`
+(kube-api) is internal-only: annotated `coredns.io/hostname` on the Service
+serves it via k8s-gateway, and external-dns's source (`gateway-httproute`)
+never publishes plain Services. Mail on waltr.tech (Migadu) is unaffected:
+MX/DKIM/SPF lookups happen at external receiving servers, never on LAN
+clients. Tailscale clients get the same view via the tailscale operator
+(future phase).
 
 ## VIP address lists
 

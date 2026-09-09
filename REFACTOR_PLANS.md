@@ -37,6 +37,39 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-09, cloudflare tunnel + waltr.tech ops zone)
+
+- **Universal SSL depth limit is real**: free Cloudflare edge certs cover only
+  `<zone>` + `*.<zone>` — one level. `*.*.rwalt.pro` hostnames fail the edge
+  TLS handshake outright (`handshake_failure` on ClientHello). Subdomain
+  zones are Enterprise-only; CNAME/partial setup is Business-only; ACM ($10/mo)
+  and CF-for-SaaS custom hostnames (free, per-app ceremony) were considered
+  and rejected.
+- **Decision: `waltr.tech` becomes the ops zone.** App names are one level
+  (`prometheus.waltr.tech`), covered by Universal SSL. The `kyz` site label
+  retired from DNS names. `rwalt.pro` stays personal/mail only. waltr.tech's
+  Migadu mail is unaffected by the full-zone internal FWD (mail lookups
+  happen at external receiving servers). One CF zone, zero cost, wildcards
+  work.
+- **cloudflare-tunnel app** (onedr0p pattern, cloudflared 2026.8.3, 2
+  replicas, token auth from 1P `cloudflare` item): wildcard ingress
+  `*.waltr.tech` → `envoy-external.network.svc.cluster.local:443` over https
+  (SNI `external.waltr.tech`, matches the wildcard LE cert). Token-mode
+  cloudflared parses local config ingress (verified in current source —
+  `prepareTunnelConfig` runs `ParseIngressFromConfigAndCLI` unconditionally).
+- **Public record chain**: HTTPRoute attached to `envoy-external` →
+  external-dns (gateway filter `--gateway-name=envoy-external` + crd source
+  + `--cloudflare-proxied`) publishes the hostname targeting
+  `external.waltr.tech` (Gateway `target` annotation) → DNSEndpoint CNAME
+  `<tunnel-id>.cfargotunnel.com` → edge → tunnel. Tunnel ID 146ea318-aadd-4efe-97c1-54feac074f1f
+  (not a secret — public in every cfargotunnel CNAME).
+- **Rename gotcha**: renaming a cert-manager Certificate while keeping the
+  secret name wedges issuance ("Secret was issued for <old>" /
+  IncorrectCertificate) — delete the secret to re-trigger. ClusterIssuer DNS-01
+  solver needed `waltr.tech` added to `dnsZones`.
+- **End-to-end verified through the real edge** (from LAN via `--resolve` to
+  a CF edge IP): 200 + `cf-ray: …-DFW` on `e2e-http.waltr.tech`.
+
 ### Additional decisions (2026-09-09, DNS split + external-dns)
 
 - **Split DNS both ways**: `kyz.rwalt.pro` served by in-cluster k8s-gateway
