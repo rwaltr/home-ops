@@ -37,6 +37,27 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-09, DNS split + external-dns)
+
+- **Split DNS both ways**: `kyz.rwalt.pro` served by in-cluster k8s-gateway
+  (CoreDNS plugin, chart 3.7.2, VIP 10.10.100.53 + v6 twin) answering from
+  Gateway/HTTPRoute/Service resources; MikroTik `type=FWD` conditional forward
+  with **`match-subdomain=yes`** (the missing knob — without it, subdomains
+  NXDOMAIN while the exact name forwards). external-dns (mirror 1.21.1) also
+  publishes the same names + internal VIPs to the public Cloudflare zone
+  (user accepts internal-IP visibility; CGNAT makes them unreachable).
+- **external-dns domain filter is ZONE-scoped**: `--domain-filter kyz.rwalt.pro`
+  silently excluded the `rwalt.pro` zone itself ("no hosted zone matching
+  record"); must filter on the zone name. Record scoping comes from sources —
+  `gateway-httproute` only, so plain Services (incl. kube-api) stay internal.
+- **kube-api stays internal-only**: `coredns.io/hostname` annotation on the
+  selectorless Service makes k8s-gateway serve `k8s.kyz.rwalt.pro`; no public
+  record.
+- Tailscale: tailnet gets clients-tier trust via the tailscale operator
+  (future phase); no subnet routes advertised today.
+- End-to-end verified: plain `curl https://prometheus.kyz.rwalt.pro/` works
+  with zero client config and connects over v6 (curl prefers the ULA AAAA).
+
 ### Additional decisions (2026-09-09, TLS)
 
 - **TLS path (working end-to-end)**: 1P `cloudflare` item (CLOUDFLARE_DNS_TOKEN,
