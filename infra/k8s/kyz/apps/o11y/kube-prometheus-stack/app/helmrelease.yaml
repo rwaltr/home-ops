@@ -41,6 +41,12 @@ spec:
           component: kube-apiserver # etcd runs on control plane nodes
     kubeProxy:
       enabled: false
+    # k0s runs these as host processes, not labeled pods — the chart's
+    # monitor Services select nothing and the targets flap "disappeared"
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
     prometheus:
       route:
         main:

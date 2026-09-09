@@ -16,6 +16,12 @@ spec:
           - name: alertname
             value: InfoInhibitor
             matchType: =
+      # always-firing heartbeat; no heartbeat consumer exists — don't push it
+      - receiver: blackhole
+        matchers:
+          - name: alertname
+            value: Watchdog
+            matchType: =
       - receiver: pushover
         matchers:
           - name: severity
