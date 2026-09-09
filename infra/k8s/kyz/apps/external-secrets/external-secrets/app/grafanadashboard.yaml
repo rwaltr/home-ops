@@ -1,5 +1,7 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/grafana.integreatly.org/grafanadashboard_v1beta1.json
+# Official ESO dashboard on grafana.com (id 21640)
+# (earlier listing 18060 is an unrelated FluentBit dashboard).
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -11,5 +13,5 @@ spec:
       dashboards: grafana
   datasources:
     - datasourceName: prometheus
-      inputName: DS_PROMETHEUS-CACTUS
-  url: https://grafana.com/api/dashboards/18060/revisions/1/download
+      inputName: DS_PROMETHEUS
+  url: https://grafana.com/api/dashboards/21640/revisions/1/download
