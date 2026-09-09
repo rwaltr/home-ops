@@ -91,10 +91,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: envoy-external
+  annotations:
+    external-dns.alpha.kubernetes.io/target: &hostname external.kyz.rwalt.pro
 spec:
   gatewayClassName: envoy
   infrastructure:
     annotations:
+      external-dns.alpha.kubernetes.io/hostname: *hostname
       lbipam.cilium.io/ips: 10.10.100.12,fdad:207a:f1ab:100::12
   listeners:
     - name: http

@@ -1,0 +1,16 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/externaldns.k8s.io/dnsendpoint_v1alpha1.json
+# external.kyz.rwalt.pro is the SNI/origin name cloudflared presents to the
+# external Gateway (and the target of every public record external-dns creates
+# for envoy-external routes via the Gateway's `target` annotation).
+# Tunnel ID is not a secret. TODO: fill in after the tunnel is created.
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: cloudflare-tunnel
+spec:
+  endpoints:
+    - dnsName: external.kyz.rwalt.pro
+      recordType: CNAME
+      targets:
+        - REPLACE-WITH-TUNNEL-ID.cfargotunnel.com
