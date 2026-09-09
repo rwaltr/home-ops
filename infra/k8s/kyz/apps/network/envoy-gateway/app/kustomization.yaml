@@ -4,7 +4,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ./envoy.yaml
-  # - ./grafanadashboard.yaml
+  - ./grafanadashboard.yaml
   - ./helmrelease.yaml
-  # - ./o11y.yaml
   - ./ocirepository.yaml
+  - ./podmonitor.yaml

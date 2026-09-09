@@ -5,8 +5,7 @@ kind: Kustomization
 resources:
   - ./alertmanagerconfig.yaml
   - ./externalsecret.yaml
-  # TODO: create grafanadashboard.yaml and re-enable
-  # - ./grafanadashboard.yaml
+  - ./grafanadashboard.yaml
   - ./helmrelease.yaml
   - ./ocirepository.yaml
 configMapGenerator:

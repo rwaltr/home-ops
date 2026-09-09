@@ -1,0 +1,19 @@
+---
+# Scrapes the envoy data-plane proxy pods (envoy-internal/envoy-external).
+# Envoy Gateway already wires the named container port "metrics" (:19001,
+# /stats/prometheus) — this just feeds it to prometheus.
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/podmonitor_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-proxies
+spec:
+  namespaceSelector:
+    matchNames:
+      - network
+  podMetricsEndpoints:
+    - path: /stats/prometheus
+      port: metrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/managed-by: envoy-gateway
