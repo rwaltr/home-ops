@@ -27,6 +27,8 @@ spec:
       parentRefs:
         - name: envoy-internal
           namespace: network
+        - name: envoy-external # public via cloudflare tunnel — GitHub webhooks hit /hooks
+          namespace: network
       hostnames:
         - "{{ .Release.Name }}.waltr.tech"
     monitoring:
