@@ -108,7 +108,7 @@ metadata:
   annotations:
     lbipam.cilium.io/ips: 10.10.100.10,fdad:207a:f1ab:100::10
     # Served by the in-cluster k8s-gateway (split DNS) — internal only
-    coredns.io/hostname: k8s.kyz.rwalt.pro
+    coredns.io/hostname: k8s.waltr.tech
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Local

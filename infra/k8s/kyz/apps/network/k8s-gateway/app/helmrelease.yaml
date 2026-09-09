@@ -22,11 +22,11 @@ spec:
       strategy: rollback
       retries: 3
   values:
-    # Internal split-DNS resolver: serves kyz.rwalt.pro from cluster resources
+    # Internal split-DNS resolver: serves waltr.tech from cluster resources
     # (Gateway/HTTPRoute hostnames + annotated/LB Services) with the Cilium
-    # BGP VIPs. Router conditionally forwards kyz.rwalt.pro here — see
+    # BGP VIPs. Router conditionally forwards waltr.tech here — see
     # infra/routeros/README.md. Public zone records are external-dns's job.
-    domain: kyz.rwalt.pro
+    domain: waltr.tech
     watchedResources:
       - Gateway
       - HTTPRoute

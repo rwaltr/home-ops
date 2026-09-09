@@ -76,11 +76,11 @@ spec:
           # wildcard rule below is authoritative for this connector.
           config.yaml: |-
             ingress:
-              - hostname: "*.kyz.rwalt.pro"
+              - hostname: "*.waltr.tech"
                 originRequest:
                   http2Origin: true
                   keepAliveTimeout: 3600s
-                  originServerName: external.kyz.rwalt.pro
+                  originServerName: external.waltr.tech
                   tcpKeepAlive: 7200s
                 service: https://envoy-external.network.svc.cluster.local:443
               - service: http_status:404

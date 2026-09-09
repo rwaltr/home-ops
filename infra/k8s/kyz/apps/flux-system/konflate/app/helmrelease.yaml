@@ -14,7 +14,7 @@ spec:
       repo: github://onedr0p/home-ops
       statusChecks: true
       prComments: true
-      publicUrl: https://{{ .Release.Name }}.kyz.rwalt.pro
+      publicUrl: https://{{ .Release.Name }}.waltr.tech
       mcp: true
       verifyImages: true
     secret:
@@ -28,7 +28,7 @@ spec:
         - name: envoy-internal
           namespace: network
       hostnames:
-        - "{{ .Release.Name }}.kyz.rwalt.pro"
+        - "{{ .Release.Name }}.waltr.tech"
     monitoring:
       serviceMonitor:
         enabled: true

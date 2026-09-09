@@ -34,14 +34,14 @@ spec:
       # services stay off the public zone (onedr0p cloudflare-dns pattern)
       - --gateway-name=envoy-external
       - --gateway-namespace=network
-      # Orange-cloud records; the public chain is hostname → external.kyz.rwalt.pro
+      # Orange-cloud records; the public chain is hostname → external.waltr.tech
       # → <tunnel-id>.cfargotunnel.com (cloudflare-tunnel app)
       - --cloudflare-proxied
     policy: sync
     registry: txt
     txtOwnerId: kyz
     domainFilters:
-      - rwalt.pro # zone-level: records stay scoped to kyz.* via the route hostnames themselves
+      - waltr.tech # ops zone — records come only from envoy-external routes + DNSEndpoints
     triggerLoopOnEvent: true
     serviceMonitor:
       enabled: true

@@ -20,14 +20,14 @@ spec:
         main:
           enabled: true
           hostnames:
-            - alertmanager.kyz.rwalt.pro
+            - alertmanager.waltr.tech
           parentRefs:
             - name: envoy-internal
               namespace: network
       alertmanagerSpec:
         alertmanagerConfiguration:
           name: alertmanager
-        externalUrl: https://alertmanager.kyz.rwalt.pro
+        externalUrl: https://alertmanager.waltr.tech
         storage:
           volumeClaimTemplate:
             spec:
@@ -46,12 +46,12 @@ spec:
         main:
           enabled: true
           hostnames:
-            - prometheus.kyz.rwalt.pro
+            - prometheus.waltr.tech
           parentRefs:
             - name: envoy-internal
               namespace: network
       prometheusSpec:
-        externalUrl: https://prometheus.kyz.rwalt.pro
+        externalUrl: https://prometheus.waltr.tech
         podMonitorSelectorNilUsesHelmValues: false
         probeSelectorNilUsesHelmValues: false
         ruleSelectorNilUsesHelmValues: false
