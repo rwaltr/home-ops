@@ -11,7 +11,7 @@ spec:
   interval: 1h
   values:
     config:
-      repo: github://onedr0p/home-ops
+      repo: github://rwaltr/home-ops
       statusChecks: true
       prComments: true
       publicUrl: https://{{ .Release.Name }}.waltr.tech
