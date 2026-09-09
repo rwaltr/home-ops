@@ -16,5 +16,6 @@ spec:
   targetNamespace: network
   dependsOn:
     - name: external-secrets
+      namespace: external-secrets
     - name: external-dns # consumes our DNSEndpoint (crd source)
   wait: false
