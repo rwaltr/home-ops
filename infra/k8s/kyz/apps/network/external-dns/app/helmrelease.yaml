@@ -36,5 +36,6 @@ spec:
     triggerLoopOnEvent: true
     serviceMonitor:
       enabled: true
+    logLevel: debug
     podAnnotations:
       secret.reloader.stakater.com/reload: external-dns-secret
