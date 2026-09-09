@@ -37,6 +37,42 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-09, o11y: grafana + dashboards)
+
+- **Grafana via grafana-operator v5 instance CR** (onedr0p pattern): the
+  operator owns Deployment/PVC/HTTPRoute for the CR (spec.httpRoute →
+  envoy-internal, `grafana.waltr.tech`); dashboards/datasources are separate
+  CRs selected by label `dashboards: grafana`. Admin password from 1P item
+  `grafana` (GF_SECURITY_ADMIN_PASSWORD), anonymous viewer enabled.
+- **kube-prometheus-stack chart deploys its dashboards as GrafanaDashboard
+  CRs already** (`grafana.forceDeployDashboards: true` + `operator.dashboardsConfigMapRefEnabled`).
+  Do NOT add a hand-rolled mixin dashboard file — title+folder collisions make
+  the operator imports overwrite each other. Chart set wins.
+- **CRD shortname collision**: `kubectl get grafana(s)` resolves to the
+  External Secrets *Grafana token generator* CRD
+  (`grafanas.generators.external-secrets.io`), not the operator's
+  `grafanas.grafana.integreatly.org` — always use the fully-qualified name.
+- **Grafana-operator needs the instance Ready before dashboards match**:
+  dashboards created before the instance was ready sit in
+  `NoMatchingInstances` until the operator resyncs/restarts; a pod restart
+  requeues everything. Datasources retry on their own, dashboards do not.
+- **1Password Connect sync lag**: items created via the desktop-integrated
+  CLI can take a long while (observed: indefinitely) to appear in the Connect
+  API — a connect pod restart forces a vault re-sync. Symptom: ExternalSecret
+  "could not get secret data from provider" although the item exists.
+- **grafana.com dashboard ID traps**: 18040-18060-range listings by organic
+  search names can be unrelated dashboards (18060 = FluentBit
+  "prometheus-cactus"); ESO's official dashboard is **21640**. Envoy Gateway
+  official: 24459/24457/24458; cert-manager 20842; cloudflared 17457.
+- **Envoy data-plane metrics**: EG already wires a named container port
+  `metrics` (:19001 `/stats/prometheus`) + prometheus.io annotations on the
+  proxy pods — only a PodMonitor (`app.kubernetes.io/managed-by: envoy-gateway`)
+  was needed. Flux controllers: PodMonitor on port `http-prom` by component
+  label; flux-operator itself is scraped by its chart ServiceMonitor.
+- **Flux PrometheusRule** (gotk_resource_info based) complements the
+  Flux→alertmanager Provider/Alert notifications for HelmRelease/Kustomization
+  failures.
+
 ### Additional decisions (2026-09-09, cloudflare tunnel + waltr.tech ops zone)
 
 - **Universal SSL depth limit is real**: free Cloudflare edge certs cover only
