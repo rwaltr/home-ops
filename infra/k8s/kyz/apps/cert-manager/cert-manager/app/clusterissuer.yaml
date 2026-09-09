@@ -19,3 +19,4 @@ spec:
         selector:
           dnsZones:
             - rwalt.pro
+            - waltr.tech
