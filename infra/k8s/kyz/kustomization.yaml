@@ -5,6 +5,7 @@ kind: Kustomization
 
 resources:
   - ./apps/cert-manager
+  - ./apps/default
   - ./apps/external-secrets
   - ./apps/flux-system
   - ./apps/kopiur-system
