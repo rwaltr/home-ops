@@ -28,6 +28,12 @@ spec:
             key: CF_API_TOKEN
     sources:
       - gateway-httproute
+      - crd # explicit DNSEndpoint records (cloudflare-tunnel targets later)
+    extraArgs:
+      # Publish ONLY routes attached to the external gateway — internal-only
+      # services stay off the public zone (onedr0p cloudflare-dns pattern)
+      - --gateway-name=envoy-external
+      - --gateway-namespace=network
     policy: sync
     registry: txt
     txtOwnerId: kyz

@@ -82,6 +82,38 @@ spec:
           - kind: Secret
             name: tls-wildcard
 ---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.networking.k8s.io/gateway_v1.json
+# External ingress point. Routes attached here (in addition to envoy-internal)
+# are what external-dns publishes publicly; anything else stays internal-only.
+# Under CGNAT this gateway receives traffic via the cloudflare-tunnel (future)
+# and the external VIPs from Tailscale (operator, future).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: envoy-external
+spec:
+  gatewayClassName: envoy
+  infrastructure:
+    annotations:
+      lbipam.cilium.io/ips: 10.10.100.12,fdad:207a:f1ab:100::12
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        certificateRefs:
+          - kind: Secret
+            name: tls-wildcard
+---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.envoyproxy.io/backendtrafficpolicy_v1alpha1.json
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
