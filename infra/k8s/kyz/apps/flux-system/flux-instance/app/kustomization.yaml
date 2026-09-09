@@ -10,3 +10,8 @@ resources:
   - ./helmrelease.yaml
   - ./httproute.yaml
   - ./ocirepository.yaml
+  # TODO: create and re-enable
+  # - ./podmonitor.yaml
+  # TODO: create and re-enable
+  # - ./prometheusrule.yaml
+  - ./receiver.yaml
