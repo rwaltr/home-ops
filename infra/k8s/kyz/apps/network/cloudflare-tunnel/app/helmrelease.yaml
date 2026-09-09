@@ -54,11 +54,11 @@ spec:
                 cpu: 10m
               limits:
                 memory: 256Mi
-        defaultPodOptions:
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
     service:
       app:
         ports:
