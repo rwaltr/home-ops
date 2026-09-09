@@ -32,10 +32,9 @@ spec:
     registry: txt
     txtOwnerId: kyz
     domainFilters:
-      - kyz.rwalt.pro
+      - rwalt.pro # zone-level: records stay scoped to kyz.* via the route hostnames themselves
     triggerLoopOnEvent: true
     serviceMonitor:
       enabled: true
-    logLevel: debug
     podAnnotations:
       secret.reloader.stakater.com/reload: external-dns-secret
