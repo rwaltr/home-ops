@@ -10,3 +10,4 @@ resources:
   - ./envoy-gateway/ks.yaml
   - ./external-dns/ks.yaml
   - ./k8s-gateway/ks.yaml
+  - ./cloudflare-tunnel/ks.yaml
