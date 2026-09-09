@@ -14,7 +14,7 @@ spec:
       repo: github://onedr0p/home-ops
       statusChecks: true
       prComments: true
-      publicUrl: https://{{ .Release.Name }}.turbo.ac
+      publicUrl: https://{{ .Release.Name }}.kyz.rwalt.pro
       mcp: true
       verifyImages: true
     secret:
@@ -25,10 +25,10 @@ spec:
         gatus.home-operations.com/endpoint: |-
           conditions: ["[STATUS] == 200"]
       parentRefs:
-        - name: envoy-external
+        - name: envoy-internal
           namespace: network
       hostnames:
-        - "{{ .Release.Name }}.turbo.ac"
+        - "{{ .Release.Name }}.kyz.rwalt.pro"
     monitoring:
       serviceMonitor:
         enabled: true
