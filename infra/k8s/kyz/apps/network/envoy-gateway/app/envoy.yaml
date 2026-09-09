@@ -5,6 +5,9 @@ kind: EnvoyProxy
 metadata:
   name: envoy
 spec:
+  # Bind the Envoy listeners dual-stack ("::" with ipv4_compat) — default is
+  # IPv4-only, which refuses the v6 DNAT'd traffic at the last hop.
+  ipFamily: DualStack
   logging:
     level:
       default: info
