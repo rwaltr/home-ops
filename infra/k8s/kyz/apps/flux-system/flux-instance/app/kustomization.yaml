@@ -8,12 +8,5 @@ resources:
   # TODO: create grafanadashboard.yaml and re-enable
   # - ./grafanadashboard.yaml
   - ./helmrelease.yaml
+  - ./httproute.yaml
   - ./ocirepository.yaml
-  # TODO: create and re-enable
-  # - ./httproute.yaml
-  # TODO: create and re-enable
-  # - ./podmonitor.yaml
-  # TODO: create and re-enable
-  # - ./prometheusrule.yaml
-  # TODO: create and re-enable
-  # - ./receiver.yaml

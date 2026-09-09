@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/notification-v1.json
+# GitHub push webhook -> immediate flux-system GitRepository reconcile
+# (cuts out the 1m polling lag). Secret is shared with the repo webhook,
+# set via gh api; see infra/k8s/kyz/apps/flux-system/flux-instance/app/receiver.yaml
+# Receiver URL: https://flux-receiver.waltr.tech/hook/<sha256-of-token>
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Receiver
+metadata:
+  name: github-receiver
+spec:
+  type: github
+  events:
+    - push
+  resources:
+    - kind: GitRepository
+      name: flux-system
+      namespace: flux-system
+  secretRef:
+    name: github-webhook-token-secret

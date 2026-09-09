@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/httproute-v1.json
+# Public route for the flux webhook Receiver endpoint. External-only:
+# it's a machine endpoint for GitHub push events, nothing to browse.
+# Served via envoy-external -> cloudflare tunnel ( *.waltr.tech origin).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: flux-receiver
+spec:
+  parentRefs:
+    - name: envoy-external
+      namespace: network
+      sectionName: https
+  hostnames:
+    - flux-receiver.waltr.tech
+  rules:
+    - backendRefs:
+        - name: webhook-receiver
+          port: 80
