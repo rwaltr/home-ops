@@ -18,6 +18,11 @@ spec:
       datapathMode: veth # netkit unsupported by kata-containers: https://github.com/kata-containers/kata-containers/issues/12159
       masquerade: true
       preallocateMaps: true
+      # VLAN tags allowed through the tcx BPF on the native device (enp88s0).
+      # Cilium filters tagged frames unless the tag is allowlisted, and the
+      # agent only rescans vlan devices at STARTUP — subinterfaces created
+      # after the agent booted are silently dropped on ingress.
+      vlanBypass: [20, 30, 40]
     bpfClockProbe: true
     bgpControlPlane:
       enabled: true
