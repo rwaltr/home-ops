@@ -23,6 +23,14 @@ spec:
         name: home-assistant-config-cache
       sourcePathStrategy: PvcName
   copyMethod: Direct
+  # The mover must READ HA's PVC: HA runs as 1000:1000 with fsGroup 1000
+  # and its .storage/ is mode 0700 — a default-UID mover (65532) gets EACCES.
+  mover:
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+    podSecurityContext:
+      fsGroup: 1000
   retention:
     keepLatest: 7
     keepDaily: 14
