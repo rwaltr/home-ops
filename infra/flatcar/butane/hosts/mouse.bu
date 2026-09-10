@@ -57,14 +57,41 @@ storage:
           DNS=10.10.0.1
           MulticastDNS=yes
           LLMNR=yes
-          # Bind the tagged iot VLAN to this (master) interface
+          # Bind the tagged VLANs to this (master) interface.
           # (note: VLAN= is a [Network] option — a [VLAN] section is netdev-only)
+          VLAN=enp88s0.20
           VLAN=enp88s0.30
+          VLAN=enp88s0.40
 
-    # VLAN 30 (iot) tagged subinterface — macvlan master for discovery-dependent
-    # apps (home-assistant class). ether4-study is a trunk (PVID 10, tagged 10/20/30/40/60).
-    # L2 only: no addressing here, pods own their IPs via the NAD.
-    - path: /etc/systemd/network/21-mouse-iot.netdev
+    # VLAN subinterfaces for macvlan masters (multus): 20-clients, 30-iot,
+    # 40-cameras. ether4-study is a trunk (PVID 10, tagged 10/20/30/40/60).
+    # L2 only: no addressing, pods own their IPs via the NADs.
+    # NOTE: these sort as 15-* — BEFORE this file's 20-mouse-static.network —
+    # because vlan subinterfaces inherit the parent's MAC and would otherwise
+    # be matched (and re-configured!) by the MAC match below.
+    - path: /etc/systemd/network/15-mouse-vlan20.netdev
+      mode: 0644
+      contents:
+        inline: |
+          [NetDev]
+          Name=enp88s0.20
+          Kind=vlan
+
+          [VLAN]
+          Id=20
+
+    - path: /etc/systemd/network/15-mouse-vlan20.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=enp88s0.20
+
+          [Network]
+          LinkLocalAddressing=no
+          IPv6AcceptRA=no # no default route via these VLANs
+
+    - path: /etc/systemd/network/15-mouse-vlan30.netdev
       mode: 0644
       contents:
         inline: |
@@ -75,7 +102,7 @@ storage:
           [VLAN]
           Id=30
 
-    - path: /etc/systemd/network/21-mouse-iot.network
+    - path: /etc/systemd/network/15-mouse-vlan30.network
       mode: 0644
       contents:
         inline: |
@@ -84,7 +111,29 @@ storage:
 
           [Network]
           LinkLocalAddressing=no
-          IPv6AcceptRA=no # no default route via the iot VLAN
+          IPv6AcceptRA=no # no default route via these VLANs
+
+    - path: /etc/systemd/network/15-mouse-vlan40.netdev
+      mode: 0644
+      contents:
+        inline: |
+          [NetDev]
+          Name=enp88s0.40
+          Kind=vlan
+
+          [VLAN]
+          Id=40
+
+    - path: /etc/systemd/network/15-mouse-vlan40.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=enp88s0.40
+
+          [Network]
+          LinkLocalAddressing=no
+          IPv6AcceptRA=no # no default route via these VLANs
 
     # Fallback: any other NIC (VMs, new hardware) gets DHCP + mDNS.
     - path: /etc/systemd/network/25-primary.network
