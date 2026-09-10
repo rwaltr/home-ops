@@ -79,6 +79,8 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
+          - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
+            namespace: network
     persistence:
       config:
         type: persistentVolumeClaim
