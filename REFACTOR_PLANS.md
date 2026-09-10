@@ -37,6 +37,39 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-10 late, full VLAN + macvlan + cilium saga)
+
+- **THE root cause of the night**: Cilium's tcx BPF (`cil_from_netdev`) on the
+  native device (enp88s0) firewalls ALL unknown traffic including 802.1q
+  tagged frames; the allowlist is built from vlan devices present at
+  AGENT STARTUP only. Our subinterfaces were created at runtime → every
+  tagged RX (broadcast ARP/mDNS especially) was silently blackholed by the
+  BPF. Fix: `bpf.vlanBypass: [20, 30, 40]` (cilium helmrelease). Symptom
+  signature: tagged frames visible on the PHYSICAL (tcpdump) but zero on
+  the subinterface; unicast could pass (unknown-dst passthrough) while
+  broadcasts always died — stale router ARP made early "successes" lies.
+  `bpftool net show dev <phys>` reveals the attachment; `tc filter show`
+  does NOT (tcx/bpf-link is invisible to tc).
+- **HA now has L2 presence on clients/iot/cameras** (10.20.0.10 /
+  10.30.0.10 / 10.40.0.10, pinned MACs a6:30:00:10:<vlan>:0a), verified
+  reachable from the router on all three; mDNS (router reflector) observed
+  flowing on the subinterfaces. Cross-VLAN discovery rides the router's
+  mDNS reflector.
+- **networkd file-sort discipline** (cost: one host network outage): the
+  master .network uses a MAC match — and vlan subifs INHERIT the parent MAC,
+  so the master re-configures its own children unless the per-vlan Name
+  matchers sort first (15-* before 20-*). Renaming the master to 30-*
+  let 25-primary (DHCP) win on enp88s0 and dropped the host to DHCP —
+  recovered via the router's lease table (mouse had picked up 10.10.0.102).
+- **macvlan bridge mode needs the parent promiscuous, and networkd re-applies
+  .network files on every restart — silently clearing CNI-set promisc**.
+  Declarative fix: `[Link] Promiscuous=yes` in each vlan .network.
+- **sbr caveat**: pod source-unbound traffic prefers eth0 (cilium) over the
+  macvlan attachments; VLAN-IP-bound flows use the right interface. Don't
+  trust unbound pings as evidence of macvlan health.
+- **ethtool rx-vlan-offload experiments don't bypass the BPF** — the tag is
+  checked in metadata form too. Reverted; bypass flag is the fix.
+
 ### Additional decisions (2026-09-10, multus/iot VLAN + kopia enrollment)
 
 - **ether4-study is already a trunk** (PVID 10, tagged 10/20/30/40/60) — the
