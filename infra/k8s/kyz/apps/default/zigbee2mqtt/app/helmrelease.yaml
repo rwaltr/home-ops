@@ -1,0 +1,86 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Zigbee2MQTT against the SLZB-Ultima3 (tcp serial 7638, adapter per the
+# device's own Z2M template). Frontend at z2m.waltr.tech (internal).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: zigbee2mqtt
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: zigbee2mqtt
+  values:
+    fullnameOverride: zigbee2mqtt
+    controllers:
+      zigbee2mqtt:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/koenkk/zigbee2mqtt
+              tag: 2.14.1@sha256:fef0de769dcd04c27b3a6d277b61046eb96284bdd4198dcb1687c3a01b3020f3
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false # Z2M writes to /app
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+              limits:
+                memory: 512Mi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: zigbee2mqtt
+        ports:
+          http:
+            port: &port 8080
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - z2m.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      config:
+        type: configMap
+        name: zigbee2mqtt-config
+        globalMounts:
+          - path: /app/configuration.yaml
+            subPath: configuration.yaml
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /app/data

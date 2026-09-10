@@ -1,0 +1,17 @@
+---
+# zigbee2mqtt configuration (mounted at /app/configuration.yaml).
+# Serial: SLZB-Ultima3 Z2M serial server (the device's own Z2M template).
+homeassistant:
+  enabled: true
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto.default.svc.cluster.local:1883
+serial:
+  port: tcp://10.10.0.101:7638
+  baudrate: 115200
+  adapter: zstack
+frontend:
+  enabled: true
+  port: &port 8080
+advanced:
+  transmit_power: 20

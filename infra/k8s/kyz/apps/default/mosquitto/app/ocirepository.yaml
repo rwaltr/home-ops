@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/source.toolkit.fluxcd.io/ocirepository_v1.json
+# NOTE: no dedicated mosquitto chart — shared app-template OCIRepository.
+# Reuses the app-template chart pinned in the namespace? No: each app gets
+# its own OCIRepository (repo convention).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: mosquitto
+spec:
+  interval: 15m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 5.1.0
+  url: oci://ghcr.io/bjw-s-labs/helm/app-template
