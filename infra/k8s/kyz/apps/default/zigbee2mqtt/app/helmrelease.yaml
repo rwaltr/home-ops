@@ -75,7 +75,7 @@ spec:
         type: configMap
         name: zigbee2mqtt-config
         globalMounts:
-          - path: /app/configuration.yaml
+          - path: /app/data/configuration.yaml # Z2M 2.x reads from the data dir
             subPath: configuration.yaml
       data:
         type: persistentVolumeClaim
