@@ -1,8 +1,15 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 # Home Assistant (onedr0p pattern; internal-only route).
-# Phase 2 (deferred): Multus/macvlan NAD for mDNS/SSDP discovery on the LAN
-# — plain Service first, manual-IP integrations work fine.
+# DONE: multus macvlan x3 (clients/iot/cameras VLANs, L2 discovery).
+#
+# TODO(metrics): after onboarding + a long-lived access token
+#   (Profile → Security → Long-Lived Access Tokens → e.g. "prometheus"):
+#   1. 1P item home-assistant, field HA_LONG_LIVED_TOKEN
+#   2. ExternalSecret → home-assistant-secret
+#   3. `prometheus:` block in /config/configuration.yaml (still YAML-read,
+#      unlike the http: integration)
+#   4. ServiceMonitor: svc :8123, path /api/prometheus, bearerTokenSecret
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
