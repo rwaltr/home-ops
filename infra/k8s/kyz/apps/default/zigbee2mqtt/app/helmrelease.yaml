@@ -71,12 +71,9 @@ spec:
           - name: envoy-internal
             namespace: network
     persistence:
-      config:
-        type: configMap
-        name: zigbee2mqtt-config
-        globalMounts:
-          - path: /app/data/configuration.yaml # Z2M 2.x reads from the data dir
-            subPath: configuration.yaml
+      # NOTE: configuration.yaml lives in this PVC (seeded via one-shot pod
+      # from ./configuration-z2m.yaml — Z2M 2.x rewrites its own config during
+      # onboarding, so a read-only configMap mount crashloops EROFS).
       data:
         type: persistentVolumeClaim
         accessMode: ReadWriteOnce
