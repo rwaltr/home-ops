@@ -37,6 +37,33 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-10, multus/iot VLAN + kopia enrollment)
+
+- **ether4-study is already a trunk** (PVID 10, tagged 10/20/30/40/60) — the
+  router side of multus needed zero changes. Host side: `enp88s0.30` via
+  systemd-networkd (butane + live hand-delta, router-README pattern).
+- **networkd gotcha**: VLAN attachment is `VLAN=` under `[Network]`, NOT a
+  `[VLAN]` section (that is .netdev-only). Wrong form parses as "Unknown
+  section" and silently does nothing. Also: kernel RA state survives networkd
+  restarts (stale `proto ra` routes expire, not disappear) — check
+  `accept_ra` before diagnosing.
+- **HA on the iot VLAN**: multus + NAD `iot` (macvlan bridge, master
+  enp88s0.30) with per-pod static IP (10.30.0.10/23, below DHCP pool
+  .100+) and pinned MAC. Pod created before its NAD exists silently skips
+  the attach — restart the workload after NAD creation. Cross-VLAN mDNS
+  (cast devices on vlan20) still needs a reflector or a second NAD — later.
+- **macvlan host isolation**: the node cannot reach its own macvlan children
+  (macvlan bridge-mode limitation); the router can. Verify from the router:
+  `/tool fetch url="http://10.30.0.10:8123/"`.
+- **kopiur enrollment** (first policy in the cluster): ns-scoped
+  SnapshotPolicy per app + nightly SnapshotSchedule (`H 3`, runOnCreate
+  false); explicit PVC names (app-template persistence has no `labels`
+  field for a pvcSelector). Namespace needs the repo tenancy label
+  `kopiur.home-operations.com/repo: cluster-kopia`. app-template PVC names
+  are `<fullname>-<persistence-name>`.
+- **kopiur controller metrics**: ServiceMonitor on
+  kopiur-controller-metrics:8081 (chart ships the svc, not the monitor).
+
 ### Additional decisions (2026-09-09, home-assistant + apps/default)
 
 - **First homelab app**: HA in the `default` ns (onedr0p convention for
