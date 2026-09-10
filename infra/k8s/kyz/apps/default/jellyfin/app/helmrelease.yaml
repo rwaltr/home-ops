@@ -1,0 +1,114 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Jellyfin media server. Config/state on a PVC; media read-only from the tank
+# DAS (/var/tank/nas/library/...) via hostPath subpaths — least privilege, the
+# container never sees the whole tank. Transcodes are CPU-only (no GPU
+# passthrough yet). UI at jellyfin.waltr.tech (internal).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: jellyfin
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: jellyfin
+  values:
+    fullnameOverride: jellyfin
+    controllers:
+      jellyfin:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/jellyfin/jellyfin
+              tag: 10.11.11@sha256:45f648c382a0c8b552582fcea40e95cb17c5d475473a891cba0eb7523fb92112
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                # Headroom for CPU transcoding
+                memory: 4Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: jellyfin
+        ports:
+          http:
+            port: &port 8096
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - jellyfin.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 10Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      # Media from tank (ZFS DAS) — READ ONLY. Host paths per library.
+      media-movies:
+        type: hostPath
+        hostPath: /var/tank/nas/library/media/movies
+        globalMounts:
+          - path: /media/movies
+            readOnly: true
+      media-tv:
+        type: hostPath
+        hostPath: /var/tank/nas/library/media/tv
+        globalMounts:
+          - path: /media/tv
+            readOnly: true
+      media-videos:
+        type: hostPath
+        hostPath: /var/tank/nas/library/media/videos
+        globalMounts:
+          - path: /media/videos
+            readOnly: true
+      media-music:
+        type: hostPath
+        hostPath: /var/tank/nas/library/music
+        globalMounts:
+          - path: /media/music
+            readOnly: true
