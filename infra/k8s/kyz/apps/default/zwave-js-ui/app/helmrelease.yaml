@@ -5,7 +5,9 @@
 # NOTE: store/settings.json is PVC state, seeded by hand (like HA's
 # configuration.yaml): zwave.port=tcp://10.10.0.101:9638 (SLZB z-wave serial
 # server — NOT 9999), serverEnabled=true, serverPort=3000, serverHost=0.0.0.0
-# (the last three are what make the HA-facing ws server listen).
+# (those three make the HA-facing ws server listen), plus S0/S2 security
+# keys + LR keys (openssl rand -hex 16 each, 2026-09-10) — S2 devices need
+# them for secure inclusion; kopia covers the store PVC.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
