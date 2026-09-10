@@ -22,6 +22,15 @@ spec:
     - pvc:
         name: home-assistant-config-cache
       sourcePathStrategy: PvcName
+    - pvc:
+        name: zigbee2mqtt
+      sourcePathStrategy: PvcName
+    - pvc:
+        name: zwave-js-ui
+      sourcePathStrategy: PvcName
+    - pvc:
+        name: matter-server
+      sourcePathStrategy: PvcName
   copyMethod: Direct
   # The mover must READ HA's PVC: HA runs as 1000:1000 with fsGroup 1000
   # and its .storage/ is mode 0700 — a default-UID mover (65532) gets EACCES.
