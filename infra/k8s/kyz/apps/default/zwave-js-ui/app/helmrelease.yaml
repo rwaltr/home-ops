@@ -1,8 +1,11 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# Z-Wave JS UI against the SLZB-Ultima3 Z-Wave serial server
-# (tcp://10.10.0.101:9999 — set the port in the device's store on first run).
-# UI at zwave.waltr.tech (internal); websocket API :3000 for HA.
+# Z-Wave JS UI against the SLZB-Ultima3 Z-Wave serial server.
+# UI at zwave.waltr.tech (internal); websocket API :3000 for HA zwave_js.
+# NOTE: store/settings.json is PVC state, seeded by hand (like HA's
+# configuration.yaml): zwave.port=tcp://10.10.0.101:9638 (SLZB z-wave serial
+# server — NOT 9999), serverEnabled=true, serverPort=3000, serverHost=0.0.0.0
+# (the last three are what make the HA-facing ws server listen).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

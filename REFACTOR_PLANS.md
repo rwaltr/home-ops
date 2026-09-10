@@ -37,6 +37,31 @@ the management VLAN but must directly serve a second VLAN.
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
 - **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
 
+### Additional decisions (2026-09-10 ~4am, smarthome stack on the SLZB-Ultima3)
+
+- **Full protocol stack in default ns**: mosquitto (anonymous internal broker),
+  zigbee2mqtt 2.14.1 (SLZB tcp serial 7638, adapter zstack — the device's own
+  template was right), zwave-js-ui 11.23.0 (SLZB z-wave serial **9638**,
+  serverEnabled/serverPort seeded into its store PVC), matter-server
+  (python-matter-server, HA container's "Matter Server" add-on equivalent).
+- **Z2M 2.x owns configuration.yaml** in its data PVC — a read-only configMap
+  mount crashloops EROFS (onboarding/migration writes the file). Seed via a
+  one-shot pod; the git copy is documentation.
+- **HA integrations wired via REST config flows** (long-lived token): mqtt
+  (mosquitto), otbr (SLZB OTBR http://10.10.0.101:8080 — remote border
+  routers work), zwave_js (ws://zwave-js-ui:3000), matter (reconfigured to
+  ws://matter-server:5580/ws). Gotcha: the MQTT flow's
+  `other_settings.set_ca_cert` must be **"off"** — "auto" sends a TLS
+  ClientHello to the plaintext port = mosquitto "protocol error"; empty-string
+  username is also protocol-illegal (omit, don't send "").
+- **kopiur mover UID/GID must match the app** — default mover (65532) got
+  EACCES on HA's mode-0700 .storage/. Fix: per-policy
+  mover.{securityContext:1000:1000, podSecurityContext: fsGroup 1000}.
+  Verified with a manual Snapshot CR (source.sourceIndex + target.pvc shape).
+- **HACS installed** via exec (custom_components/hacs on the config PVC) for
+  custom integrations like adaptive-lighting — not a blueprint, a custom
+  integration; blueprint ≠ integration (common confusion).
+
 ### Additional decisions (2026-09-10 late, full VLAN + macvlan + cilium saga)
 
 - **THE root cause of the night**: Cilium's tcx BPF (`cil_from_netdev`) on the
