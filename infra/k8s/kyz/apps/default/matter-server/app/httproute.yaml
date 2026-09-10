@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/httproute-v1.json
+# matter-server endpoint (websocket :5580, no web UI). Internal-only —
+# useful as a stable hostname for debugging or a second HA instance.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: matter-server
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: network
+      sectionName: https
+  hostnames:
+    - matter.waltr.tech
+  rules:
+    - backendRefs:
+        - name: matter-server
+          port: 5580
