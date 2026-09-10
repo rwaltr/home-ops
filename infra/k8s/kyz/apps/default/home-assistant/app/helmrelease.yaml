@@ -60,6 +60,16 @@ spec:
               limits:
                 memory: 2Gi
     defaultPodOptions:
+      annotations:
+        # iot VLAN attachment (multus): mDNS/SSDP discovery for LAN devices.
+        # Static IP below the router DHCP pool (10.30.0.100+), pinned MAC.
+        k8s.v1.cni.cncf.io/networks: |-
+          [{
+            "name": "iot",
+            "namespace": "kube-system",
+            "ips": ["10.30.0.10/23"],
+            "mac": "a6:30:00:10:30:0a"
+          }]
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
