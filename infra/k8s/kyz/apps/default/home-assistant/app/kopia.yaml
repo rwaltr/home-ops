@@ -1,0 +1,43 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+# Kopia enrollment for HA's PVCs (namespace-scoped policy; repo via
+# ClusterRepository/cluster-kopia, ns admitted by the repo's tenancy label
+# on the default namespace).
+# copyMethod: Direct is mandatory on openebs-hostpath (no CSI snapshots) —
+# crash-consistent live reads; HA's sqlite recorder is the accepted tradeoff
+# (beforeSnapshot hooks exist if it ever needs quiescing).
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: home-assistant
+  namespace: default
+spec:
+  repository:
+    kind: ClusterRepository
+    name: cluster-kopia
+  sources:
+    - pvc:
+        name: home-assistant-config
+      sourcePathStrategy: PvcName
+    - pvc:
+        name: home-assistant-config-cache
+      sourcePathStrategy: PvcName
+  copyMethod: Direct
+  retention:
+    keepLatest: 7
+    keepDaily: 14
+    keepWeekly: 4
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: home-assistant-nightly
+  namespace: default
+spec:
+  policyRef:
+    name: home-assistant
+  schedule:
+    cron: "H 3 * * *"
+    jitter: 30m
+    runOnCreate: false

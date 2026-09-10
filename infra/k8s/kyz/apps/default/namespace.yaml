@@ -7,3 +7,5 @@ metadata:
     kustomize.toolkit.fluxcd.io/prune: disabled
   labels:
     resource.kubernetes.io/admin-access: "true"
+    # kopiur tenancy: namespaces with this label may back up to cluster-kopia
+    kopiur.home-operations.com/repo: cluster-kopia

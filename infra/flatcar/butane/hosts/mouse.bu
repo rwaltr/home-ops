@@ -57,6 +57,34 @@ storage:
           DNS=10.10.0.1
           MulticastDNS=yes
           LLMNR=yes
+          # Bind the tagged iot VLAN to this (master) interface
+          # (note: VLAN= is a [Network] option — a [VLAN] section is netdev-only)
+          VLAN=enp88s0.30
+
+    # VLAN 30 (iot) tagged subinterface — macvlan master for discovery-dependent
+    # apps (home-assistant class). ether4-study is a trunk (PVID 10, tagged 10/20/30/40/60).
+    # L2 only: no addressing here, pods own their IPs via the NAD.
+    - path: /etc/systemd/network/21-mouse-iot.netdev
+      mode: 0644
+      contents:
+        inline: |
+          [NetDev]
+          Name=enp88s0.30
+          Kind=vlan
+
+          [VLAN]
+          Id=30
+
+    - path: /etc/systemd/network/21-mouse-iot.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=enp88s0.30
+
+          [Network]
+          LinkLocalAddressing=no
+          IPv6AcceptRA=no # no default route via the iot VLAN
 
     # Fallback: any other NIC (VMs, new hardware) gets DHCP + mDNS.
     - path: /etc/systemd/network/25-primary.network
