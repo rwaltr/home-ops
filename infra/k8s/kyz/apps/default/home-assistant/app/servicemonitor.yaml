@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/servicemonitor_v1.json
+# HA's prometheus integration (configuration.yaml `prometheus:`) serves
+# /api/prometheus with mandatory Bearer auth = the long-lived access token.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: home-assistant
+spec:
+  endpoints:
+    - port: http
+      path: /api/prometheus
+      bearerTokenSecret:
+        name: home-assistant-secret
+        key: HA_LONG_LIVED_TOKEN
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: home-assistant
