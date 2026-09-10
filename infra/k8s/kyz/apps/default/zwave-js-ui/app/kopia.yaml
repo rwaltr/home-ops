@@ -1,15 +1,14 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
-# Kopia enrollment for HA's PVCs (namespace-scoped policy; repo via
-# ClusterRepository/cluster-kopia, ns admitted by the repo's tenancy label
-# on the default namespace).
-# copyMethod: Direct is mandatory on openebs-hostpath (no CSI snapshots) —
-# crash-consistent live reads; HA's sqlite recorder is the accepted tradeoff
-# (beforeSnapshot hooks exist if it ever needs quiescing).
+# Kopia enrollment for this app's PVCs (namespace-scoped policy; repo via
+# ClusterRepository/cluster-kopia). copyMethod: Direct — crash-consistent
+# live reads (openebs-hostpath has no CSI snapshots). Mover runs as
+# 1000:1000 to match the app UID/GID; the store holds the Z-Wave security
+# keys, so this backup is what makes them recoverable.
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotPolicy
 metadata:
-  name: home-assistant
+  name: zwave-js-ui
   namespace: default
 spec:
   repository:
@@ -17,14 +16,9 @@ spec:
     name: cluster-kopia
   sources:
     - pvc:
-        name: home-assistant-config
-      sourcePathStrategy: PvcName
-    - pvc:
-        name: home-assistant-config-cache
+        name: zwave-js-ui
       sourcePathStrategy: PvcName
   copyMethod: Direct
-  # The mover must READ HA's PVC: HA runs as 1000:1000 with fsGroup 1000
-  # and its .storage/ is mode 0700 — a default-UID mover (65532) gets EACCES.
   mover:
     securityContext:
       runAsUser: 1000
@@ -40,12 +34,12 @@ spec:
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotSchedule
 metadata:
-  name: home-assistant-nightly
+  name: zwave-js-ui-nightly
   namespace: default
 spec:
   policyRef:
-    name: home-assistant
+    name: zwave-js-ui
   schedule:
-    cron: "H 3 * * *"
+    cron: "H 4 * * *"
     jitter: 30m
     runOnCreate: false
