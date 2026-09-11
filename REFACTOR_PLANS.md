@@ -652,6 +652,29 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 - `kubectl top` unusable on this cluster (no metrics-server) — debug via
   in-pod `/proc` + app /api/stats.
 
+### 2026-09-11 (night) — Frigate REMOVED, go2rtc stands in
+
+- **Frigate torn out entirely** (HR/pods/PVC/routes pruned). Why: the E1 Pro
+  is a WiFi camera — Frigate's persistent dual-RTSP pulls (main for record +
+  sub for detect, 24/7) choked its radio until it dropped off the network
+  and rebooted. User verdict: too much load for WiFi cameras; future is
+  either a second node or ethernet cameras. The go2rtc non-root/s6 work
+  above remains valid reference material.
+- **Standalone go2rtc deployed** (apps/default/go2rtc, alexxit/go2rtc
+  1.9.9 pinned): streams are LAZY — producers dial the camera only while a
+  consumer is viewing, so the camera gets zero idle load.
+  - cameras VLAN macvlan 10.40.0.11 (same IP frigate used) + NAD on-link
+    route handles unbound dials; webrtc candidate `10.40.0.11:8555` rides
+    the router's clients->cameras UDP accept.
+  - streams: `nursery` (main, plain) + `nursery_talk` (backchannel,
+    only while talking). Ports 1984 API/UI, 8554 RTSP restream for HA's
+    generic camera stream, 8555 WebRTC UDP.
+  - creds: same 1P `reolink local admin` item → `go2rtc-secret` (with the
+    urlquery-encoded copy). Route: `go2rtc.waltr.tech` (internal).
+  - HA viewing: AlexxIT WebRTC card / frigate-card style config pointing
+    at `go2rtc.waltr.tech:1984` (webrtc+mse), or generic camera entity on
+    `rtsp://go2rtc.default.svc.cluster.local:8554/nursery`.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
