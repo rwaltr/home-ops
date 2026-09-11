@@ -70,8 +70,6 @@ spec:
             port: 1984
           rtsp:
             port: 8554
-          webrtc-udp:
-            enabled: false
     route:
       app:
         enabled: false # routes live in ./httproute.yaml
