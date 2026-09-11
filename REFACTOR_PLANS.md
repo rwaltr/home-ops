@@ -629,6 +629,29 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
     `mirceanton/external-dns-provider-mikrotik` (records written into
     RouterOS DNS — survives cluster outages; cost: router-side state).
 
+### 2026-09-11 (evening) — Frigate lag root cause: VLAN routing + s6 caps
+
+- **Symptom**: frigate UI/API lagging badly. Chain of causes, all fixed:
+  1. **s6 log services crashloop**: `logutil-service` runs
+     `s6-applyuidgid -U` (drop logs to nobody) — the runtime does NOT honor
+     `caps.add: [SETGID]` for non-root containers (CapPrm=0 despite add),
+     so setgroups always EPERMs. Fix: shim configmap mounted over
+     `/package/admin/s6/command/s6-applyuidgid` that strips uid/gid flags
+     and execs as container uid (frigate/s6/s6-applyuidgid). Watch the
+     quoting: a case pattern `-g')` needs quoting or it's a syntax error.
+  2. **ffmpeg lost its camera feed**: go2rtc dials the camera with an
+     UNBOUND socket → dst route lookup hits the main table → eth0 →
+     firewall timeout. sbr only routes SOURCE-bound traffic. Fix: add the
+     on-link subnet route to each VLAN NAD (`{"dst": "10.40.0.0/24"}` etc.)
+     so unbound dials ride the macvlan. NO YAML comments inside the CNI
+     JSON string — multus fails to parse and EVERY pod with an attachment
+     fails its sandbox (caught after all 3 NADs were broken together).
+  3. Post-fix: camera_fps 4.2, detect 2.8, detector ~25ms, frames flowing.
+- **Restarted frigate/matter-server/home-assistant** to pick up the NAD
+  change (attachments apply at pod (re)creation only).
+- `kubectl top` unusable on this cluster (no metrics-server) — debug via
+  in-pod `/proc` + app /api/stats.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
