@@ -17,6 +17,25 @@ spec:
   chartRef:
     kind: OCIRepository
     name: frigate
+  postRenderers:
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: frigate
+          patch: |-
+            - op: add
+              path: /spec/template/spec/initContainers
+              value:
+                - name: nginx-config
+                  image: ghcr.io/blakeblackshear/frigate:0.16.2@sha256:4041ad318224500cf9513c513b1bb927d9dd252f63bbd3d11c92006c1172c86c
+                  command: ["/bin/sh", "-c", "cp -a /usr/local/nginx/. /target/ && chown -R 1000:1000 /target"]
+                  securityContext:
+                    runAsNonRoot: false
+                    runAsUser: 0
+                  volumeMounts:
+                    - name: nginx
+                      mountPath: /target
   values:
     fullnameOverride: frigate
     controllers:
@@ -58,7 +77,11 @@ spec:
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: false
-              capabilities: { drop: ["ALL"] }
+              capabilities:
+                drop: ["ALL"]
+                # s6-applyuidgid sets supplementary groups per service —
+                # SETGID is required for that as a non-root container
+                add: ["SETGID"]
             resources:
               requests:
                 cpu: 500m
@@ -77,6 +100,10 @@ spec:
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
+    # NOTE: nginx-copy init container lives in postRenderers below — the
+    # chart auto-applies globalMounts to values-defined init containers,
+    # which would shadow the image's /usr/local/nginx with the emptyDir
+    # and copy nothing.
     defaultPodOptions:
       annotations:
         # Cameras VLAN presence — Frigate must reach the Reolinks over
