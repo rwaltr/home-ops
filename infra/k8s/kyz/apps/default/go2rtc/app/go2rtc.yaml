@@ -1,0 +1,20 @@
+# Standalone go2rtc — camera streams on demand ONLY.
+# Producers connect lazily: the E1 Pro (WiFi) gets ZERO load unless someone
+# is actually viewing. Viewing path: HA card (WebRTC/MSE) -> this pod ->
+# camera RTSP. Ports: 1984 API/WebUI, 8554 RTSP restream (for HA's generic
+# camera stream), 8555 WebRTC (UDP, candidates on the cameras-VLAN IP —
+# reachable from clients VLAN via the router's clients->cameras UDP accept).
+api:
+  listen: ":1984"
+rtsp:
+  listen: ":8554"
+webrtc:
+  listen: ":8555"
+  candidates:
+    - 10.40.0.11:8555
+log:
+  format: json
+streams:
+  nursery: rtsp://{GO2RTC_RTSP_USER}:{GO2RTC_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main
+  # on-demand two-way audio (backchannel held only during talk sessions)
+  nursery_talk: rtsp://{GO2RTC_RTSP_USER}:{GO2RTC_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main#backchannel=1

@@ -1,0 +1,92 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# go2rtc standalone — replaces frigate for camera viewing. WebRTC/mse viewing
+# via HA; streams are ON-DEMAND (lazy producers) so the WiFi camera gets no
+# persistent load. Cameras VLAN macvlan (10.40.0.11, pinned MAC pattern)
+# so RTSP stays on-VLAN; webrtc candidate rides clients->cameras UDP.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: go2rtc
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: go2rtc
+  values:
+    fullnameOverride: go2rtc
+    controllers:
+      go2rtc:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/alexxit/go2rtc
+              tag: 1.9.9@sha256:7d31dcb73633310e80497c431f4534c81ed55ec0708db3262bc56918e654bba5
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+    defaultPodOptions:
+      annotations:
+        # Cameras VLAN presence — lazy RTSP dials to 10.40.0.198; the NAD's
+        # on-link route makes unbound dials ride this interface
+        k8s.v1.cni.cncf.io/networks: |-
+          [{"name": "cameras", "namespace": "kube-system", "ips": ["10.40.0.11/24"], "mac": "a6:30:00:10:40:0b"}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: go2rtc
+        ports:
+          http:
+            port: 1984
+          rtsp:
+            port: 8554
+          webrtc-udp:
+            enabled: false
+    route:
+      app:
+        enabled: false # routes live in ./httproute.yaml
+    persistence:
+      # go2rtc writes config/streams state here
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      go2rtc-config:
+        type: configMap
+        name: go2rtc-config
+        globalMounts:
+          - path: /config/go2rtc.yaml
+            subPath: go2rtc.yaml

@@ -11,6 +11,7 @@ resources:
   - ./matter-server/ks.yaml
   - ./mosquitto/ks.yaml
   - ./frigate/ks.yaml
+  - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
   - ./zigbee2mqtt/ks.yaml
   - ./zwave-js-ui/ks.yaml
