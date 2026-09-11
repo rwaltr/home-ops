@@ -74,7 +74,6 @@ spec:
               repository: ghcr.io/blakeblackshear/frigate
               tag: 0.16.2@sha256:4041ad318224500cf9513c513b1bb927d9dd252f63bbd3d11c92006c1172c86c
             command: ["/bin/sh", "-c", "cp -a /usr/local/nginx/. /target/"]
-            restartPolicy: Always
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
