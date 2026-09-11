@@ -10,11 +10,11 @@ go2rtc:
   streams:
     # backchannel=1 — Reolink RTSP talk-back: go2rtc can push mic audio
     # INTO the camera over this stream (frigate card / talk API target).
-    reolink: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS}@10.40.0.199:554/h264Preview_01_main#backchannel=1
-    reolink_sub: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS}@10.40.0.199:554/h264Preview_01_sub
+    reolink: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.199:554/h264Preview_01_main#backchannel=1
+    reolink_sub: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.199:554/h264Preview_01_sub
     reolink_talk: ffmpeg:reolink#audio=opus
-    nursery: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS}@10.40.0.198:554/h264Preview_01_main#backchannel=1
-    nursery_sub: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS}@10.40.0.198:554/h264Preview_01_sub
+    nursery: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main#backchannel=1
+    nursery_sub: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_sub
     nursery_talk: ffmpeg:nursery#audio=opus
   # WebRTC for low-latency live view + mic push. Browser-side UDP rides the
   # existing 'clients -> cameras: UDP only' accept (10.40.0.11 is the pod's
