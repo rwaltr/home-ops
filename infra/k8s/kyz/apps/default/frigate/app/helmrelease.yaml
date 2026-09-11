@@ -166,6 +166,15 @@ spec:
         globalMounts:
           - path: /etc/s6-overlay/s6-rc.d/log-prepare/run
             subPath: log-prepare-run
+      # non-root s6 shim: s6-applyuidgid can't setgroups (runtime won't
+      # grant CAP_SETGID to non-root) — run services as container uid
+      s6-applyuidgid:
+        type: configMap
+        name: frigate-s6
+        defaultMode: 493
+        globalMounts:
+          - path: /package/admin/s6/command/s6-applyuidgid
+            subPath: s6-applyuidgid
       # certsync writes TLS material here; emptyDir keeps it writable non-root
       letsencrypt:
         type: emptyDir
