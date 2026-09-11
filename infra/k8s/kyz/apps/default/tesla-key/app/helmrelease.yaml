@@ -1,0 +1,110 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Static key host for the HA Tesla Fleet integration. Tesla's partner flow
+# requires the app public key at EXACTLY /.well-known/appspecific/
+# com.tesla.3p.public-key.pem with NO redirects — hence a dedicated nginx
+# instead of a redirect-based path. Public-only (envoy-external via CF
+# tunnel); Tesla's verifier is the only consumer. Key pair in 1P item
+# tesla-fleet; the matching private key lives at /config/tesla_fleet.key
+# in the home-assistant PVC (command signing).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tesla-key
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: tesla-key
+  values:
+    fullnameOverride: tesla-key
+    controllers:
+      tesla-key:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/nginxinc/nginx-unprivileged
+              tag: 1.27.4-alpine@sha256:e234d4f7e346c098f7b22245690372382aded5be988611eb2c53ae62231eece7
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+              limits:
+                memory: 128Mi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: tesla-key
+        ports:
+          http:
+            port: &port 8080
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - tesla.waltr.tech
+        parentRefs:
+          # Public only — Tesla's verifier must reach the key from the internet
+          - name: envoy-external
+            namespace: network
+    configMaps:
+      tesla-key:
+        data:
+          default.conf: |
+            server {
+              listen 8080;
+              server_name tesla.waltr.tech;
+              root /usr/share/nginx/html;
+              # Tesla Fleet API: exact path, no redirect handling
+              location = /.well-known/appspecific/com.tesla.3p.public-key.pem {
+                default_type application/x-pem-file;
+                add_header Cache-Control "public, max-age=86400";
+              }
+            }
+          com.tesla.3p.public-key.pem: |
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUPgc3C9IP0K9UvYD2obEqZwkGCLq
+            nS1ODSiSySdUYenuuhOrSnc0eXI1q3jEO9fVjdXFgWSXbXvIboeaRAuetw==
+            -----END PUBLIC KEY-----
+    persistence:
+      conf:
+        type: configMap
+        name: tesla-key
+        globalMounts:
+          - path: /etc/nginx/conf.d/default.conf
+            subPath: default.conf
+      key:
+        type: configMap
+        name: tesla-key
+        globalMounts:
+          - path: /usr/share/nginx/html/.well-known/appspecific/com.tesla.3p.public-key.pem
+            subPath: com.tesla.3p.public-key.pem
