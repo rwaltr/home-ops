@@ -88,18 +88,6 @@ spec:
                 memory: 2Gi
               limits:
                 memory: 6Gi
-        initContainers:
-          # nginx writes its conf under /usr/local/nginx at startup — the
-          # image ships it root-owned read-only for non-root runs, so copy
-          # it to a writable emptyDir (kinghrothgar's k8s approach).
-          nginx-config:
-            image:
-              repository: ghcr.io/blakeblackshear/frigate
-              tag: 0.16.2@sha256:4041ad318224500cf9513c513b1bb927d9dd252f63bbd3d11c92006c1172c86c
-            command: ["/bin/sh", "-c", "cp -a /usr/local/nginx/. /target/"]
-            securityContext:
-              runAsNonRoot: false
-              runAsUser: 0
     # NOTE: nginx-copy init container lives in postRenderers below — the
     # chart auto-applies globalMounts to values-defined init containers,
     # which would shadow the image's /usr/local/nginx with the emptyDir
