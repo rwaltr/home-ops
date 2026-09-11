@@ -587,6 +587,48 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
   via 1P `frigate` item (frigate_rtsp_user/frigate_rtsp_pass) →
   `frigate-secret` → go2rtc `{ENV}` substitution.
 
+#### Frigate follow-up (same day)
+- **Deployed + running non-root** (1/1): went through the full s6-overlay
+  gauntlet — see `frigate/app/helmrelease.yaml` comments. Key learnings:
+  - app-template 5.x REJECTS `podAnnotations` under controllers → use
+    `defaultPodOptions.annotations`
+  - emptyDir persistence uses `sizeLimit` (not `size`)
+  - s6 non-root needs the full recipe: `/run` emptyDir (Memory),
+    `HOME=/tmp/home`, `S6_CATCHALL_USER`, `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN…`,
+    CAP_SETGID (applyuidgid sets supplementary groups), a chown-free
+    `log-prepare/run` override (configmap, defaultMode 493), and the nginx
+    copy init container via HelmRelease `postRenderers` (NOT values —
+    chart applies globalMounts to values-inits, shadowing the image dir)
+  - `postRenderers` on HelmRelease v2 is a LIST of maps, not a map
+- **RTSP URL gotcha**: the Reolink password contains `@` — secret template
+  renders a percent-encoded copy via sprig `urlquery`
+  (`FRIGATE_RTSP_PASS_ENC`).
+- **reolink camera (10.40.0.199) REMOVED**: its firmware doesn't support
+  generic RTSP output (port 554 refused); nursery (10.40.0.198) streams fine.
+- **2-way talk wired**: RTSP `#backchannel=1` + `*_talk` opus streams +
+  go2rtc WebRTC listener `:8555` with candidate `10.40.0.11:8555` — rides
+  the router's existing `clients → cameras: UDP only` accept. HA-side:
+  frigate integration (MQTT auto-discovery, URL
+  `http://frigate.default.svc.cluster.local:5000`) + frigate-card with
+  `live_provider: go2rtc, modes: [webrtc]` + `menu.buttons.microphone`.
+- **k8s-gateway upstream migration** (was broken ~2 days unnoticed — chart
+  + pod kept running, only the helmrepo refresh 404'd):
+  - `k8s-gateway.github.io` index → 404; true new home is the
+    `k8s-gateway/k8s_gateway` fork (GitHub read-only mirror + codeberg),
+    Helm repo `https://k8s-gateway.kryptonian.kapsi.fi/`, chart 3.7.3,
+    image `codeberg.org/k8s-gateway/k8s_gateway:1.8.3` (public).
+  - intermediate detour through `ori-edge.github.io` was a dead end:
+    chart 2.4.0 defaults to `quay.io/oriedge/k8s_gateway` which went
+    **private** (401) — do NOT pin that.
+  - debugging notes: a wedged kustomization reconcile survived `--force`;
+    clearing required deleting the ks object + restarting
+    kustomize-controller. Helm upgrade loops showed "release is in a
+    failed state" while waiting on the crashlooping deployment.
+  - split-DNS verified restored (v4+v6 records for envoy VIPs).
+  - backlog idea (user): replace k8s-gateway with
+    `mirceanton/external-dns-provider-mikrotik` (records written into
+    RouterOS DNS — survives cluster outages; cost: router-side state).
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
