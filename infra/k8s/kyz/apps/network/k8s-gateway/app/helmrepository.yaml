@@ -6,4 +6,4 @@ metadata:
   name: k8s-gateway
 spec:
   interval: 1h
-  url: https://ori-edge.github.io/k8s_gateway/ # upstream moved off k8s-gateway.github.io (404 since 2026-09)
+  url: https://k8s-gateway.kryptonian.kapsi.fi/ # upstream moved: k8s-gateway.github.io 404'd (2026-09); repo is github.com/k8s-gateway/k8s_gateway
