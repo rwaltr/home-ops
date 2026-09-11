@@ -32,8 +32,13 @@ spec:
             env:
               TZ: America/Chicago
               CONFIG_FILE: /config/config.yml
-              # s6 non-root: redirect HOME off /root
+              # s6 non-root set (frigate discussion #18375, kinghrothgar):
+              # HOME redirect, s6 single-uid catchall, and the sanctioned
+              # escape hatch for a kube-provisioned (not uid-owned) /run.
               HOME: /tmp/home
+              USER: "1000"
+              S6_CATCHALL_USER: "1000"
+              S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES: "1"
             envFrom:
               - secretRef:
                   name: frigate-secret
@@ -60,6 +65,19 @@ spec:
                 memory: 2Gi
               limits:
                 memory: 6Gi
+        initContainers:
+          # nginx writes its conf under /usr/local/nginx at startup — the
+          # image ships it root-owned read-only for non-root runs, so copy
+          # it to a writable emptyDir (kinghrothgar's k8s approach).
+          nginx-config:
+            image:
+              repository: ghcr.io/blakeblackshear/frigate
+              tag: 0.16.2@sha256:4041ad318224500cf9513c513b1bb927d9dd252f63bbd3d11c92006c1172c86c
+            command: ["/bin/sh", "-c", "cp -a /usr/local/nginx/. /target/"]
+            restartPolicy: Always
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
     defaultPodOptions:
       annotations:
         # Cameras VLAN presence — Frigate must reach the Reolinks over
@@ -113,8 +131,19 @@ spec:
       # ("/run belongs to uid 0 … lacking privileges") for non-root runs
       run:
         type: emptyDir
+        medium: Memory
         globalMounts:
           - path: /run
+      # HOME for the app user (nginx temp + misc writes)
+      home:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp/home
+      # nginx conf is written at runtime — copy from image to writable dir
+      nginx:
+        type: emptyDir
+        globalMounts:
+          - path: /usr/local/nginx
       shm:
         type: emptyDir
         medium: Memory
