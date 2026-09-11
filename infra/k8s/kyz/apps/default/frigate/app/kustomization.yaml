@@ -12,5 +12,8 @@ configMapGenerator:
   - name: frigate-config
     files:
       - config.yml=./config.yml
+  - name: frigate-s6
+    files:
+      - log-prepare-run=./s6/log-prepare-run
 generatorOptions:
   disableNameSuffixHash: true

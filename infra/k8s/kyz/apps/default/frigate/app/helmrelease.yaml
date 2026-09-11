@@ -143,6 +143,19 @@ spec:
         type: emptyDir
         globalMounts:
           - path: /usr/local/nginx
+      # non-root s6 override: log-prepare without the chown nobody:nogroup
+      s6-log-prepare:
+        type: configMap
+        name: frigate-s6
+        defaultMode: 493
+        globalMounts:
+          - path: /etc/s6-overlay/s6-rc.d/log-prepare/run
+            subPath: log-prepare-run
+      # certsync writes TLS material here; emptyDir keeps it writable non-root
+      letsencrypt:
+        type: emptyDir
+        globalMounts:
+          - path: /etc/letsencrypt
       shm:
         type: emptyDir
         medium: Memory
