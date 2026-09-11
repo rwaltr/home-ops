@@ -8,11 +8,14 @@ detectors:
     num_threads: 2
 go2rtc:
   streams:
-    # backchannel=1 — Reolink RTSP talk-back: go2rtc can push mic audio
-    # INTO the camera over this stream (frigate card / talk API target).
-    nursery: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main#backchannel=1
+    # NOTE: backchannel=1 was REMOVED from the always-on main stream —
+    # Reolink RTSP servers drop held backchannel sessions, which took down
+    # the whole stream chain (frigate ffmpeg consumers died with it).
+    # Talk now uses a dedicated on-demand stream (nursery_talk).
+    nursery: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main
     nursery_sub: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_sub
-    nursery_talk: ffmpeg:nursery#audio=opus
+    # talk-only: backchannel session held only while mic is active
+    nursery_talk: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASS_ENC}@10.40.0.198:554/h264Preview_01_main#backchannel=1
   # WebRTC for low-latency live view + mic push. Browser-side UDP rides the
   # existing 'clients -> cameras: UDP only' accept (10.40.0.11 is the pod's
   # macvlan IP) — no LB VIP needed. IoT-VLAN phones use the HA proxy path.
@@ -23,6 +26,13 @@ go2rtc:
 cameras:
   nursery:
     enabled: true
+    # ONVIF — required for frigate PTZ controls (only renders if the camera
+    # reports PTZ capability; harmless on fixed cameras)
+    onvif:
+      host: 10.40.0.198
+      port: 8000
+      user: {FRIGATE_RTSP_USER}
+      password: {FRIGATE_RTSP_PASS}
     ffmpeg:
       output_args:
         record: preset-record-generic-audio-copy
