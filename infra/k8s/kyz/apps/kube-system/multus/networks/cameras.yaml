@@ -19,6 +19,11 @@ spec:
           "ipam": {
             "type": "static",
             "routes": [
+              # on-link subnet route: dst-based lookups (unbound sockets —
+              # e.g. go2rtc dialing camera RTSP) must use this macvlan, not
+              # eth0; the sbr plugin moves source-bound traffic to its own
+              # table, but unbound dials fall back to the main table
+              {"dst": "10.40.0.0/24"},
               {"dst": "0.0.0.0/0", "gw": "10.40.0.1"}
             ]
           }
