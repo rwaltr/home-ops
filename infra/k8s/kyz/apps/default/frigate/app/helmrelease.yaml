@@ -80,10 +80,6 @@ spec:
             port: 5000
           go2rtc-api:
             port: 1984
-          rtsp-restream:
-            enabled: false
-          webrtc:
-            enabled: false
     route:
       app:
         enabled: false # routes live in ./httproute.yaml (frigate + go2rtc)
@@ -109,7 +105,7 @@ spec:
       shm:
         type: emptyDir
         medium: Memory
-        size: 1Gi
+        sizeLimit: 1Gi
         globalMounts:
           - path: /dev/shm
       # Frigate config — camera creds injected via env ({ENV} substitution
