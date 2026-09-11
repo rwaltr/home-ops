@@ -31,8 +31,8 @@ cameras:
     onvif:
       host: 10.40.0.198
       port: 8000
-      user: {FRIGATE_RTSP_USER}
-      password: {FRIGATE_RTSP_PASS}
+      user: "{FRIGATE_RTSP_USER}"
+      password: "{FRIGATE_RTSP_PASS}"
     ffmpeg:
       output_args:
         record: preset-record-generic-audio-copy
