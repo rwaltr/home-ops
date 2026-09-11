@@ -92,10 +92,14 @@ add address=fdad:207a:f1ab:100::/64 comment="Cilium LB VIPs v6 (BGP)" list=v6-k8
 
 Model (v4 and v6 twins): mgmt + clients get full access as direct accepts;
 iot/cameras jump into one shared chain per family (`k8s-vips` / `k8s-vips6`)
-where their restrictions live (currently empty → fall-through back to the
-default deny, logged); untrusted's jump exists but is disabled. All sit before
-the `any -> any` default deny. Reply traffic rides established/related +
-fasttrack.
+where their restrictions live: web ports (TCP 80/443 + UDP 443 for HTTP/3)
+are accepted, everything else falls through to the default deny, logged;
+untrusted's jump exists but is disabled. All sit before the `any -> any`
+default deny. Reply traffic rides established/related + fasttrack.
+
+> 2026-09-11: chains populated with the web allows (v4+v6) — phones on IoT
+> couldn't reach `homeassistant.waltr.tech` (envoy VIPs) while the chain was
+> empty; every SYN logged as ZONEDENY. Keep the v4/v6 chains symmetric.
 
 ```routeros
 /ip/firewall/filter
@@ -110,6 +114,11 @@ add action=jump chain=forward comment="cameras -> k8s vips: jump" \
 add action=jump chain=forward comment="untrusted -> k8s vips: jump" disabled=yes \
     dst-address-list=v4-k8s-vips in-interface=vlan60-untrusted jump-target=k8s-vips out-interface=vlan10-mgmt
 
+add action=accept chain=k8s-vips comment="k8s vips: web (HTTP/HTTPS)" \
+    protocol=tcp dst-port=80,443
+add action=accept chain=k8s-vips comment="k8s vips: HTTP/3 (QUIC)" \
+    protocol=udp dst-port=443
+
 /ipv6/firewall/filter
 add action=accept chain=forward comment="mgmt -> k8s vips: full access" \
     dst-address-list=v6-k8s-vips in-interface-list=MGMT out-interface=vlan10-mgmt
@@ -121,6 +130,11 @@ add action=jump chain=forward comment="cameras -> k8s vips: jump" \
     dst-address-list=v6-k8s-vips in-interface=vlan40-cameras jump-target=k8s-vips6 out-interface=vlan10-mgmt
 add action=jump chain=forward comment="untrusted -> k8s vips: jump" disabled=yes \
     dst-address-list=v6-k8s-vips in-interface=vlan60-untrusted jump-target=k8s-vips6 out-interface=vlan10-mgmt
+
+add action=accept chain=k8s-vips6 comment="k8s vips6: web (HTTP/HTTPS)" \
+    protocol=tcp dst-port=80,443
+add action=accept chain=k8s-vips6 comment="k8s vips6: HTTP/3 (QUIC)" \
+    protocol=udp dst-port=443
 ```
 
 Onboarding a restricted zone's service = one accept in the shared chain
