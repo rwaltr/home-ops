@@ -19,6 +19,13 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "true"
+        podAnnotations:
+          # IoT VLAN presence so the Matter server sees device mDNS (Matter's
+          # mDNS is IPv6 link-local ff02::fb — unrouteable, so reflection is
+          # impossible; the controller must live on the device's VLAN).
+          # Static IP below DHCP pool (.100+), pinned MAC per HA pattern.
+          k8s.v1.cni.cncf.io/networks: |-
+            [{"name": "iot", "namespace": "kube-system", "ips": ["10.30.0.11/23"], "mac": "a6:30:00:10:30:0b"}]
         containers:
           app:
             image:
