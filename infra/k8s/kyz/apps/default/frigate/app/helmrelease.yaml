@@ -67,8 +67,11 @@ spec:
         k8s.v1.cni.cncf.io/networks: |-
           [{"name": "cameras", "namespace": "kube-system", "ips": ["10.40.0.11/24"], "mac": "a6:30:00:10:40:0b"}]
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
+        # Frigate's s6-overlay REQUIRES uid 0 (it refuses to start as a
+        # regular user — /run ownership check). Still no caps, no privilege
+        # escalation. File writes on PVC/tank ride fsGroup 1000.
+        runAsNonRoot: false
+        runAsUser: 0
         runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
