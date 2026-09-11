@@ -18,8 +18,8 @@ spec:
     kind: OCIRepository
     name: frigate
   postRenderers:
-    kustomize:
-      patches:
+    - kustomize:
+        patches:
         - target:
             kind: Deployment
             name: frigate
