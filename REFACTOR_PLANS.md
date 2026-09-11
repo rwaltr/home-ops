@@ -552,6 +552,41 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 4. Knuckle headless mode may be useful later for bare-metal installer media
    for mouse instead of hand-rolling flatcar-install
 
+## Session log
+
+### 2026-09-11 — Tesla key host, Matter VLAN presence, VIP firewall fix, Frigate
+
+- **Tesla Fleet integration live**: keypair (EC P-256) in 1P `tesla-fleet` +
+  `/config/tesla_fleet.key` in HA PVC; public key served by new `tesla-key`
+  nginx app at the exact Tesla path (`/.well-known/appspecific/…`, no
+  redirects) — `tesla.waltr.tech`, envoy-external ONLY (Tesla's verifier is
+  the sole consumer). 2026 Model Y → command signing required; user pairs
+  vehicle key at tesla.com/_ak/tesla.waltr.tech.
+- **matter-server got IoT VLAN macvlan** (`10.30.0.11/23`, MAC a6:30:00:10:30:0b,
+  annotation lives in `defaultPodOptions.annotations` — app-template 5.x
+  schema REJECTS `podAnnotations` under controllers): Matter mDNS is IPv6
+  link-local `ff02::fb`, unrouteable — co-VLAN presence is the only fix, no
+  router reflection possible. Verified `_matterc` discovery from the pod.
+- **Leviton WiFi Matter switch**: BLE provisioning requires phone-side GMS;
+  matter-server has no BLE (`commission_with_code: Bluetooth commissioning
+  is not available`). Commission via My Leviton app + share, or GMS phone.
+- **GrapheneOS finding**: Matter/Thread commissioning on Android is mediated
+  by sandboxed GMS; Thread credential handoff is unreliable there. mouse
+  HAS a MediaTek WiFi/BT combo (0e8d:c616) — server-side BLE via
+  matter-server is the future fix; user deferred (old-phone fallback).
+- **k8s-vips / k8s-vips6 chains populated** (TCP 80/443 + UDP 443): they were
+  designed empty (fall-through deny) which ZONEDENY'd phones on IoT reaching
+  homeassistant.waltr.tech. Keep v4/v6 chains symmetric (routeros README).
+- **Router mDNS repeater**: `/ip dns mdns-repeat-ifaces` now covers
+  vlan20-clients + vlan30-iot + vlan10-mgmt (IPv4 mDNS only — v6 LL cannot
+  be reflected by design).
+- **Frigate 0.16.2 (in flight)**: go2rtc embedded (route go2rtc.waltr.tech :1984),
+  cameras VLAN macvlan `10.40.0.11/24` MAC a6:30:00:10:40:0b, config PVC
+  (kopia @H5, 30m jitter), recordings on `/var/tank/nas/nvr` (NOT backed up),
+  CPU detector, anonymous internal mosquitto for HA discovery. RTSP creds
+  via 1P `frigate` item (frigate_rtsp_user/frigate_rtsp_pass) →
+  `frigate-secret` → go2rtc `{ENV}` substitution.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?

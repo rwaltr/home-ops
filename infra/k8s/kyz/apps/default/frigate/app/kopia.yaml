@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+# Kopia enrollment for Frigate's config PVC (namespace-scoped policy; repo via
+# ClusterRepository/cluster-kopia). copyMethod: Direct — crash-consistent
+# live reads (openebs-hostpath has no CSI snapshots). Mover runs as
+# 1000:1000 to match the app's UIDs. Recordings on tank are NOT backed up —
+# they're source data, same policy as media.
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: frigate
+  namespace: default
+spec:
+  repository:
+    kind: ClusterRepository
+    name: cluster-kopia
+  sources:
+    - pvc:
+        name: frigate
+      sourcePathStrategy: PvcName
+  copyMethod: Direct
+  mover:
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+    podSecurityContext:
+      fsGroup: 1000
+  retention:
+    keepLatest: 7
+    keepDaily: 14
+    keepWeekly: 4
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: frigate-nightly
+  namespace: default
+spec:
+  policyRef:
+    name: frigate
+  schedule:
+    cron: "H 5 * * *"
+    jitter: 30m
+    runOnCreate: false
