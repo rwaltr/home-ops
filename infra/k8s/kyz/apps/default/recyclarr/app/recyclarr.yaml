@@ -4,7 +4,7 @@
 # (onedr0p pattern). Keys injected via SONARR_API_KEY/RADARR_API_KEY env.
 sonarr:
   series:
-    base_url: http://sonarr.default.svc.cluster.local
+    base_url: http://sonarr.default.svc.cluster.local:8989
     api_key: !env_var SONARR_API_KEY
     delete_old_custom_formats: true
     media_management:
@@ -41,7 +41,7 @@ sonarr:
 
 radarr:
   movie:
-    base_url: http://radarr.default.svc.cluster.local
+    base_url: http://radarr.default.svc.cluster.local:7878
     api_key: !env_var RADARR_API_KEY
     delete_old_custom_formats: true
     media_naming:
