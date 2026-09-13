@@ -1,9 +1,9 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# Jellyfin media server. Config/state on a PVC; media read-only from the tank
-# DAS (/var/tank/nas/library/...) via hostPath subpaths — least privilege, the
-# container never sees the whole tank. Transcodes are CPU-only (no GPU
-# passthrough yet). UI at jellyfin.waltr.tech (internal).
+# Jellyfin media server. Config/state on a PVC; media read-write from the tank
+# DAS (/var/tank/nas/library/...) via hostPath subpaths. Write access allows
+# MediaDash plugin to remove/re-encode broken files. Transcodes are CPU-only
+# (no GPU passthrough yet). UI at jellyfin.waltr.tech (internal).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -89,28 +89,25 @@ spec:
         storageClass: openebs-hostpath
         globalMounts:
           - path: /config
-      # Media from tank (ZFS DAS) — READ ONLY. Host paths per library.
+      # Media from tank (ZFS DAS) — READ-WRITE for MediaDash plugin.
+      # Host paths per library.
       media-movies:
         type: hostPath
         hostPath: /var/tank/nas/library/media/movies
         globalMounts:
           - path: /media/movies
-            readOnly: true
       media-tv:
         type: hostPath
         hostPath: /var/tank/nas/library/media/tv
         globalMounts:
           - path: /media/tv
-            readOnly: true
       media-videos:
         type: hostPath
         hostPath: /var/tank/nas/library/media/videos
         globalMounts:
           - path: /media/videos
-            readOnly: true
       media-music:
         type: hostPath
         hostPath: /var/tank/nas/library/music
         globalMounts:
           - path: /media/music
-            readOnly: true
