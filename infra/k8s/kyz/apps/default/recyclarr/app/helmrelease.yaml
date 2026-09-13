@@ -1,0 +1,65 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Recyclarr — nightly TRaSH-Guides sync into Sonarr/Radarr (cronjob, not a
+# service). API keys come from 1P item 'arr' via ExternalSecret. Config is the
+# TRaSH WEB-2160p profile + standard unwanted/CF set (onedr0p pattern).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: recyclarr
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: recyclarr
+  values:
+    controllers:
+      recyclarr:
+        type: cronjob
+        cronjob:
+          schedule: "0 0 * * *"
+          backoffLimit: 0
+          concurrencyPolicy: Forbid
+          successfulJobsHistory: 1
+          failedJobsHistory: 1
+          ttlSecondsAfterFinished: 86400
+        containers:
+          app:
+            image:
+              repository: ghcr.io/recyclarr/recyclarr
+              tag: 8.7.2@sha256:6e69e009e1cd7493ff6093e8e187b5d3788c75b4a2c0c5127b6a1beda1c19728
+            env:
+              RECYCLARR_DATA_DIR: /tmp
+            envFrom:
+              - secretRef:
+                  name: "{{ .Release.Name }}-secret"
+            args:
+              - sync
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+        pod:
+          restartPolicy: Never
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    persistence:
+      recyclarr-config:
+        type: configMap
+        name: recyclarr-config
+        globalMounts:
+          - path: /config/recyclarr.yml
+            subPath: recyclarr.yml
+      tmp:
+        type: emptyDir
