@@ -36,6 +36,17 @@ notify_samantha:
     Reusable part: send a notification to Samantha's phone.
     Variables: title, message, notification_id, critical.
   sequence:
+    # Fail loudly if a caller sends blank content (bug guard — a silently
+    # empty notification is worse than a failed automation).
+    - alias: guard-blank-content
+      if: "{{ (title | default('')) == '' and (message | default('')) == '' }}"
+      then:
+        - action: system_log.write
+          data:
+            level: error
+            message: "notify_samantha: refused blank notification (title and message both empty)"
+        - stop: "notify_samantha: blank notification content refused"
+          error: true
     - if: "{{ critical | bool(false) }}"
       then:
         # iOS critical alert: plays at full volume even in DND/silent
@@ -64,6 +75,16 @@ notify_ryan:
     Reusable part: send a notification to Ryan's phone.
     Variables: title, message, notification_id, critical.
   sequence:
+    # same blank-content guard as notify_samantha
+    - alias: guard-blank-content
+      if: "{{ (title | default('')) == '' and (message | default('')) == '' }}"
+      then:
+        - action: system_log.write
+          data:
+            level: error
+            message: "notify_ryan: refused blank notification (title and message both empty)"
+        - stop: "notify_ryan: blank notification content refused"
+          error: true
     - if: "{{ critical | bool(false) }}"
       then:
         # Android: route through alarm stream (max volume channel) so it
