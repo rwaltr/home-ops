@@ -34,10 +34,12 @@ notify_samantha:
     Reusable part: send a notification to Samantha's phone.
     Variables: title, message, notification_id, critical.
   variables: &person_notify_vars
-    title: ""
-    message: ""
-    notification_id: "home"
-    critical: false
+    # NOTE: script-level variables OVERRIDE caller-passed ones, so read the
+    # caller's values back through `this.variables` (blank if not passed).
+    title: "{{ this.variables.get('title', '') }}"
+    message: "{{ this.variables.get('message', '') }}"
+    notification_id: "{{ this.variables.get('notification_id', 'home') }}"
+    critical: "{{ this.variables.get('critical', false) }}"
   sequence:
     - if: "{{ critical | bool(false) }}"
       then:
@@ -94,10 +96,11 @@ notify_who_is_home:
     Notify whoever is currently home (both people if both are home; no-op if
     nobody is). Variables: title, message, notification_id, critical.
   variables: &who_is_home_vars
-    title: ""
-    message: ""
-    notification_id: "home"
-    critical: false
+    # see person_notify_vars note — must read caller values via this.variables
+    title: "{{ this.variables.get('title', '') }}"
+    message: "{{ this.variables.get('message', '') }}"
+    notification_id: "{{ this.variables.get('notification_id', 'home') }}"
+    critical: "{{ this.variables.get('critical', false) }}"
   sequence:
     - if: "{{ is_state('person.samantha', 'home') }}"
       then:
