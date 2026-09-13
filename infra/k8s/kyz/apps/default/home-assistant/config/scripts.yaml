@@ -120,7 +120,7 @@ notify_who_is_home:
             variables: &pass_through_vars
               title: "{{ title | default('') }}"
               message: "{{ message | default('') }}"
-              notification_id: "{{ notification_id }}"
+              notification_id: "{{ notification_id | default('home') }}"
               critical: "{{ critical | default(false) | bool }}"
     - if: "{{ is_state('person.ryan_walter', 'home') }}"
       then:
