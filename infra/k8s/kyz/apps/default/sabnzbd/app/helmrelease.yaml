@@ -82,9 +82,8 @@ spec:
       # tank filesystem, so imports are instant). NOT backed up (source data).
       downloads:
         type: hostPath
-        hostPath:
-          path: /var/tank/nas/downloads
-          type: Directory
+        hostPath: /var/tank/nas/downloads
+        type: Directory
         globalMounts:
           - path: /downloads
       tmp:

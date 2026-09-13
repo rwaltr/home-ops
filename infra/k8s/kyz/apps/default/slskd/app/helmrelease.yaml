@@ -71,13 +71,6 @@ spec:
         ports:
           http:
             port: 5030
-          slskd-tcp:
-            enabled: false # inbound Soulseek connections come via listen port below
-          # Soulseek peer/listen port — outbound only for us (no port forward on
-          # the router needed unless we want inbound search/download slots)
-          soulseek:
-            enabled: false
-    persistence:
       # slskd app-data (db, sessions, config overrides)
       app-data:
         type: persistentVolumeClaim
@@ -88,16 +81,14 @@ spec:
           - path: /app-data
       downloads:
         type: hostPath
-        hostPath:
-          path: /var/tank/nas/downloads
-          type: Directory
+        hostPath: /var/tank/nas/downloads
+        type: Directory
         globalMounts:
           - path: /downloads
       music:
         type: hostPath
-        hostPath:
-          path: /var/tank/nas/library/media/music
-          type: Directory
+        hostPath: /var/tank/nas/library/media/music
+        type: Directory
         globalMounts:
           - path: /media/music
       tmp:
