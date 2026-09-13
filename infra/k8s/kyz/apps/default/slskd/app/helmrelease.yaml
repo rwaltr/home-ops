@@ -55,6 +55,7 @@ spec:
             resources:
               requests:
                 cpu: 100m
+                memory: 250Mi
               limits:
                 memory: 2Gi
     defaultPodOptions:
@@ -71,6 +72,7 @@ spec:
         ports:
           http:
             port: 5030
+    persistence:
       # slskd app-data (db, sessions, config overrides)
       app-data:
         type: persistentVolumeClaim
