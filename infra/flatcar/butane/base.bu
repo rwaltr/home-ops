@@ -53,6 +53,17 @@ storage:
           PORT="41641"
           FLAGS=""
 
+    # Inotify limits: every pod shares the uid-1000 quota for inotify
+    # INSTANCES (kernel default 128) — Sonarr/Radarr/HA/jellyfin/z2m etc. each
+    # hold several and the arr stack exhausted it. Watches bumped too.
+    # Applied by systemd-sysctl at boot; also set live via `sysctl -w`.
+    - path: /etc/sysctl.d/90-inotify.conf
+      mode: 0644
+      contents:
+        inline: |
+          fs.inotify.max_user_instances = 1024
+          fs.inotify.max_user_watches = 1048576
+
     # Bakery tailscale sysext version + sha256 (bump together; Renovate later)
     - path: /etc/flatcar/tailscale-sysext.env
       mode: 0644
