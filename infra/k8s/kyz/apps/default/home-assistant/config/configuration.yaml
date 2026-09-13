@@ -14,6 +14,53 @@ scene: !include scenes.yaml
 # Centralizes the "is anyone home" check used by notify-who-is-home scripts
 # and automations. People only (pets roxy/ivy excluded).
 template:
+  # ── LG ThinQ remain_time +1h bug workaround (home-assistant/core#159194) ──
+  # When a cycle drops below 1h remaining, the integration's timestamp jumps
+  # exactly +1h. Pair below detects that jump: raw_prev delays the raw value
+  # one poll; the corrected sensor subtracts 1h when raw jumps >30min while
+  # still running, then freezes that end time (raw stays ~1h ahead) until the
+  # cycle leaves 'running'. Corrected end = truth, matching the machine UI.
+  - trigger:
+      - platform: state
+        entity_id: sensor.dryer_remaining_time
+    sensor:
+      - name: "Dryer Remaining Time raw previous"
+        unique_id: dryer_remaining_time_raw_prev
+        device_class: timestamp
+        state: "{{ this.state }}"
+
+  - trigger:
+      - platform: state
+        entity_id: sensor.dryer_remaining_time
+        not_to:
+          - unknown
+          - unavailable
+      - platform: state
+        entity_id: sensor.dryer_current_status
+    sensor:
+      - name: "Dryer End Time corrected"
+        unique_id: dryer_end_time_corrected
+        device_class: timestamp
+        state: >-
+          {% set raw = states('sensor.dryer_remaining_time') | as_datetime %}
+          {% set status = states('sensor.dryer_current_status') %}
+          {% set prev = states('sensor.dryer_remaining_time_raw_prev') | as_datetime %}
+          {% set corrected = none if this.state in ['unknown', 'unavailable', 'none']
+                 else this.state | as_datetime %}
+          {% if status != 'running' or raw is none %}
+            {{ raw }}
+          {% elif corrected is not none
+                 and (raw - corrected) > timedelta(minutes=55)
+                 and (raw - corrected) < timedelta(minutes=65) %}
+            {{ corrected }}
+          {% elif prev is not none
+                 and (raw - prev) > timedelta(minutes=30)
+                 and (raw - prev) < timedelta(hours=2) %}
+            {{ raw - timedelta(hours=1) }}
+          {% else %}
+            {{ raw }}
+          {% endif %}
+
   - binary_sensor:
       - name: "Anyone Home"
         unique_id: anyone_home
