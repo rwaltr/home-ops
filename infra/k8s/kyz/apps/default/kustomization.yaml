@@ -19,3 +19,6 @@ resources:
   - ./radarr/ks.yaml
   - ./prowlarr/ks.yaml
   - ./slskd/ks.yaml
+  - ./bazarr/ks.yaml
+  - ./seerr/ks.yaml
+  - ./recyclarr/ks.yaml
