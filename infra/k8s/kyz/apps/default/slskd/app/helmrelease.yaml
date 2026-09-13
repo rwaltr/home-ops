@@ -82,13 +82,11 @@ spec:
       downloads:
         type: hostPath
         hostPath: /var/tank/nas/downloads
-        type: Directory
         globalMounts:
           - path: /downloads
       music:
         type: hostPath
         hostPath: /var/tank/nas/library/media/music
-        type: Directory
         globalMounts:
           - path: /media/music
       tmp:
