@@ -14,7 +14,9 @@
 #   notify_who_is_home_queued      — same dispatcher, but waits up to 24h for
 #                                    someone to arrive home before dispatching
 #
-# Call any of the top-level notify_who_is_home* scripts with variables:
+# IMPORTANT: these scripts define NO script-level variables (they would
+# OVERRIDE caller-passed values — HA gotcha). All lookups use | default()
+# filters so callers may pass any subset of:
 #   title: "Doorbell"
 #   message: "Someone is at the front door"
 #   notification_id: "front-door"   # tag for replacing prior notifications
@@ -33,23 +35,16 @@ notify_samantha:
   description: >-
     Reusable part: send a notification to Samantha's phone.
     Variables: title, message, notification_id, critical.
-  variables: &person_notify_vars
-    # NOTE: script-level variables OVERRIDE caller-passed ones, so read the
-    # caller's values back through `this.variables` (blank if not passed).
-    title: "{{ this.variables.get('title', '') }}"
-    message: "{{ this.variables.get('message', '') }}"
-    notification_id: "{{ this.variables.get('notification_id', 'home') }}"
-    critical: "{{ this.variables.get('critical', false) }}"
   sequence:
     - if: "{{ critical | bool(false) }}"
       then:
         # iOS critical alert: plays at full volume even in DND/silent
         - action: notify.mobile_app_samanthas_iphone
           data:
-            title: "{{ title }}"
-            message: "{{ message }}"
+            title: "{{ title | default('') }}"
+            message: "{{ message | default('') }}"
             data:
-              tag: "{{ notification_id }}"
+              tag: "{{ notification_id | default('home') }}"
               push:
                 interruption-level: critical
                 sound:
@@ -59,16 +54,15 @@ notify_samantha:
       else:
         - action: notify.mobile_app_samanthas_iphone
           data: &notify_payload
-            title: "{{ title }}"
-            message: "{{ message }}"
+            title: "{{ title | default('') }}"
+            message: "{{ message | default('') }}"
             data:
-              tag: "{{ notification_id }}"
+              tag: "{{ notification_id | default('home') }}"
 
 notify_ryan:
   description: >-
     Reusable part: send a notification to Ryan's phone.
     Variables: title, message, notification_id, critical.
-  variables: *person_notify_vars
   sequence:
     - if: "{{ critical | bool(false) }}"
       then:
@@ -76,10 +70,10 @@ notify_ryan:
         # breaks through Do Not Disturb
         - action: notify.mobile_app_rwaltrpixel10
           data:
-            title: "{{ title }}"
-            message: "{{ message }}"
+            title: "{{ title | default('') }}"
+            message: "{{ message | default('') }}"
             data:
-              tag: "{{ notification_id }}"
+              tag: "{{ notification_id | default('home') }}"
               channel: alarm_stream
               importance: high
               priority: high
@@ -95,12 +89,6 @@ notify_who_is_home:
   description: >-
     Notify whoever is currently home (both people if both are home; no-op if
     nobody is). Variables: title, message, notification_id, critical.
-  variables: &who_is_home_vars
-    # see person_notify_vars note — must read caller values via this.variables
-    title: "{{ this.variables.get('title', '') }}"
-    message: "{{ this.variables.get('message', '') }}"
-    notification_id: "{{ this.variables.get('notification_id', 'home') }}"
-    critical: "{{ this.variables.get('critical', false) }}"
   sequence:
     - if: "{{ is_state('person.samantha', 'home') }}"
       then:
@@ -109,10 +97,10 @@ notify_who_is_home:
             entity_id: script.notify_samantha
           data:
             variables: &pass_through_vars
-              title: "{{ title }}"
-              message: "{{ message }}"
+              title: "{{ title | default('') }}"
+              message: "{{ message | default('') }}"
               notification_id: "{{ notification_id }}"
-              critical: "{{ critical | bool(false) }}"
+              critical: "{{ critical | default(false) | bool }}"
     - if: "{{ is_state('person.ryan_walter', 'home') }}"
       then:
         - action: script.turn_on
@@ -133,7 +121,6 @@ notify_who_is_home_queued:
     notification_id, critical.
   mode: queued
   max: 10
-  variables: *who_is_home_vars
   sequence:
     - wait_template: "{{ is_state('binary_sensor.anyone_home', 'on') }}"
       timeout: "24:00:00"
