@@ -1,0 +1,142 @@
+# Home Assistant scripts — "notify who is home"
+#
+# Source-of-truth copy. HA's /config is PVC-managed (not Flux-applied), so
+# this file is copied into the home-assistant pod at /config/scripts.yaml and
+# reloaded (script.reload). See header commands at the bottom of this file.
+#
+# Structure (reusable parts):
+#   binary_sensor.anyone_home      — presence helper (configuration.yaml):
+#                                    on if Samantha or Ryan is home
+#   notify_samantha / notify_ryan  — per-person delivery, share an anchored
+#                                    payload (tag = notification_id)
+#   notify_who_is_home             — dispatcher: notifies whoever is home
+#                                    (both if both, nobody if empty)
+#   notify_who_is_home_queued      — same dispatcher, but waits up to 24h for
+#                                    someone to arrive home before dispatching
+#
+# Call any of the top-level notify_who_is_home* scripts with variables:
+#   title: "Doorbell"
+#   message: "Someone is at the front door"
+#   notification_id: "front-door"   # tag for replacing prior notifications
+#   critical: true                  # optional: break through DND (iOS critical
+#                                   # alert / Android alarm_stream channel)
+
+---
+# ── Reusable part: per-person delivery ──────────────────────────────────────
+# Called by the dispatcher via script.turn_on with {title, message,
+# notification_id}. The payload is anchored once and shared by every notifier.
+# Critical flag: when `critical` is true the payload switches to a
+# platform-specific critical alert that breaks through Do Not Disturb:
+#   iOS (Samantha): push.sound.critical + interruption-level: critical
+#   Android (Ryan): alarm_stream channel, high priority/importance
+notify_samantha:
+  description: >-
+    Reusable part: send a notification to Samantha's phone.
+    Variables: title, message, notification_id, critical.
+  variables: &person_notify_vars
+    title: ""
+    message: ""
+    notification_id: "home"
+    critical: false
+  sequence:
+    - if: "{{ critical | bool(false) }}"
+      then:
+        # iOS critical alert: plays at full volume even in DND/silent
+        - action: notify.mobile_app_samanthas_iphone
+          data:
+            title: "{{ title }}"
+            message: "{{ message }}"
+            data:
+              tag: "{{ notification_id }}"
+              push:
+                interruption-level: critical
+                sound:
+                  name: default
+                  critical: 1
+                  volume: 1.0
+      else:
+        - action: notify.mobile_app_samanthas_iphone
+          data: &notify_payload
+            title: "{{ title }}"
+            message: "{{ message }}"
+            data:
+              tag: "{{ notification_id }}"
+
+notify_ryan:
+  description: >-
+    Reusable part: send a notification to Ryan's phone.
+    Variables: title, message, notification_id, critical.
+  variables: *person_notify_vars
+  sequence:
+    - if: "{{ critical | bool(false) }}"
+      then:
+        # Android: route through alarm stream (max volume channel) so it
+        # breaks through Do Not Disturb
+        - action: notify.mobile_app_rwaltrpixel10
+          data:
+            title: "{{ title }}"
+            message: "{{ message }}"
+            data:
+              tag: "{{ notification_id }}"
+              channel: alarm_stream
+              importance: high
+              priority: high
+              ttl: 0
+      else:
+        - action: notify.mobile_app_rwaltrpixel10
+          data: *notify_payload
+
+# ── Non-queued: notify only who is home (right now) ─────────────────────────
+# Fires immediately. One independent check per person — 0, 1 or both get
+# notified depending on who's home.
+notify_who_is_home:
+  description: >-
+    Notify whoever is currently home (both people if both are home; no-op if
+    nobody is). Variables: title, message, notification_id, critical.
+  variables: &who_is_home_vars
+    title: ""
+    message: ""
+    notification_id: "home"
+    critical: false
+  sequence:
+    - if: "{{ is_state('person.samantha', 'home') }}"
+      then:
+        - action: script.turn_on
+          target:
+            entity_id: script.notify_samantha
+          data:
+            variables: &pass_through_vars
+              title: "{{ title }}"
+              message: "{{ message }}"
+              notification_id: "{{ notification_id }}"
+              critical: "{{ critical | bool(false) }}"
+    - if: "{{ is_state('person.ryan_walter', 'home') }}"
+      then:
+        - action: script.turn_on
+          target:
+            entity_id: script.notify_ryan
+          data:
+            variables: *pass_through_vars
+
+# ── Queued: wait for someone to get home, then notify them ──────────────────
+# If someone is already home this fires immediately (same as the non-queued
+# version). If nobody is home, the run parks in a wait queue (up to 24h,
+# max 10 queued runs) until one of us arrives, then dispatches to whoever is
+# home at that moment.
+notify_who_is_home_queued:
+  description: >-
+    Notify whoever is home, queueing the notification until someone arrives
+    if nobody is home (waits up to 24h). Variables: title, message,
+    notification_id, critical.
+  mode: queued
+  max: 10
+  variables: *who_is_home_vars
+  sequence:
+    - wait_template: "{{ is_state('binary_sensor.anyone_home', 'on') }}"
+      timeout: "24:00:00"
+      continue_on_timeout: false
+    - action: script.turn_on
+      target:
+        entity_id: script.notify_who_is_home
+      data:
+        variables: *pass_through_vars

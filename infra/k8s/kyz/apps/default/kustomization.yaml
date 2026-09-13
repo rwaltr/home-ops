@@ -14,3 +14,8 @@ resources:
   - ./tesla-key/ks.yaml
   - ./zigbee2mqtt/ks.yaml
   - ./zwave-js-ui/ks.yaml
+  - ./sabnzbd/ks.yaml
+  - ./sonarr/ks.yaml
+  - ./radarr/ks.yaml
+  - ./prowlarr/ks.yaml
+  - ./slskd/ks.yaml

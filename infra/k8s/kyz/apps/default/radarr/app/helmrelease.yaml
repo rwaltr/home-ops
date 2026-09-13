@@ -1,0 +1,93 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: radarr
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: radarr
+  values:
+    controllers:
+      radarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/home-operations/radarr
+              tag: 6.4.3.10645@sha256:0ebb4ae26ee9522674a4ad1855e926fd6b97c534ff982644c9c9a87bca740077
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /ping
+                    port: 7878
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                memory: 4Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        forceRename: "{{ .Release.Name }}"
+        primary: true
+        ports:
+          http:
+            port: 7878
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      downloads:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/downloads
+          type: Directory
+        globalMounts:
+          - path: /downloads
+      media:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/library/media
+          type: Directory
+        globalMounts:
+          - path: /media
+      tmp:
+        type: emptyDir

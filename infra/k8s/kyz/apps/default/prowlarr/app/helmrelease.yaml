@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prowlarr
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: prowlarr
+  values:
+    controllers:
+      prowlarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/home-operations/prowlarr
+              tag: 2.6.3.5592@sha256:8c9ee448bb6de0e3e8b9c2f536b7a3455ec6ff5e184c2fb2a8602791b2757442
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /ping
+                    port: 9696
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+              limits:
+                memory: 1Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        forceRename: "{{ .Release.Name }}"
+        primary: true
+        ports:
+          http:
+            port: 9696
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 2Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      tmp:
+        type: emptyDir

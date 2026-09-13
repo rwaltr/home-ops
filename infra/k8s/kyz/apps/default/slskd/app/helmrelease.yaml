@@ -1,0 +1,104 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: slskd
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: slskd
+  values:
+    controllers:
+      slskd:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/slskd/slskd
+              tag: 0.26.0@sha256:ecd4026d4f8fb504e2cc55323efa2c1f5b56d20d3686b018249cc36b48ea17a6
+            env:
+              TZ: America/Chicago
+              SLSKD__REMOTE__FILE_MANAGEMENT__ENABLED: "true"
+            envFrom:
+              - secretRef:
+                  name: "{{ .Release.Name }}-secret"
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: 5030
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                memory: 2Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        forceRename: "{{ .Release.Name }}"
+        primary: true
+        ports:
+          http:
+            port: 5030
+          slskd-tcp:
+            enabled: false # inbound Soulseek connections come via listen port below
+          # Soulseek peer/listen port — outbound only for us (no port forward on
+          # the router needed unless we want inbound search/download slots)
+          soulseek:
+            enabled: false
+    persistence:
+      # slskd app-data (db, sessions, config overrides)
+      app-data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /app-data
+      downloads:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/downloads
+          type: Directory
+        globalMounts:
+          - path: /downloads
+      music:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/library/media/music
+          type: Directory
+        globalMounts:
+          - path: /media/music
+      tmp:
+        type: emptyDir

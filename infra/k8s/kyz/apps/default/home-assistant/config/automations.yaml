@@ -1,0 +1,77 @@
+# Home Assistant automations
+#
+# Source-of-truth copy. HA's /config is PVC-managed (not Flux-applied), so
+# this file is copied into the home-assistant pod at /config/automations.yaml
+# and reloaded (automation.reload).
+#
+# K.I.T.T. entities used (Tesla integration):
+#   device_tracker.k_i_t_t_route          — destination tracker; state becomes
+#                                           the destination zone when navigating
+#   sensor.k_i_t_t_distance_to_arrival    — mi remaining while navigation active
+#   sensor.k_i_t_t_time_to_arrival        — ETA timestamp while navigation active
+#
+# The notification itself goes through the reusable notify-who-is-home scripts
+# (see scripts.yaml): whoever is home gets it, both if both are home, no-op if
+# nobody is home.
+
+---
+- id: kitt_on_the_way_home
+  alias: K.I.T.T. On The Way Home
+  description: >-
+    When K.I.T.T. is navigating to somewhere at/near home, notify whoever is
+    home that it's on its way, with distance and ETA. Reuses
+    script.notify_who_is_home for delivery.
+  mode: single
+  max_exceeded: silent
+  triggers:
+    # Navigation started: route tracker goes from unknown to a destination
+    - trigger: state
+      entity_id: device_tracker.k_i_t_t_route
+      from:
+        - unknown
+        - unavailable
+    # Distance updates while driving (gated by the 10-minute throttle below)
+    - trigger: numeric_state
+      entity_id: sensor.k_i_t_t_distance_to_arrival
+      above: 0
+  conditions:
+    # Someone is home to receive it (reusable presence helper)
+    - condition: state
+      entity_id: binary_sensor.anyone_home
+      state: "on"
+    # Navigation is actually active
+    - condition: template
+      value_template: >-
+        {{ states('sensor.k_i_t_t_distance_to_arrival') not in
+           ['unknown', 'unavailable', 'none'] }}
+    # Destination is home: route tracker is in the home zone, or its GPS is
+    # within 1.5 km of home (covers "Home" favorites slightly outside the zone)
+    - condition: template
+      value_template: >-
+        {% set d = distance('device_tracker.k_i_t_t_route', 'zone.home') %}
+        {{ states('device_tracker.k_i_t_t_route') == 'home'
+           or (d is not none and d < 1.5) }}
+    # Don't re-fire on every distance update — once per 10 minutes
+    - condition: template
+      value_template: >-
+        {{ this.attributes.last_triggered is none
+           or (now() - this.attributes.last_triggered) > timedelta(minutes=10) }}
+  actions:
+    - action: script.turn_on
+      target:
+        entity_id: script.notify_who_is_home
+      data:
+        variables:
+          title: "K.I.T.T. inbound"
+          message: >-
+            K.I.T.T. is on its way home
+            {%- set dist = states('sensor.k_i_t_t_distance_to_arrival') -%}
+            {%- if dist not in ['unknown', 'unavailable', 'none'] -%}
+              , {{ dist }} mi out
+            {%- endif -%}
+            {%- set eta = states('sensor.k_i_t_t_time_to_arrival') -%}
+            {%- if eta not in ['unknown', 'unavailable', 'none'] -%}
+              (ETA ~ {{ eta | as_datetime | as_local | as_timestamp
+                        | timestamp_custom('%-I:%M %p') }})
+            {%- endif -%}
+          notification_id: kitt-inbound

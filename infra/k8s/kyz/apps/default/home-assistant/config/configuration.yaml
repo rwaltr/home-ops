@@ -1,0 +1,35 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# ── Reusable presence helpers ───────────────────────────────────────────────
+# Centralizes the "is anyone home" check used by notify-who-is-home scripts
+# and automations. People only (pets roxy/ivy excluded).
+template:
+  - binary_sensor:
+      - name: "Anyone Home"
+        unique_id: anyone_home
+        device_class: occupancy
+        state: >-
+          {{ is_state('person.samantha', 'home')
+             or is_state('person.ryan_walter', 'home') }}
+
+
+# ── Manual toggles (UI-editable helpers) ────────────────────────────────────
+# guest_mode: no consumers yet — intended future uses: suppress
+# notify-who-is-home dispatch when guests are over, gate guest-facing
+# automations, etc.
+input_boolean:
+  guest_mode:
+    name: Guest Mode
+    icon: mdi:account-multiple-outline
+
+prometheus:

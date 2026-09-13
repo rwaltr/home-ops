@@ -1,0 +1,95 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: sonarr
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: sonarr
+  values:
+    controllers:
+      sonarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/home-operations/sonarr
+              tag: 4.0.20.3012@sha256:1f19eb5e0f421418c1a956bbe01310a0141423afe28bd9a4b1dcb8629ff2bce2
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /ping
+                    port: 8989
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                memory: 4Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        forceRename: "{{ .Release.Name }}"
+        primary: true
+        ports:
+          http:
+            port: 8989
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      # RW so sonarr can hardlink/move completed downloads into the library.
+      # tank is not backed up (source data lives outside snapshot scope).
+      downloads:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/downloads
+          type: Directory
+        globalMounts:
+          - path: /downloads
+      media:
+        type: hostPath
+        hostPath:
+          path: /var/tank/nas/library/media
+          type: Directory
+        globalMounts:
+          - path: /media
+      tmp:
+        type: emptyDir
