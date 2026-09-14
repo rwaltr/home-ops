@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: rustfs
-      version: 1.0.0-rc.5
+      version: 1.0.0-rc.6
       sourceRef:
         kind: HelmRepository
         name: rustfs
