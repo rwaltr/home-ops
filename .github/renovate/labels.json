@@ -33,6 +33,10 @@
       "addLabels": ["renovate/github-release"]
     },
     {
+      "matchUpdateTypes": ["digest"],
+      "addLabels": ["type/digest"]
+    },
+    {
       "matchManagers": ["github-actions"],
       "addLabels": ["renovate/github-action"]
     }

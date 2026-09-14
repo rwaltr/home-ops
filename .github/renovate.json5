@@ -1,18 +1,15 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // home-operations preset (as used by onedr0p/home-ops) wires up the flux,
+  // helm-values, kubernetes and kustomize managers for infra/k8s/kyz, plus
+  // oci:// + "# renovate:" annotated custom managers and container digest handling.
   extends: [
-    "config:recommended",
-    ":disableRateLimiting",
-    ":dependencyDashboard",
-    ":semanticCommits",
-    ":separatePatchReleases",
-    "docker:enableMajor",
+    "github>home-operations/renovate-presets#8.1.0",
+    ":timezone(America/Chicago)",
     ":enablePreCommit",
     "github>rwaltr/home-ops//.github/renovate/autoMerge",
     "github>rwaltr/home-ops//.github/renovate/labels",
   ],
-  dependencyDashboardTitle: "Renovate Dashboard 🤖",
   suppressNotifications: ["prIgnoreNotification"],
   rebaseWhen: "conflicted",
-  ignorePaths: ["docs/**"],
 }

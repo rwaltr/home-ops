@@ -1,20 +1,41 @@
 {
   "packageRules": [
     {
-      "matchDatasources": [
-        "docker",
-        "github-tags"
-      ],
+      "description": "Auto-merge trusted home-operations container digests",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest"],
+      "matchPackageNames": ["/home-operations/"],
+      "automerge": true,
+      "automergeType": "pr",
+      "ignoreTests": false
+    },
+    {
+      "description": "Auto-merge GitHub Actions (minor/patch/digest)",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
       "automergeType": "branch",
-      "requiredStatusChecks": null,
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "matchPackageNames": [
-        "renovatebot/github-action"
-      ]
+      "minimumReleaseAge": "3 days",
+      "ignoreTests": true
+    },
+    {
+      "description": "Auto-merge trusted GitHub Actions immediately",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["/^actions\\//", "/^renovatebot\\//", "/^tibdex\\//", "/^oxsecurity\\//"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
+      "automergeType": "branch",
+      "minimumReleaseAge": "1 day",
+      "ignoreTests": true
+    },
+    {
+      "description": "Auto-merge Renovate action updates",
+      "matchDatasources": ["docker", "github-tags"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchPackageNames": ["renovatebot/github-action"],
+      "automerge": true,
+      "automergeType": "branch",
+      "requiredStatusChecks": null
     }
   ]
 }

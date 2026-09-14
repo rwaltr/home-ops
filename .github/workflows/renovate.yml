@@ -19,6 +19,8 @@ on: # yamllint disable-line rule:truthy
       - master
     paths:
       - ".github/renovate.json5"
+      - ".github/renovate.json5"
+      - ".github/renovate/**.json5"
       - ".github/renovate/**.json"
 
 concurrency:
