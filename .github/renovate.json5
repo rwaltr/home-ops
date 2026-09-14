@@ -11,5 +11,7 @@
     "github>rwaltr/home-ops//.github/renovate/labels",
   ],
   suppressNotifications: ["prIgnoreNotification"],
-  rebaseWhen: "conflicted",
+  // keep PRs current so lint:fmt (whole-repo oxfmt check) always sees the
+  // formatted tree; auto-rebases stale PRs instead of only conflicted ones
+  rebaseWhen: "behind-base-branch",
 }
