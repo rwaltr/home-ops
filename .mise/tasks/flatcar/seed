@@ -23,6 +23,7 @@ fi
 
 log "Waiting for SSH..."
 SECONDS=0
+# shellcheck disable=SC2086
 until ssh ${SSH_OPTS} "${TARGET}" true 2>/dev/null; do
     [ "${SECONDS}" -gt 300 ] && die "Timed out waiting for SSH after 5m"
     sleep 5

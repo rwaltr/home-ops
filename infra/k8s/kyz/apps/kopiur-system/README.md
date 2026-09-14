@@ -2,11 +2,11 @@
 
 Kopia-native PVC backups for the mouse cluster. Three apps, one namespace:
 
-| App                | What it is                                                              |
-| ------------------ | ----------------------------------------------------------------------- |
-| `rustfs/`          | S3 backend (official chart, standalone) on a static hostPath PV → `tank/backup/k8s`, node-pinned to mouse (follows the DAS) |
-| `kopiur/`          | The operator (CRDs, controller, webhook; self-managed webhook TLS — no cert-manager) |
-| `kopiur-repo/`     | The repository config: `ClusterRepository/cluster-kopia` + credential fanout |
+| App            | What it is                                                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `rustfs/`      | S3 backend (official chart, standalone) on a static hostPath PV → `tank/backup/k8s`, node-pinned to mouse (follows the DAS) |
+| `kopiur/`      | The operator (CRDs, controller, webhook; self-managed webhook TLS — no cert-manager)                                        |
+| `kopiur-repo/` | The repository config: `ClusterRepository/cluster-kopia` + credential fanout                                                |
 
 ## Data flow
 

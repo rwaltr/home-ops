@@ -21,7 +21,12 @@
     {
       "description": "Auto-merge trusted GitHub Actions immediately",
       "matchManagers": ["github-actions"],
-      "matchPackageNames": ["/^actions\\//", "/^renovatebot\\//", "/^tibdex\\//", "/^oxsecurity\\//"],
+      "matchPackageNames": [
+        "/^actions\\//",
+        "/^renovatebot\\//",
+        "/^tibdex\\//",
+        "/^oxsecurity\\//"
+      ],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
       "automergeType": "branch",

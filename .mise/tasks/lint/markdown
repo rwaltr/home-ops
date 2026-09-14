@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Lint Markdown files (markdownlint-cli2)"
+set -euo pipefail
+
+markdownlint-cli2 --config .github/linters/markdownlint.yaml \
+  "**/*.md" "!**/.terraform/**" "#node_modules"

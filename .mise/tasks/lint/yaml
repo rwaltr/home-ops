@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Lint YAML files (yamllint)"
+set -euo pipefail
+
+yamllint -c .github/linters/yamllint.yaml infra/ .mise/ .pre-commit-config.yaml

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Lint mise task shell scripts (shellcheck)"
+set -euo pipefail
+
+# shellcheck disable=SC2038
+find .mise/tasks .mise/lib -type f | xargs shellcheck -x

@@ -17,12 +17,14 @@ fi
 
 log "Waiting for SSH on 127.0.0.1:${SSH_PORT}..."
 SECONDS=0
+# shellcheck disable=SC2086
 until ssh ${SSH_OPTS} "${TARGET}" true 2>/dev/null; do
     [ "${SECONDS}" -gt 300 ] && die "Timed out waiting for SSH after 5m"
     sleep 5
 done
 log "✓ SSH up after ${SECONDS}s"
 
+# shellcheck disable=SC2086
 SSH="ssh ${SSH_OPTS} ${TARGET}"
 
 echo ""

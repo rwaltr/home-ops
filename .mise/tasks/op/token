@@ -16,6 +16,7 @@ command -v secret-tool >/dev/null || die "secret-tool not found (install libsecr
 # Requires an interactive `op` sign-in (your personal account) to mint service accounts.
 op whoami &>/dev/null || die "op not signed in — run: op signin --shell fish | source"
 
+# shellcheck disable=SC2086
 if [ -z "${usage_rotate:-}" ] && secret-tool lookup $ATTRS >/dev/null 2>&1; then
   log "Token already stored (use --rotate to replace)"
   exit 0
@@ -28,10 +29,13 @@ TOKEN="$(op service-account create "$SA_NAME" \
   --raw)" || die "service account creation failed"
 [ -n "$TOKEN" ] || die "empty token returned"
 
+# shellcheck disable=SC2086
 printf '%s' "$TOKEN" | secret-tool store --label="$LABEL" $ATTRS
 unset TOKEN
 
+# shellcheck disable=SC2086
 STORED="$(secret-tool lookup $ATTRS)"
 [ -n "$STORED" ] || die "stored token not readable back"
+# shellcheck disable=SC2086
 log "Stored in gnome-keyring: secret-tool lookup $ATTRS"
 log "k8s:bootstrap (and any op call) will use it automatically for the next $EXPIRES"

@@ -22,6 +22,6 @@ spec:
         name: test
       spec:
         network:
-          provider: custom    # Cilium installed out-of-band (flatcar:k0s task)
+          provider: custom # Cilium installed out-of-band (flatcar:k0s task)
           kubeProxy:
-            disabled: true    # Cilium kubeProxyReplacement
+            disabled: true # Cilium kubeProxyReplacement

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE alias="lint"
+#MISE description="Run all linters (actions, security, yaml, markdown, shell, fmt-check)"
+#MISE depends=["lint:actions", "lint:security", "lint:yaml", "lint:markdown", "lint:shell", "lint:fmt"]
+
+echo "All lint checks completed"

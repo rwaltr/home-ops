@@ -44,7 +44,7 @@ fi
 [ -f "${KUBECONFIG}" ] && sed -i "s|https://127.0.0.1:6443|https://127.0.0.1:${API_PORT}|" "${KUBECONFIG}"
 
 log "=== Waiting for node to register (will stay NotReady until Cilium) ==="
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
     kubectl get nodes --no-headers 2>/dev/null | grep -q . && break
     sleep 5
 done

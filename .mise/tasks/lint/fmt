@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Check formatting (oxfmt --check on yaml/json/markdown)"
+set -euo pipefail
+
+oxfmt --check .

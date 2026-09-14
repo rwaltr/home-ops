@@ -7,4 +7,5 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2086
 terraform -chdir="${MISE_PROJECT_ROOT}/infra/terraform/${usage_dir?}" plan ${usage_tf_args:-}

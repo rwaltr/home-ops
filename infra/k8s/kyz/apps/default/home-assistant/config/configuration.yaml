@@ -1,4 +1,3 @@
-
 # Loads default set of integrations. Do not remove.
 default_config:
 
@@ -68,7 +67,6 @@ template:
         state: >-
           {{ is_state('person.samantha', 'home')
              or is_state('person.ryan_walter', 'home') }}
-
 
 # ── Manual toggles (UI-editable helpers) ────────────────────────────────────
 # guest_mode: no consumers yet — intended future uses: suppress

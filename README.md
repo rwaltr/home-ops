@@ -82,14 +82,14 @@ Age-based secrets management — sensitive values are encrypted inline alongside
 
 **mouse** (Flatcar) — primary infrastructure host:
 
-| Role           | Details                                    |
-| -------------- | ------------------------------------------ |
-| Storage        | ZFS tank pool (raidz1×2, `/var/tank`)      |
-| Kubernetes     | single-node k0s + Cilium                   |
-| Object Storage | RustFS (S3-compatible, in-cluster)        |
-| Backups        | kopiur + kopia → RustFS on tank           |
-| Monitoring     | Netdata (moving in-cluster)                |
-| Access         | Tailscale + mDNS (`mouse.local`)           |
+| Role           | Details                               |
+| -------------- | ------------------------------------- |
+| Storage        | ZFS tank pool (raidz1×2, `/var/tank`) |
+| Kubernetes     | single-node k0s + Cilium              |
+| Object Storage | RustFS (S3-compatible, in-cluster)    |
+| Backups        | kopiur + kopia → RustFS on tank       |
+| Monitoring     | Netdata (moving in-cluster)           |
+| Access         | Tailscale + mDNS (`mouse.local`)      |
 
 Config: `infra/flatcar/butane/hosts/mouse.bu`
 
@@ -134,11 +134,11 @@ segment.
 
 | VLAN | Name      | IPv4         | IPv6 (ULA)             | DHCP/RA | Purpose                     |
 | ---- | --------- | ------------ | ---------------------- | ------- | --------------------------- |
-| 10   | mgmt      | 10.10.0.0/24 | fdad:207a:f1ab:10::/64 | ✔      | Network gear + `mouse` host |
-| 20   | clients   | 10.20.0.0/24 | fdad:207a:f1ab:20::/64 | ✔      | TVs, phones, laptops        |
-| 30   | iot       | 10.30.0.0/23 | fdad:207a:f1ab:30::/64 | ✔      | Appliances and robots       |
-| 40   | cameras   | 10.40.0.0/24 | fdad:207a:f1ab:40::/64 | ✔      | Reolink cameras             |
-| 60   | untrusted | 10.60.0.0/24 | fdad:207a:f1ab:60::/64 | ✔      | Guest — upstream DNS only   |
+| 10   | mgmt      | 10.10.0.0/24 | fdad:207a:f1ab:10::/64 | ✔       | Network gear + `mouse` host |
+| 20   | clients   | 10.20.0.0/24 | fdad:207a:f1ab:20::/64 | ✔       | TVs, phones, laptops        |
+| 30   | iot       | 10.30.0.0/23 | fdad:207a:f1ab:30::/64 | ✔       | Appliances and robots       |
+| 40   | cameras   | 10.40.0.0/24 | fdad:207a:f1ab:40::/64 | ✔       | Reolink cameras             |
+| 60   | untrusted | 10.60.0.0/24 | fdad:207a:f1ab:60::/64 | ✔       | Guest — upstream DNS only   |
 
 The router recurses DNS to Quad9/Cloudflare and repeats mDNS between clients
 and IoT. A link-local rescue port lives on `ether8-oob` (`fe80::1`).
@@ -193,7 +193,7 @@ Flatcar OS runs on a separate 1TB NVMe. Every dataset uses lz4 compression with
 | tank/nas/library  | /var/tank/nas/library  | 6.63T | Media, games, books, music       |
 | tank/nas/pictures | /var/tank/nas/pictures | 14.4G | Photo library                    |
 | tank/home/rwaltr  | /var/tank/home/rwaltr  | 36.8G | Home directory                   |
-| tank/backup/k8s   | /var/tank/backup/k8s   | —     | kopia repository (via RustFS)   |
+| tank/backup/k8s   | /var/tank/backup/k8s   | —     | kopia repository (via RustFS)    |
 | tank/services     | /var/tank/services     | —     | Reserved for in-cluster services |
 
 Pool health is automated with a monthly scrub timer and `zfs-zed` for events.

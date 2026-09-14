@@ -164,6 +164,7 @@ add action=accept chain=forward \
 ```
 
 (placed before `defconf: drop invalid`). Alternatives considered:
+
 - **B — router src-NAT on the hairpin**: fully symmetric flows, no invalid
   packets, but services lose real client IPs and replies take an extra hop
 - **C — per-client static routes**: works but unmanageable for phones/IoT
