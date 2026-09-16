@@ -15,6 +15,41 @@
 # nobody is home.
 
 ---
+- id: kitt_charge_reminder
+  alias: KITT: plug-in reminder
+  description: >-
+    When the car arrives home, wait 30 minutes, wake the car, then if it still
+    isn't charging, nudge whoever is home. Wake avoids stale-charging false
+    positives (asleep car reports last session's state). 30-minute delay so a
+    short errand after arriving doesn't race the reminder window.
+  mode: single
+  max_exceeded: silent
+  triggers:
+    - trigger: state
+      entity_id: device_tracker.k_i_t_t_location
+      to: home
+  conditions: []
+  actions:
+    - delay:
+        minutes: 30
+    - action: button.press
+      target:
+        entity_id: button.k_i_t_t_wake
+    - delay:
+        seconds: 45
+    - condition: state
+      entity_id: device_tracker.k_i_t_t_location
+      state: home
+    - condition: template
+      value_template: "{{ states('sensor.k_i_t_t_charging') in ['disconnected','no_power','stopped'] }}"
+    - action: script.turn_on
+      target:
+        entity_id: script.notify_who_is_home_queued
+      data:
+        variables:
+          title: "KITT"
+          message: "The car has been home for 30 minutes and isn't charging — go plug it in."
+
 - id: kitt_on_the_way_home
   alias: K.I.T.T. On The Way Home
   description: >-
