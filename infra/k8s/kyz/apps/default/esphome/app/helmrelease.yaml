@@ -33,24 +33,34 @@ spec:
               # and the iot NAD's sbr source-binds to 10.30.0.0/23.
               ESPHOME_DASHBOARD_USE_PING: "true"
             probes:
+              # NOTE: app-template defaults an un-annotated probe to the FIRST
+              # service port (alphabetically `api`/6053 here) — that is not
+              # served by this container, so every probe is pinned to `http`.
               liveness:
                 enabled: true
+                custom: true
                 spec:
+                  tcpSocket:
+                    port: http
                   periodSeconds: 30
                   timeoutSeconds: 5
                   failureThreshold: 5
               readiness:
                 enabled: true
+                custom: true
                 spec:
                   httpGet:
                     path: /
-                    port: &port 6052
+                    port: http
                   periodSeconds: 10
                   timeoutSeconds: 5
                   failureThreshold: 5
               startup:
                 enabled: true
+                custom: true
                 spec:
+                  tcpSocket:
+                    port: http
                   failureThreshold: 30
                   periodSeconds: 10
             securityContext:
@@ -85,7 +95,7 @@ spec:
         controller: esphome
         ports:
           http:
-            port: *port
+            port: 6052
           api:
             port: 6053
           peer-link:
@@ -100,6 +110,12 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
+        # Pin the route to the dashboard port; without this app-template picks
+        # the first service port (`api`/6053) and the route breaks.
+        rules:
+          - backendRefs:
+              - identifier: app
+                port: http
     persistence:
       config:
         type: persistentVolumeClaim
