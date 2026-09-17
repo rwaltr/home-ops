@@ -695,6 +695,16 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
 - **Dashboard auth deferred**: runWithoutAuthentication warning is expected;
   envoy-internal only. Wire `ESPHOME_USERNAME`/`ESPHOME_PASSWORD` from 1P if
   it ever gets a public route.
+- **HA does NOT connect to this server** — the `esphome` integration talks to
+  each ESP device on TCP 6053 (native API, `api.encryption.key`); the pod is
+  the build/flash UI on 6052 only. Exposing 6053 on the Service is inert
+  (reverted).
+- **app-template 5.x probe/route gotcha**: an un-pinned probe (and a
+  `route` without explicit `rules`) defaults to the **first service port by
+  alphabetical key**. Adding an `api` port made every probe and the HTTPRoute
+  target 6053, un-readying the pod and breaking the route. Fix if extra ports
+  are ever needed: `probes.*.custom: true` with an integer `port:`, and
+  `route.<x>.rules[].backendRefs[].port: http`.
 
 ## Open questions
 
