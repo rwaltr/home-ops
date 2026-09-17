@@ -35,13 +35,13 @@ spec:
             probes:
               # NOTE: app-template defaults an un-annotated probe to the FIRST
               # service port (alphabetically `api`/6053 here) — that is not
-              # served by this container, so every probe is pinned to `http`.
+              # served by this container, so every probe is pinned to 6052.
               liveness:
                 enabled: true
                 custom: true
                 spec:
                   tcpSocket:
-                    port: http
+                    port: 6052
                   periodSeconds: 30
                   timeoutSeconds: 5
                   failureThreshold: 5
@@ -51,7 +51,7 @@ spec:
                 spec:
                   httpGet:
                     path: /
-                    port: http
+                    port: 6052
                   periodSeconds: 10
                   timeoutSeconds: 5
                   failureThreshold: 5
@@ -60,7 +60,7 @@ spec:
                 custom: true
                 spec:
                   tcpSocket:
-                    port: http
+                    port: 6052
                   failureThreshold: 30
                   periodSeconds: 10
             securityContext:
