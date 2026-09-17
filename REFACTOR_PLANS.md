@@ -678,6 +678,24 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
     at `go2rtc.waltr.tech:1984` (webrtc+mse), or generic camera entity on
     `rtsp://go2rtc.default.svc.cluster.local:8554/nursery`.
 
+### Additional decisions (2026-09-17, esphome)
+
+- **ESPHome device-builder dashboard** in `default` (apps/default/esphome),
+  `ghcr.io/home-operations/esphome` digest-pinned, route
+  `esphome.waltr.tech` (envoy-internal). It is the build/flash control
+  plane; HA's `esphome` integration talks devices' native API directly.
+- **IoT VLAN macvlan** (`10.30.0.12/23`, MAC a6:30:00:10:30:0c) following the
+  home-assistant (.10) / matter-server (.11) pattern — mDNS discovery +
+  OTA TCP 3232 to the ESPs. `ESPHOME_DASHBOARD_USE_PING=true` for status.
+- **`readOnlyRootFilesystem: true` verified** against 2026.9.0 in-cluster:
+  the image sets `HOME=/config` and keeps PlatformIO/build/data under
+  `/cache`, so the only writable non-PVC path is `/tmp` (emptyDir). Cache
+  PVC (20Gi) is intentionally NOT kopia-backed (regenerable toolchains);
+  only `esphome-config` is.
+- **Dashboard auth deferred**: runWithoutAuthentication warning is expected;
+  envoy-internal only. Wire `ESPHOME_USERNAME`/`ESPHOME_PASSWORD` from 1P if
+  it ever gets a public route.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?

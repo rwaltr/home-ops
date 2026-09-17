@@ -1,0 +1,117 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# ESPHome device-builder dashboard (compile + OTA for ESP8266/ESP32 devices).
+# HA's `esphome` integration talks each device's native API directly; this
+# dashboard is the build/flash control plane, so it needs L2 presence on the
+# IoT VLAN for mDNS discovery + OTA (TCP 3232) to the ESPs. Same multus
+# macvlan pattern as home-assistant / matter-server.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: esphome
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: esphome
+  values:
+    fullnameOverride: esphome
+    controllers:
+      esphome:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/home-operations/esphome
+              tag: 2026.9.0@sha256:c81bd7f0c440324351f288de868c45ddfd2c5c864b9a9d22ce54b77b03e6ef50
+            env:
+              TZ: America/Chicago
+              # Status checks via ICMP instead of mDNS (mDNS query contention
+              # in-cluster); discovery itself still rides the IoT VLAN macvlan
+              # and the iot NAD's sbr source-binds to 10.30.0.0/23.
+              ESPHOME_DASHBOARD_USE_PING: "true"
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &port 6052
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Image sets HOME=/config and keeps PlatformIO/build/data under
+              # /cache, so the root FS can stay read-only (verified 2026-09)
+              # with /tmp as the only writable non-PVC path.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 256Mi
+              limits:
+                memory: 3Gi # PlatformIO/ESP-IDF compile + link is memory-hungry
+    defaultPodOptions:
+      annotations:
+        # IoT VLAN presence (macvlan on the host's enp88s0.30 via the
+        # kube-system NAD). Static IP below the router DHCP pool (.100+),
+        # pinned MAC (a6:30:00:10:<vlan>:<n>), matching home-assistant (.10)
+        # and matter-server (.11).
+        k8s.v1.cni.cncf.io/networks: |-
+          [{"name": "iot", "namespace": "kube-system", "ips": ["10.30.0.12/23"], "mac": "a6:30:00:10:30:0c"}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: esphome
+        ports:
+          http:
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - esphome.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /config
+      # PlatformIO toolchains + build artifacts. Regenerable, hence excluded
+      # from the kopia SnapshotPolicy (see kopia.yaml).
+      cache:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 20Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /cache
+      tmp:
+        type: emptyDir
