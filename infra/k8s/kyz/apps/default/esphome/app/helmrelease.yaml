@@ -86,6 +86,10 @@ spec:
         ports:
           http:
             port: *port
+          api:
+            port: 6053
+          peer-link:
+            port: 6055
     route:
       app:
         annotations:
