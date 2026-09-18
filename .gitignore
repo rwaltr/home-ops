@@ -8,6 +8,9 @@ bin/
 # Sops
 .decrypted~*.yaml
 
+# Home Assistant runtime secrets (PVC-only; may contain station MACs/locations)
+**/secrets.yaml
+
 # Helm
 *Chart.lock
 terraform.tfstate*

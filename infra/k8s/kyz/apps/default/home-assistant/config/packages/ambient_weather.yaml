@@ -1,0 +1,85 @@
+# Ambient Weather Network station (public, no API key).
+#
+# Uses the same open endpoint HA's `ambient_network` integration polls, but
+# deliberately bypasses that integration's indoor-station filter (this station
+# is flagged `indoor: true` in AWN, so the config flow hides it from the
+# "Select station" dropdown).
+#
+# Indoor sensors intentionally omitted.
+#
+# The station URL/MAC is kept in secrets.yaml (ambient_weather_url) so it is
+# never committed to git. See /config/secrets.yaml.
+rest:
+  - resource: !secret ambient_weather_url
+    scan_interval: 300
+    sensor:
+      - name: "Ambient Station Temperature"
+        unique_id: ambient_station_tempf
+        value_template: "{{ value_json.lastData.get('tempf') }}"
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+      - name: "Ambient Station Humidity"
+        unique_id: ambient_station_humidity
+        value_template: "{{ value_json.lastData.get('humidity') }}"
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+      - name: "Ambient Station Dew Point"
+        unique_id: ambient_station_dewpoint
+        value_template: "{{ value_json.lastData.get('dewPoint') }}"
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+      - name: "Ambient Station Feels Like"
+        unique_id: ambient_station_feelslike
+        value_template: "{{ value_json.lastData.get('feelsLike') }}"
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+      - name: "Ambient Station Wind Speed"
+        unique_id: ambient_station_windspeed
+        value_template: "{{ value_json.lastData.get('windspeedmph') }}"
+        unit_of_measurement: "mph"
+        device_class: wind_speed
+        state_class: measurement
+      - name: "Ambient Station Wind Gust"
+        unique_id: ambient_station_windgust
+        value_template: "{{ value_json.lastData.get('windgustmph') }}"
+        unit_of_measurement: "mph"
+        device_class: wind_speed
+        state_class: measurement
+      - name: "Ambient Station Wind Direction"
+        unique_id: ambient_station_winddir
+        value_template: "{{ value_json.lastData.get('winddir') }}"
+        unit_of_measurement: "°"
+        device_class: wind_direction
+        state_class: measurement_angle
+      - name: "Ambient Station UV Index"
+        unique_id: ambient_station_uv
+        value_template: "{{ value_json.lastData.get('uv') }}"
+        state_class: measurement
+      - name: "Ambient Station Solar Radiation"
+        unique_id: ambient_station_solarradiation
+        value_template: "{{ value_json.lastData.get('solarradiation') }}"
+        unit_of_measurement: "W/m²"
+        device_class: irradiance
+        state_class: measurement
+      - name: "Ambient Station Relative Pressure"
+        unique_id: ambient_station_baromrelin
+        value_template: "{{ value_json.lastData.get('baromrelin') }}"
+        unit_of_measurement: "inHg"
+        device_class: pressure
+        state_class: measurement
+      - name: "Ambient Station Daily Rain"
+        unique_id: ambient_station_dailyrain
+        value_template: "{{ value_json.lastData.get('dailyrainin') }}"
+        unit_of_measurement: "in"
+        device_class: precipitation
+        state_class: total_increasing
+      - name: "Ambient Station Last Report"
+        unique_id: ambient_station_last_report
+        value_template: >-
+          {{ (value_json.lastData.get('dateutc') / 1000) | as_datetime
+             if value_json.lastData.get('dateutc') is not none else none }}
+        device_class: timestamp

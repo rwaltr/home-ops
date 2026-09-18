@@ -78,3 +78,9 @@ input_boolean:
     icon: mdi:account-multiple-outline
 
 prometheus:
+
+# ── Packages ────────────────────────────────────────────────────────────────
+# Loads config/packages/*.yaml. Used for YAML-only integrations (e.g. REST
+# sensors) whose per-station URL/MAC is kept in secrets.yaml, off git.
+homeassistant:
+  packages: !include_dir_named packages
