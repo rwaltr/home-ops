@@ -114,11 +114,13 @@ spec:
       postgres:
         strategy: Recreate
         pod:
-          # The Immich Postgres image runs as postgres (999); override the
-          # pod-level 1000 so the PVC is group-owned correctly.
+          # The official Postgres entrypoint starts as root, chowns/chmods
+          # PGDATA, then drops to `postgres` via gosu — root is required for
+          # first init. Capabilities are limited to exactly what that needs.
           securityContext:
-            runAsUser: 999
-            runAsGroup: 999
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
             fsGroup: 999
             fsGroupChangePolicy: OnRootMismatch
         containers:
@@ -168,7 +170,9 @@ spec:
               # entrypoint rewrites /etc/postgresql/postgresql.conf from the
               # SSD/HDD template — keep the root FS writable for this one.
               readOnlyRootFilesystem: false
-              capabilities: { drop: ["ALL"] }
+              capabilities:
+                drop: ["ALL"]
+                add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"] # gosu drop + PGDATA chown/chmod
             resources:
               requests:
                 cpu: 100m
