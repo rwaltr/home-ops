@@ -706,6 +706,35 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   are ever needed: `probes.*.custom: true` with an integer `port:`, and
   `route.<x>.rules[].backendRefs[].port: http`.
 
+### Additional decisions (2026-09-18, immich — slim)
+
+- **Immich v3.2.2 slim stack** in `default` (apps/default/immich): `server` +
+  `valkey` + `postgres`, **no machine-learning yet**. Public bjw-s app-template
+  5.1.0 + official upstream images (`immich-app/immich-server`,
+  `immich-app/postgres:17-vectorchord1.1.1`, `valkey:9-alpine`). Route
+  `immich.waltr.tech` on envoy-internal + envoy-external (public via CF tunnel).
+  Verified public HTTPS `/api/server/ping` → `pong`; `vchord 1.1.1` +
+  `vector 0.8.5` created by Immich's own superuser migration. DB password from
+  1P item `immich` / `db_password` → `immich-secret`.
+- **Storage**: library hostPath `/var/tank/nas/library/photos` → `/data`
+  (created 1000:1000); PG PVC `immich-postgres` 8Gi openebs-hostpath (ext4 —
+  passes the image's NFS/SMB guard). The existing `/var/tank/nas/pictures`
+  collection is NOT the upload root — add it later as a read-only external
+  library (never point `UPLOAD_LOCATION` at it). Kopia policy on `immich-postgres`
+  (mover 999:999); library is not kopia-covered (tank).
+- **Gotchas (both cost a debugging cycle)**:
+  - app-template names a PVC just `<fullname>` while only ONE PVC exists; adding
+    a second PVC (e.g. ML cache) renames the first and orphans the data. Pinned
+    with `forceRename: immich-postgres`.
+  - the immich/postgres entrypoint needs **root** for first init (chown/chmod
+    PGDATA, then `gosu postgres`); as uid 999 `initdb` fails with
+    `could not change permissions`. Caps limited to
+    CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID; `readOnlyRootFilesystem: false`
+    (rewrites `/etc/postgresql/postgresql.conf`).
+  - ML omitted → server logs `Machine learning server became unhealthy`; add the
+    controller later with no data migration.
+- **Public exposure relies on Immich's own auth** (no CF Access in front).
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
