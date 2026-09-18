@@ -1,0 +1,252 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Immich — slim stack: server + valkey + postgres (no machine-learning yet).
+# Images are upstream official (immich-app/*, valkey); the chart is the public
+# bjw-s app-template used by every app in this repo.
+#
+# NOTE: without machine-learning the server logs an unhealthy ML backend and
+# smart-search/facial-recognition jobs fail. Disable those in
+# Administration > Settings after first login, or add the ML controller later
+# (no data migration needed).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: immich
+  values:
+    fullnameOverride: immich
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    controllers:
+      server:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/immich-app/immich-server
+              tag: v3.2.2@sha256:79cc1623323d5894922686d8743b4780181428f98eecbfb58ce12c41ef02d1ea
+            env:
+              TZ: America/Chicago
+              DB_HOSTNAME: immich-postgres
+              DB_PORT: "5432"
+              DB_DATABASE_NAME: immich
+              DB_USERNAME: postgres
+              DB_PASSWORD:
+                secretKeyRef:
+                  name: immich-secret
+                  key: db_password
+              DB_VECTOR_EXTENSION: vectorchord
+              REDIS_HOSTNAME: immich-valkey
+              REDIS_PORT: "6379"
+              # Trust X-Forwarded-For only from the cluster pod CIDR (envoy
+              # gateway is always a pod on this node); gives real client IPs
+              # behind envoy/cloudflared.
+              IMMICH_TRUSTED_PROXIES: "10.244.0.0/24,fdad:207a:f1ab:244::/117"
+              MPLCONFIGDIR: /tmp/matplotlib
+            probes:
+              # probes are pinned explicitly: app-template defaults to the first
+              # service port, which is not necessarily this controller's.
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 2283
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/server/ping
+                    port: 2283
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 2283
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 4Gi # CPU transcoding headroom
+      valkey:
+        strategy: Recreate
+        containers:
+          valkey:
+            image:
+              repository: docker.io/valkey/valkey
+              tag: 9-alpine@sha256:a0dbf4c1d5708782907c10e2c72deff317518518b5288a58416981d9db95d30b
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+      postgres:
+        strategy: Recreate
+        pod:
+          # The Immich Postgres image runs as postgres (999); override the
+          # pod-level 1000 so the PVC is group-owned correctly.
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            fsGroupChangePolicy: OnRootMismatch
+        containers:
+          postgres:
+            image:
+              repository: ghcr.io/immich-app/postgres
+              tag: 17-vectorchord1.1.1@sha256:236fc185fcdbc929d9a86e6f3b0dce123076f1001e3db730057629b48bf5c3f7
+            env:
+              POSTGRES_USER: postgres
+              POSTGRES_DB: immich
+              POSTGRES_PASSWORD:
+                secretKeyRef:
+                  name: immich-secret
+                  key: db_password
+              POSTGRES_INITDB_ARGS: --data-checksums
+              DB_STORAGE_TYPE: SSD # openebs-hostpath is on the OS NVMe (ext4)
+              PGDATA: /var/lib/postgresql/data
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["pg_isready", "-U", "postgres", "-d", "immich"]
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["pg_isready", "-U", "postgres", "-d", "immich"]
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["pg_isready", "-U", "postgres", "-d", "immich"]
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # entrypoint rewrites /etc/postgresql/postgresql.conf from the
+              # SSD/HDD template — keep the root FS writable for this one.
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 2Gi
+    service:
+      server:
+        controller: server
+        ports:
+          http:
+            port: 2283
+      valkey:
+        controller: valkey
+        ports:
+          valkey:
+            port: 6379
+      postgres:
+        controller: postgres
+        ports:
+          postgres:
+            port: 5432
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - immich.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+          - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
+            namespace: network
+        rules:
+          - backendRefs:
+              - identifier: server
+                port: http
+    persistence:
+      # Immich-managed upload root (library/thumbs/encoded-video/backups…).
+      # The existing /var/tank/nas/pictures collection can be added later as a
+      # read-only external library — never point UPLOAD_LOCATION at it.
+      library:
+        type: hostPath
+        hostPath: /var/tank/nas/library/photos
+        advancedMounts:
+          server:
+            app:
+              - path: /data
+      postgres:
+        type: persistentVolumeClaim
+        forceRename: immich-postgres # pin: app-template only suffixes PVCs when >1 exists
+        accessMode: ReadWriteOnce
+        size: 8Gi
+        storageClass: openebs-hostpath
+        advancedMounts:
+          postgres:
+            postgres:
+              - path: /var/lib/postgresql/data
+      # Postgres shared memory (compose uses shm_size: 128mb; k8s default is 64Mi).
+      shm:
+        type: emptyDir
+        medium: Memory
+        sizeLimit: 256Mi
+        advancedMounts:
+          postgres:
+            postgres:
+              - path: /dev/shm
+      # Valkey working dir (dump.rdb); ephemeral by design — matches upstream compose.
+      valkey-data:
+        type: emptyDir
+        advancedMounts:
+          valkey:
+            valkey:
+              - path: /data
+      tmp:
+        type: emptyDir
+        advancedMounts:
+          server:
+            app:
+              - path: /tmp
