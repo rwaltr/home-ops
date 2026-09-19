@@ -52,8 +52,9 @@ spec:
                   - CHOWN
                   - DAC_OVERRIDE
                   - FOWNER
-          # Install CLI toolchain (mise, uv) into the persisted data dir so the
-          # terminal tool can use them. Guarded, so restarts don't re-download.
+          # Install CLI toolchain (mise, uv, gh, go, homebrew) into the persisted
+          # data dir so the terminal tool can use them. Guarded, so restarts don't
+          # re-download. Mirrors the eleboucher/1Solon home-ops setups.
           tools:
             image:
               repository: nousresearch/hermes-agent
@@ -70,6 +71,19 @@ spec:
                 fi
                 if [ ! -x "$P/bin/mise" ]; then
                   curl -LsSf https://mise.run | env MISE_INSTALL_PATH="$P/bin/mise" sh
+                fi
+                if [ ! -x "$P/bin/gh" ]; then
+                  GH=2.101.0
+                  curl -fsSL "https://github.com/cli/cli/releases/download/v${GH}/gh_${GH}_linux_amd64.tar.gz" | tar xz -C /tmp
+                  install -m 755 "/tmp/gh_${GH}_linux_amd64/bin/gh" "$P/bin/gh"
+                  rm -rf "/tmp/gh_${GH}_linux_amd64"
+                fi
+                if [ ! -x "$P/go/bin/go" ]; then
+                  GO=1.27.1
+                  curl -fsSL "https://go.dev/dl/go${GO}.linux-amd64.tar.gz" | tar xz -C "$P"
+                fi
+                if [ ! -x "$P/homebrew/bin/brew" ]; then
+                  git clone --depth 1 --branch 7.0.4 https://github.com/Homebrew/brew "$P/homebrew"
                 fi
                 chown -R 10000:10000 "$P"
             env:
@@ -100,11 +114,19 @@ spec:
               TZ: America/Chicago
               HERMES_HOME: /opt/data
               # Toolchain installed by the `tools` init container (persisted on the PVC).
-              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/opt/data/.local/go/bin:/opt/data/.local/homebrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
               MISE_DATA_DIR: /opt/data/.local/share/mise
               MISE_CACHE_DIR: /opt/data/.cache/mise
               MISE_CONFIG_DIR: /opt/data/.config/mise
               UV_CACHE_DIR: /opt/data/.cache/uv
+              GOPATH: /opt/data/go
+              GOMODCACHE: /opt/data/go/pkg/mod
+              GOCACHE: /opt/data/.cache/go-build
+              HOMEBREW_PREFIX: /opt/data/.local/homebrew
+              HOMEBREW_CELLAR: /opt/data/.local/homebrew/Cellar
+              HOMEBREW_REPOSITORY: /opt/data/.local/homebrew
+              HOMEBREW_NO_AUTO_UPDATE: "1"
+              HOMEBREW_NO_ANALYTICS: "1"
               # Expose the OpenAI-compatible API server on the pod network.
               API_SERVER_ENABLED: "true"
               API_SERVER_HOST: 0.0.0.0
