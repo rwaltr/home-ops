@@ -37,6 +37,9 @@ spec:
                 install -m 600 -o 10000 -g 10000 /config/config.yaml /opt/data/config.yaml
                 mkdir -p /opt/data/workspace
                 chown 10000:10000 /opt/data/workspace
+                # Skip bundled-skill seeding (skills are disabled; SOUL/config carry the brief).
+                touch /opt/data/.no-bundled-skills
+                chown 10000:10000 /opt/data/.no-bundled-skills
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -70,7 +73,8 @@ spec:
               HERMES_DASHBOARD_HOST: 0.0.0.0
               HERMES_DASHBOARD_PORT: &dashboardPort 9119
               HERMES_DASHBOARD_PUBLIC_URL: https://hermes.waltr.tech
-              # Self-hosted SearXNG for the web_search backend (see config.yaml).
+              # Self-hosted SearXNG. Harmless while the `web` toolset is disabled;
+              # re-enable search by adding `web` to toolsets + `web.search_backend: searxng`.
               SEARXNG_URL: http://searxng.default.svc.cluster.local:8080
             envFrom:
               - secretRef:
@@ -186,8 +190,12 @@ spec:
             model:
               provider: openrouter
               default: anthropic/claude-sonnet-4.6
-            web:
-              search_backend: searxng
+            # Minimal, CLI-first toolset (like pi): shell + file ops only. Everything
+            # else (web/browser/vision/memory/skills/delegation/cronjob/...) is off,
+            # which also strips those tool schemas from the system prompt every turn.
+            toolsets:
+              - terminal
+              - file
             terminal:
               backend: local
               cwd: /opt/data/workspace
