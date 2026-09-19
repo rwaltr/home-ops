@@ -1,0 +1,193 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hermes
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: hermes
+  interval: 1h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      hermes:
+        strategy: Recreate
+        initContainers:
+          # Seed config.yaml from the ConfigMap onto the data volume. Hermes
+          # migrates/extends config on start, so it must be writable (a
+          # read-only ConfigMap mount at /opt/data/config.yaml would break it).
+          config:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -euo pipefail
+                install -m 600 -o 10000 -g 10000 /config/config.yaml /opt/data/config.yaml
+                mkdir -p /opt/data/workspace
+                chown 10000:10000 /opt/data/workspace
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+        containers:
+          app:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+            args:
+              - gateway
+              - run
+            env:
+              TZ: America/Chicago
+              HERMES_HOME: /opt/data
+              # Expose the OpenAI-compatible API server on the pod network.
+              API_SERVER_ENABLED: "true"
+              API_SERVER_HOST: 0.0.0.0
+              API_SERVER_PORT: &apiPort 8642
+              # Dashboard is supervised by the gateway; it fails closed without
+              # an auth provider, so basic auth (from hermes-secret) is required.
+              HERMES_DASHBOARD: "true"
+              HERMES_DASHBOARD_HOST: 0.0.0.0
+              HERMES_DASHBOARD_PORT: &dashboardPort 9119
+              HERMES_DASHBOARD_PUBLIC_URL: https://hermes.waltr.tech
+              # Self-hosted SearXNG for the web_search backend (see config.yaml).
+              SEARXNG_URL: http://searxng.default.svc.cluster.local:8080
+            envFrom:
+              - secretRef:
+                  name: hermes-secret
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 60
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 4Gi
+            # The image's s6-overlay entrypoint starts as root and drops
+            # privileges; it needs these caps for its own cont-init and for the
+            # supervised dashboard/gateway services to touch /run.
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+                  - SETGID
+                  - SETUID
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 10000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: hermes
+        ports:
+          http:
+            port: *dashboardPort
+          api:
+            port: *apiPort
+    route:
+      app:
+        hostnames:
+          - hermes.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+        rules:
+          - backendRefs:
+              - name: hermes
+                port: *dashboardPort
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 10Gi
+        storageClass: openebs-hostpath
+        forceRename: hermes-data
+        globalMounts:
+          - path: /opt/data
+      config:
+        type: configMap
+        name: hermes-config
+        advancedMounts:
+          hermes:
+            config:
+              - path: /config
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+    configMaps:
+      hermes-config:
+        forceRename: hermes-config
+        data:
+          config.yaml: |
+            ---
+            model:
+              provider: openrouter
+              default: anthropic/claude-sonnet-4.6
+            web:
+              search_backend: searxng
+            terminal:
+              backend: local
+              cwd: /opt/data/workspace
