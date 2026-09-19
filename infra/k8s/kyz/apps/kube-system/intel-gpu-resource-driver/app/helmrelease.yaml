@@ -15,10 +15,12 @@ spec:
   chartRef:
     kind: OCIRepository
     name: intel-gpu-resource-driver
-  # k0s runs kubelet with root-dir=/var/lib/k0s/kubelet, but the chart hardcodes
-  # /var/lib/kubelet for the kubelet plugin registry/state dirs. Repoint the
-  # hostPaths or kubelet never sees the DRA plugin registration ("DRA driver
-  # gpu.intel.com is not registered").
+  # k0s runs kubelet with root-dir=/var/lib/k0s/kubelet, so the plugin
+  # *registration* socket must land in /var/lib/k0s/kubelet/plugins_registry or
+  # kubelet never sees the DRA plugin ("DRA driver gpu.intel.com is not
+  # registered"). The plugin *data* dir stays at kubelet's default
+  # --plugin-dir=/var/lib/kubelet/plugins, which is where kubelet dials
+  # dra.sock — so only plugins-registry is overridden.
   postRenderers:
     - kustomize:
         patches:
@@ -37,9 +39,6 @@ spec:
                       - name: plugins-registry
                         hostPath:
                           path: /var/lib/k0s/kubelet/plugins_registry
-                      - name: plugins
-                        hostPath:
-                          path: /var/lib/k0s/kubelet/plugins
   values:
     # Use ResourceClaims (DRA), not DRA-backed extended resources.
     enableDRAExtendedResources: false
