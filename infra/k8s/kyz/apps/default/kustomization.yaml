@@ -25,3 +25,4 @@ resources:
   - ./seerr/ks.yaml
   - ./recyclarr/ks.yaml
   - ./searxng/ks.yaml
+  - ./hermes/ks.yaml
