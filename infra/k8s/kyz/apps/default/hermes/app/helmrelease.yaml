@@ -190,12 +190,21 @@ spec:
             model:
               provider: openrouter
               default: anthropic/claude-sonnet-4.6
-            # Minimal, CLI-first toolset (like pi): shell + file ops only. Everything
-            # else (web/browser/vision/memory/skills/delegation/cronjob/...) is off,
-            # which also strips those tool schemas from the system prompt every turn.
-            toolsets:
-              - terminal
-              - file
+            # Minimal, CLI-first toolset (like pi): shell + file ops only. The API
+            # server and CLI platforms fall back to the full `hermes-*-server`/
+            # `hermes-cli` presets otherwise, which is ~50 tool schemas every turn.
+            platform_toolsets:
+              api_server:
+                - terminal
+                - file
+              cli:
+                - terminal
+                - file
+            tools:
+              tool_search:
+                enabled: "off"
+              connectors:
+                enabled: false
             terminal:
               backend: local
               cwd: /opt/data/workspace
