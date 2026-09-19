@@ -733,6 +733,12 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
     (rewrites `/etc/postgresql/postgresql.conf`).
   - ML omitted → server logs `Machine learning server became unhealthy`; add the
     controller later with no data migration.
+- **ML attempt deferred (2026-09-18)**: adding the ML controller stalled —
+  containerd wedged mid-ingest on the `immich-machine-learning:v3.2.2` pull
+  (~0.34 GB, so not a size problem). The index digest has `unknown/unknown`
+  attestation entries; pinning the amd64 manifest digest was tried, then
+  reverted back to the slim stack. Revisit later (try a fresh node/containerd
+  or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
 
 ## Open questions
