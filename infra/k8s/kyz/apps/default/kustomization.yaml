@@ -24,3 +24,4 @@ resources:
   - ./bazarr/ks.yaml
   - ./seerr/ks.yaml
   - ./recyclarr/ks.yaml
+  - ./searxng/ks.yaml
