@@ -1,8 +1,13 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# Immich — server + machine-learning + valkey + postgres.
+# Immich — slim stack: server + valkey + postgres (no machine-learning yet).
 # Images are upstream official (immich-app/*, valkey); the chart is the public
 # bjw-s app-template used by every app in this repo.
+#
+# NOTE: without machine-learning the server logs an unhealthy ML backend and
+# smart-search/facial-recognition jobs fail. Disable those in
+# Administration > Settings after first login, or add the ML controller later
+# (no data migration needed).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -44,7 +49,6 @@ spec:
               DB_VECTOR_EXTENSION: vectorchord
               REDIS_HOSTNAME: immich-valkey
               REDIS_PORT: "6379"
-              IMMICH_MACHINE_LEARNING_URL: http://immich-machine-learning:3003
               # Trust X-Forwarded-For only from the cluster pod CIDR (envoy
               # gateway is always a pod on this node); gives real client IPs
               # behind envoy/cloudflared.
@@ -107,55 +111,6 @@ spec:
                 memory: 64Mi
               limits:
                 memory: 256Mi
-      machine-learning:
-        strategy: Recreate
-        containers:
-          app:
-            image:
-              repository: ghcr.io/immich-app/immich-machine-learning
-              tag: v3.2.2@sha256:390453a571ca73b563cc3d9a12a37a4d71217b12608de72f26884f5e2ebc4896
-            env:
-              TZ: America/Chicago
-            probes:
-              # CPU inference: models load lazily and can be slow on first run,
-              # hence the generous startup window.
-              liveness:
-                enabled: true
-                custom: true
-                spec:
-                  tcpSocket:
-                    port: 3003
-                  periodSeconds: 30
-                  timeoutSeconds: 5
-                  failureThreshold: 5
-              readiness:
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /ping
-                    port: 3003
-                  periodSeconds: 10
-                  timeoutSeconds: 5
-                  failureThreshold: 5
-              startup:
-                enabled: true
-                custom: true
-                spec:
-                  tcpSocket:
-                    port: 3003
-                  failureThreshold: 60
-                  periodSeconds: 10
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities: { drop: ["ALL"] }
-            resources:
-              requests:
-                cpu: 100m
-                memory: 1Gi
-              limits:
-                memory: 4Gi # CPU inference for CLIP + facial recognition models
       postgres:
         strategy: Recreate
         pod:
@@ -235,11 +190,6 @@ spec:
         ports:
           valkey:
             port: 6379
-      machine-learning:
-        controller: machine-learning
-        ports:
-          http:
-            port: 3003
       postgres:
         controller: postgres
         ports:
@@ -291,17 +241,6 @@ spec:
           postgres:
             postgres:
               - path: /dev/shm
-      # ML model cache (CLIP + facial recognition weights). Regenerable, so
-      # intentionally not kopia-backed.
-      ml-cache:
-        type: persistentVolumeClaim
-        accessMode: ReadWriteOnce
-        size: 8Gi
-        storageClass: openebs-hostpath
-        advancedMounts:
-          machine-learning:
-            app:
-              - path: /cache
       # Valkey working dir (dump.rdb); ephemeral by design — matches upstream compose.
       valkey-data:
         type: emptyDir
@@ -313,8 +252,5 @@ spec:
         type: emptyDir
         advancedMounts:
           server:
-            app:
-              - path: /tmp
-          machine-learning:
             app:
               - path: /tmp
