@@ -52,6 +52,42 @@ spec:
                   - CHOWN
                   - DAC_OVERRIDE
                   - FOWNER
+          # Install CLI toolchain (mise, uv) into the persisted data dir so the
+          # terminal tool can use them. Guarded, so restarts don't re-download.
+          tools:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -euo pipefail
+                P=/opt/data/.local
+                mkdir -p "$P/bin"
+                if [ ! -x "$P/bin/uv" ]; then
+                  curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$P/bin" UV_NO_MODIFY_PATH=1 sh
+                fi
+                if [ ! -x "$P/bin/mise" ]; then
+                  curl -LsSf https://mise.run | env MISE_INSTALL_PATH="$P/bin/mise" sh
+                fi
+                chown -R 10000:10000 "$P"
+            env:
+              MISE_DATA_DIR: /opt/data/.local/share/mise
+              MISE_CACHE_DIR: /opt/data/.cache/mise
+              MISE_CONFIG_DIR: /opt/data/.config/mise
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
         containers:
           app:
             image:
@@ -63,6 +99,12 @@ spec:
             env:
               TZ: America/Chicago
               HERMES_HOME: /opt/data
+              # Toolchain installed by the `tools` init container (persisted on the PVC).
+              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              MISE_DATA_DIR: /opt/data/.local/share/mise
+              MISE_CACHE_DIR: /opt/data/.cache/mise
+              MISE_CONFIG_DIR: /opt/data/.config/mise
+              UV_CACHE_DIR: /opt/data/.cache/uv
               # Expose the OpenAI-compatible API server on the pod network.
               API_SERVER_ENABLED: "true"
               API_SERVER_HOST: 0.0.0.0
@@ -189,7 +231,7 @@ spec:
             ---
             model:
               provider: openrouter
-              default: anthropic/claude-sonnet-4.6
+              default: deepseek/deepseek-v4-flash
             # Minimal, CLI-first toolset (like pi) + web search via self-hosted
             # SearXNG. The API server and CLI platforms otherwise fall back to the
             # full `hermes-*-server`/`hermes-cli` presets (~50 tool schemas/turn).
