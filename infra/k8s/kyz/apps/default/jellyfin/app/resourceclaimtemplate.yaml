@@ -1,0 +1,16 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/resource.k8s.io/resourceclaimtemplate_v1.json
+# Requests the Intel iGPU (DeviceClass published by the intel-gpu-resource-driver
+# DRA driver). The driver injects /dev/dri/renderD128 into the Jellyfin pod via
+# CDI — no hostPath device mount needed.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: jellyfin-gpu
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu.intel.com

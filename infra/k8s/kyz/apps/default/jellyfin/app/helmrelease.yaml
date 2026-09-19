@@ -2,8 +2,9 @@
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 # Jellyfin media server. Config/state on a PVC; media read-write from the tank
 # DAS (/var/tank/nas/library/...) via hostPath subpaths. Write access allows
-# MediaDash plugin to remove/re-encode broken files. Transcodes are CPU-only
-# (no GPU passthrough yet). UI at jellyfin.waltr.tech (internal).
+# MediaDash plugin to remove/re-encode broken files. The Intel iGPU is attached
+# via a DRA ResourceClaim (DeviceClass gpu.intel.com) for QuickSync — the driver
+# injects /dev/dri/renderD128 through CDI. UI at jellyfin.waltr.tech (internal).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -51,12 +52,17 @@ spec:
               readOnlyRootFilesystem: false
               capabilities: { drop: ["ALL"] }
             resources:
+              claims:
+                - name: gpu
               requests:
                 cpu: 100m
               limits:
-                # Headroom for CPU transcoding
+                # Headroom for transcoding
                 memory: 4Gi
     defaultPodOptions:
+      resourceClaims:
+        - name: gpu
+          resourceClaimTemplateName: jellyfin-gpu
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
