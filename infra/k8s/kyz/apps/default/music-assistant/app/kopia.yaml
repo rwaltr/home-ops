@@ -14,7 +14,9 @@ spec:
     name: cluster-kopia
   sources:
     - pvc:
-        name: music-assistant-config
+        # Single-PVC app: app-template names it just <fullname> (the chart only
+        # appends the persistence key when there is more than one PVC).
+        name: music-assistant
       sourcePathStrategy: PvcName
   copyMethod: Direct
   mover:
