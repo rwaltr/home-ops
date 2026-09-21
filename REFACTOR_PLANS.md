@@ -576,6 +576,7 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   by sandboxed GMS; Thread credential handoff is unreliable there. mouse
   HAS a MediaTek WiFi/BT combo (0e8d:c616) — server-side BLE via
   matter-server is the future fix; user deferred (old-phone fallback).
+  → consolidated in "Matter/Thread commissioning pitfalls" below.
 - **k8s-vips / k8s-vips6 chains populated** (TCP 80/443 + UDP 443): they were
   designed empty (fall-through deny) which ZONEDENY'd phones on IoT reaching
   homeassistant.waltr.tech. Keep v4/v6 chains symmetric (routeros README).
@@ -740,6 +741,75 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   reverted back to the slim stack. Revisit later (try a fresh node/containerd
   or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
+
+## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
+
+Living list of the non-obvious failure modes we hit wiring Matter + Thread into
+a segmented homelab. Not config to apply — context for the next debugging
+session. Router-side specifics live in `infra/routeros/README.md`
+("Matter over Thread across VLANs").
+
+### The commissioner is a phone, and on Android that means GMS
+
+- **Matter commissioning on Android is mediated by privileged Google Play
+  Services modules** (the Matter/Home module and
+  `ThreadNetworkControllerService`). Apps — including the Home Assistant
+  Companion app — bind to those APIs rather than speaking Matter directly.
+- **GrapheneOS sandboxes Play Services without the privileged hooks, so the
+  whole commissioning path is effectively unavailable there.** Symptom is not
+  a clean error: BLE scan/provision may start and then fail, or Thread
+  credential import/export silently does nothing. Controlling an
+  *already-commissioned* device from HA on GrapheneOS works fine — it's only
+  onboarding (and Thread credential handoff) that breaks.
+- **Compounding factor here**: mouse's BT is a MediaTek Wi-Fi/BT combo
+  (0e8d:c616) and the OTBR is on a different VLAN than the controlling phone
+  (see below), so even with working GMS the phone path is fragile.
+
+### matter-server has no radio, and BLE proxies don't fix it
+
+- Server-side commissioning needs a **real adapter**: BlueZ/D-Bus
+  (`/var/run/dbus`) plus `/dev/hci*` visible to the matter-server container.
+  Without it every attempt returns
+  `commission_with_code: Bluetooth commissioning is not available`
+  (confirmed: the pod has no `/sys/class/bluetooth`, no D-Bus socket).
+- **ESPHome Bluetooth proxies only extend HA's `bluetooth` integration** —
+  they cannot serve matter-server's CHIP BLE layer. Adding a proxy does not
+  change that error.
+- The host's combo radio is a poor candidate to pass through (Wi-Fi/BT bound
+  together); a cheap dedicated USB BT dongle is the sane path if this is ever
+  implemented. This is the deferred "server-side BLE" fix.
+
+### Workarounds when the phone can't commission (no code yet, options recorded)
+
+1. **Server-side commissioning** — give matter-server (or a one-shot
+   `connectedhomeip` chip-tool container) BLE + the Thread dataset, so HA owns
+   the fabric and no GMS is involved.
+2. **Dedicated commissioning device** — an old full-Play Android or an
+   iPhone/iPad. iOS Matter/Thread does not go through GMS.
+3. **Multi-admin** — commission in another ecosystem (Apple Home / Aqara /
+   SmartThings) and share the device to HA as a second administrator.
+4. **On-network commissioning** — for Wi-Fi Matter devices already on the LAN,
+   `commission_with_code` needs no BLE at all.
+
+### Thread over multiple VLANs (recap of the 2026-09-20 fix)
+
+- Thread is its own L2; the border router is the only L3 door. Anything that
+  has to reach Thread devices **through the router** needs a static route for
+  the OMR prefix — RouterOS ignores RAs while forwarding, and the
+  `fc00::/7` blackhole swallows it otherwise.
+- The **OMR prefix is chosen at commissioning time** and can change on a new
+  dataset — the static route then breaks the phone path silently.
+- **mDNS discovery ≠ connectivity**: the router's mDNS repeater reflects IPv4
+  only; `_meshcop`/`_matter` over IPv6 link-local cannot cross VLANs.
+- **Server path and phone path diverge**: in-cluster pods reach Thread via
+  mouse's RA-learned route (bypassing the router) while the phone goes through
+  the router. "HA sees the border router" tells you nothing about the phone.
+- **The v6 `any -> any` default deny had no logging**, so cross-zone v6
+  failures were invisible until `log=yes log-prefix=ZONEDY6` was enabled.
+  Turn it on first when debugging Thread/Matter.
+- **Structural fix**: keep the border router and the controller (HA /
+  matter-server) on the same VLAN. Splitting them is what forces the route +
+  firewall allow in the first place.
 
 ## Open questions
 
