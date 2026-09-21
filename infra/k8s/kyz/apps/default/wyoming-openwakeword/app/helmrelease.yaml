@@ -1,0 +1,108 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Wyoming openWakeWord — the Assist wake word. Doorbell for the piper GLaDOS
+# voice (255aace3) and faster-whisper STT (4a1f3a3d); HA's `wyoming` integration
+# points at tcp://wyoming-openwakeword.default.svc.cluster.local:10400.
+#
+# This is the third and final piece of the pipeline. Note that wake word is
+# normally done on-device by the satellite (ESPHome does it locally); this
+# service is for satellites that stream audio to HA instead.
+#
+# No args needed: docker_run.sh already passes --uri tcp://0.0.0.0:10400, and
+# the model set is discovered from the image. Ships 5 pre-trained models —
+# okay_nabu (the HA default), hey_jarvis, hey_mycroft, alexa, hey_rhasspy — all
+# advertised and selectable per-request by HA.
+#
+# No PVC: models are baked into the image and there is no other state. Custom
+# .tflite wake words would need a mounted dir plus --custom-model-dir.
+#
+# Tuning knobs, left at defaults, in case detection is too eager or too deaf:
+#   --threshold 0.5            (0.0-1.0) raise to reduce false positives
+#   --trigger-level 1          activations required before firing
+#   --refractory-seconds 2     lockout after a detection
+#   --custom-model-dir DIR     load custom .tflite models from DIR
+#   --debug                    log probabilities per frame
+#
+# NOTE: --model/--models-dir/--preload-model/--output-dir are deprecated in 2.1.0
+# and deliberately not used.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wyoming-openwakeword
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: wyoming-openwakeword
+  values:
+    fullnameOverride: wyoming-openwakeword
+    controllers:
+      wyoming-openwakeword:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/rhasspy/wyoming-openwakeword
+              tag: 2.1.0@sha256:52cb1168731a1849fc28cf339c935fde58746bbabc94226668a40ef6ddf5d42b
+            env:
+              TZ: America/Chicago
+              PYTHONDONTWRITEBYTECODE: "1"
+            probes:
+              # Wyoming is a TCP protocol, not HTTP — the chart's default
+              # httpGet probe would crash-loop the pod.
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: &port 10400
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Verified 2026-09: runs read-only as uid 1000 with
+              # PYTHONDONTWRITEBYTECODE=1 and /tmp as the only writable path.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: wyoming-openwakeword
+        ports:
+          wyoming:
+            port: *port
+    persistence:
+      tmp:
+        type: emptyDir
