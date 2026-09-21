@@ -176,9 +176,95 @@ clients. The exception is safe-to-spoof only in a narrow sense: a packet must
 already have been routed by this router toward a Cilium LB service port on the
 VIP list to reach this rule at all.
 
+## Matter over Thread across VLANs
+
+**2026-09-20 — the SLZB-Ultima3 OTBR lives on `vlan10-mgmt` (`10.10.0.101`,
+ULA `fdad:207a:f1ab:10:d405:92ff:fe6f:fe78`), while the controller pods have
+L2 presence on `vlan30-iot` and the commissioning phone is on
+`vlan20-clients`.** Commissioning "worked" but the phone's post-pairing
+"confirm connectivity" step failed. Root cause was two separate gaps, both on
+the router side:
+
+1. **The router never learned the Thread route.** RouterOS only accepts RA by
+default when forwarding is off (`accept-router-advertisements` defaults to
+`yes-if-forwarding-disabled`, and `ipv6 forward=yes` here), so the OTBR's RA
+did no good. The k8s node `mouse` *is* a host and kept a `proto ra` route
+`fdde:c7ce:397e:1::/64 via fe80::d405:92ff:fe6f:fe78`, which is why HA /
+matter-server could reach Thread devices straight over the OTBR's link-local
+— and why the breakage only showed up on the phone.
+2. **The ULA catch-all black-holed it.** `fc00::/7 → blackhole` (the "ula
+catch-all" route) silently drops any ULA prefix without a more-specific
+route, including the Thread OMR prefix. Router ping to a Thread address was
+100% loss until the route below existed; the pod ping was 0% loss the whole
+time (different path — see #1).
+
+```routeros
+# Static route is deliberate: accepting RAs on a forwarding router would also
+# let the OTBR inject a default route. OMR prefix is chosen by the OTBR.
+/ipv6/route
+add dst-address=fdde:c7ce:397e:1::/64 \
+    gateway=fe80::d405:92ff:fe6f:fe78%vlan10-mgmt distance=1 \
+    comment="Thread OMR -> SLZB OTBR (router ignores RAs by design)"
+
+# clients zone -> OTBR, placed before the any->any default deny
+/ipv6/firewall/filter
+add action=accept chain=forward comment="clients -> OTBR mgmt ULA (Border Agent)" \
+    in-interface=vlan20-clients out-interface=vlan10-mgmt \
+    dst-address=fdad:207a:f1ab:10:d405:92ff:fe6f:fe78
+add action=accept chain=forward comment="clients -> Thread OMR (Thread/Matter devices)" \
+    in-interface=vlan20-clients out-interface=vlan10-mgmt \
+    dst-address=fdde:c7ce:397e:1::/64
+```
+
+The v4 rule (`clients -> 10.10.0.101`) was tried and removed — the actual
+confirm hit the v6 OMR allow and nothing used the v4/REST path. Verified:
+phone confirm now increments the OMR rule (244 B/pkt), and the `any -> any`
+default deny does not move.
+
+### Findings: why Thread is painful with many VLANs
+
+- **Thread is its own L2; the border router is the only L3 door.** All Thread
+device traffic arrives as the OMR prefix (`fdde:c7ce:397e:1::/64` here,
+chosen at commissioning time) on the OTBR's LAN segment. Every router that
+sits between a client and the OTBR needs a route for it — hosts that consume
+RAs get it free, forwarding routers do not. The prefix is not static: a new
+dataset/commission can change it and silently break everything until the route
+is updated.
+- **mDNS gives false confidence.** `_meshcop._udp` is link-local multicast
+(`ff02::fb`). The router's mDNS repeater (`/ip/dns/mdns-repeat-ifaces`, here
+vlan10 + vlan20 + vlan30) reflects **IPv4 mDNS only** — v6 link-local cannot
+be repeated by design. So the phone *discovers* the OTBR across VLANs, but the
+addresses it then needs (ULA/OMR, and the Thread border agent) still require
+L3 routing and a firewall allow. Discovery working ≠ connectivity working.
+- **The controller and border router should share a VLAN.** Matter/Thread's
+mDNS service records (`_matter._tcp`, `_matterc._udp`, `_meshcop._udp`) and
+Thread itself are link-local-first. Co-locating HA/matter-server with the
+OTBR (or the OTBR with them) avoids the route + allow entirely. The earlier
+"put matter-server on the iot VLAN" fix followed this reasoning; the OTBR
+staying on mgmt is what created the split.
+- **Server-side vs phone-side paths diverge.** In-cluster pods reached Thread
+via `mouse`'s RA route while the router black-holed it, so the server "worked"
+and only the phone failed. Debugging this needs to start from *where the
+packet enters the router*, not from whether HA "sees" the border router.
+- **IPv6 default-deny was silent.** The v6 `any -> any` drop had no `log=yes`
+(unlike v4's `ZONEDENY`), so cross-zone v6 failures were invisible. If you're
+debugging Thread/Matter, enable logging on it first (`log=yes
+log-prefix=ZONEDENY6`), or you'll stare at an empty log while packets vanish.
+- **BLE commissioning is out of band.** `commission_with_code: Bluetooth
+commissioning is not available` comes from matter-server, which needs a real
+adapter (D-Bus + `/dev/hci*`). ESPHome Bluetooth proxies only extend HA's
+`bluetooth` integration — they cannot serve matter-server. Thread credential
+sync to the phone is likewise separate from this IP path.
+- **Zone model reminder:** there is no generic `clients -> mgmt` (or `iot ->
+mgmt`) allow — only the k8s VIP block. The OTBR is a plain mgmt host, so every
+controller-to-OTBR flow needs an explicit, narrowly-scoped accept like the
+ones above.
+
 ## Verify
 
 ```routeros
+/ipv6 route print where comment~"Thread OMR"   # As, via OTBR LL on vlan10-mgmt
+/ipv6 firewall filter print stats where comment~"Thread OMR"  # increments on phone confirm
 /routing/bgp/connection print status    # both sessions: established
 /ip route print where dst-address~"10.10.100."        # v4 /32s via 10.10.0.10
 /ipv6 route print where dst-address~"fdad:207a:f1ab:100"  # v6 /128s via native v6
