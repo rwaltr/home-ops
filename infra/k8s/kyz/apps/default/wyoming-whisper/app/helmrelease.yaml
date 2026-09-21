@@ -1,0 +1,126 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Wyoming Faster Whisper (STT) — the Assist ears. HA's `wyoming` integration
+# points at tcp://wyoming-whisper.default.svc.cluster.local:10300.
+#
+# The GitHub project is rhasspy/wyoming-faster-whisper but it publishes to the
+# Docker Hub repo `rhasspy/wyoming-whisper`; the `-int8` models are CTranslate2
+# (faster-whisper) quantisations, not the original openai-whisper runtime.
+#
+# Model choice — measured on the 12-thread host against GLaDOS TTS output:
+#   base-int8   79MB   RTF 0.11-0.14
+#   small-int8 246MB   RTF 0.21-0.25   <- chosen
+# small is ~2x slower but noticeably better on proper nouns, which is exactly
+# what HA device names are. Both are comfortably realtime; swap the --model arg
+# for base-int8 if you want the lower latency instead.
+#
+# Model weights land in /data on first start (~250MB, one-time HuggingFace
+# download), which the generous startupProbe budget covers.
+#
+# NOT enabled, but worth knowing:
+#   --vad-endpointing 0.7   server-side Silero endpointing; the service then
+#                           advertises it does not need HA's external VAD, which
+#                           trims end-of-speech latency. Off by default because
+#                           it moves endpointing off the well-trodden HA path.
+#   --hass-token            biases transcription toward your real entity/area
+#                           names ("Ecobee" instead of "incubi"). Needs a
+#                           long-lived access token; pass it via a mounted file
+#                           with WYO_WHISPER_HASS_TOKEN_FILE so it stays off the
+#                           command line. Requires a standard (non-distil)
+#                           Whisper model — small-int8 qualifies.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wyoming-whisper
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: wyoming-whisper
+  values:
+    fullnameOverride: wyoming-whisper
+    controllers:
+      wyoming-whisper:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/rhasspy/wyoming-whisper
+              tag: 3.8.1@sha256:ba6fcb6056ebe237d15a325381763a80af2fc8fcedaa04f6a714a7375eb20d80
+            # docker_run.sh already passes --uri tcp://0.0.0.0:10300,
+            # --data-dir /data and --device cpu.
+            args:
+              - --model
+              - small-int8
+              - --language
+              - en
+            env:
+              TZ: America/Chicago
+              PYTHONDONTWRITEBYTECODE: "1"
+            probes:
+              # Wyoming is a TCP protocol, not HTTP — the chart's default
+              # httpGet probe would crash-loop the pod.
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: &port 10300
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  # Generous: the first start downloads the model weights.
+                  failureThreshold: 60
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Verified 2026-09: runs read-only as uid 1000 with
+              # PYTHONDONTWRITEBYTECODE=1, model download landing in /data.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                memory: 512Mi
+              limits:
+                memory: 3Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: wyoming-whisper
+        ports:
+          wyoming:
+            port: *port
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 2Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /data
+      tmp:
+        type: emptyDir

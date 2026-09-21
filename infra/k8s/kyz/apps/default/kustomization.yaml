@@ -16,6 +16,7 @@ resources:
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
   - ./wyoming-piper/ks.yaml
+  - ./wyoming-whisper/ks.yaml
   - ./zigbee2mqtt/ks.yaml
   - ./zwave-js-ui/ks.yaml
   - ./sabnzbd/ks.yaml
