@@ -12,6 +12,7 @@ resources:
   - ./jellyfin/ks.yaml
   - ./matter-server/ks.yaml
   - ./mosquitto/ks.yaml
+  - ./music-assistant/ks.yaml
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
   - ./zigbee2mqtt/ks.yaml

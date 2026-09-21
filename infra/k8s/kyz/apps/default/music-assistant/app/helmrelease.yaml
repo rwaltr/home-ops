@@ -1,0 +1,112 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Music Assistant server (ghcr.io/music-assistant/server). Central library +
+# streaming hub; HA's `music_assistant` integration points at
+# http://music-assistant.default.svc.cluster.local:8095.
+#
+# Discovery-dependent app class (same as home-assistant): the player providers
+# (Chromecast/Sonos/AirPlay/DLNA) rely on mDNS/SSDP on the media VLAN, so the
+# pod gets multus macvlan L2 presence on `clients` rather than a routed hop.
+# Static IPs below the router DHCP pool (.100+), pinned MAC per the
+# a6:30:00:10:<vlan>:<n> scheme (home-assistant .0a, matter-server .0b,
+# esphome .0c → music-assistant .0d).
+#
+# Image entrypoint already carries `--data-dir /data --cache-dir /data/.cache`;
+# /data is the config PVC, the cache is an emptyDir so it stays out of kopia.
+# Providers that open extra listener ports (Snapcast 1704/1705, AirPlay, etc.)
+# bind on the macvlan address directly — no Service entries needed for those.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: music-assistant
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: music-assistant
+  values:
+    fullnameOverride: music-assistant
+    controllers:
+      music-assistant:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/music-assistant/server
+              tag: stable@sha256:37a9a2776e838a754c9f5b38c432567389952304e7cb8f6b44b6cd28043de6de
+            env:
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &port 8095
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                failureThreshold: 30
+                periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Not verified read-only yet (MA writes scratch under /app and
+              # /tmp); tighten once confirmed in-cluster.
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+              limits:
+                memory: 2Gi
+    defaultPodOptions:
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |-
+          [{"name": "clients", "namespace": "kube-system", "ips": ["10.20.0.13/24"], "mac": "a6:30:00:10:20:0d"}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: music-assistant
+        ports:
+          http:
+            appProtocol: kubernetes.io/ws
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - music-assistant.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /data
+      cache:
+        type: emptyDir
+        globalMounts:
+          - path: /data/.cache
+      tmp:
+        type: emptyDir
