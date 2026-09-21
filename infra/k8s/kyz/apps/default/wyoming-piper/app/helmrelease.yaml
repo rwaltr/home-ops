@@ -1,0 +1,164 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Wyoming Piper TTS — the Assist voice. HA's `wyoming` integration points at
+# tcp://wyoming-piper.default.svc.cluster.local:10200.
+#
+# Voice: en_US-glados-medium (Portal GLaDOS), a community Piper model. It is not
+# in the rhasspy/piper-voices catalogue, so an init container fetches the two
+# files into the data PVC on first start, and skips them once present. Upstream
+# splits the pair across hosts — the .onnx is a Git LFS object served by
+# media.githubusercontent.com while the .onnx.json is a plain git object served
+# by raw.githubusercontent.com — hence the try-both-and-validate logic. Without
+# the validation an LFS pointer (~130 bytes of text) or a 404 body would be
+# written to disk and piper would fail at load.
+#
+# CPU-only and fast: RTF ~0.03 on the 12-thread host (30-40x realtime), first
+# audio ~50ms. Internal-only — no route, HA reaches it in-cluster.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wyoming-piper
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: wyoming-piper
+  values:
+    fullnameOverride: wyoming-piper
+    controllers:
+      wyoming-piper:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          fetch-voice:
+            # Same image as the app: it ships python3 + CA certs but no curl/wget.
+            image:
+              repository: docker.io/rhasspy/wyoming-piper
+              tag: 2.5.2@sha256:7d39aafac409c2b6b09d999ed04d84c311d632e558b35baa60fad6aac722af7a
+            command:
+              - /usr/src/.venv/bin/python3
+              - -c
+              - |
+                import json, os, urllib.request
+
+                FILES = ("en_US-glados-medium.onnx", "en_US-glados-medium.onnx.json")
+                RAW = "https://raw.githubusercontent.com/itsdarklikehell/GLaDOS-TTS/main"
+                MEDIA = "https://media.githubusercontent.com/media/itsdarklikehell/GLaDOS-TTS/main"
+                DST = "/data"
+
+                def valid(path, name):
+                    if not os.path.exists(path):
+                        return False
+                    size = os.path.getsize(path)
+                    if name.endswith(".onnx"):
+                        return size > 1_000_000  # an LFS pointer is ~130 bytes
+                    try:
+                        json.load(open(path))
+                        return True
+                    except Exception:
+                        return False
+
+                os.makedirs(DST, exist_ok=True)
+                for name in FILES:
+                    dest = os.path.join(DST, name)
+                    if valid(dest, name):
+                        print("present:", name, os.path.getsize(dest))
+                        continue
+                    for base in (MEDIA, RAW):
+                        host = base.split("/")[2]
+                        try:
+                            print("fetching:", name, "from", host)
+                            urllib.request.urlretrieve(f"{base}/{name}", dest)
+                        except Exception as exc:
+                            print("  failed:", host, exc)
+                            continue
+                        if valid(dest, name):
+                            print("  got:", name, os.path.getsize(dest))
+                            break
+                        print("  rejected bad content from", host, os.path.getsize(dest))
+                    else:
+                        raise SystemExit(f"ERROR: could not fetch {name}")
+                print("voice files ready")
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+        containers:
+          app:
+            image:
+              repository: docker.io/rhasspy/wyoming-piper
+              tag: 2.5.2@sha256:7d39aafac409c2b6b09d999ed04d84c311d632e558b35baa60fad6aac722af7a
+            # docker_run.sh already passes --uri tcp://0.0.0.0:10200 and
+            # --data-dir /data; only the default voice is ours to set. Other
+            # voices in /data are advertised and selectable per request.
+            args:
+              - --voice
+              - en_US-glados-medium
+            env:
+              TZ: America/Chicago
+              # Wyoming is a TCP protocol, not HTTP, so every probe below is a
+              # tcpSocket — the chart's default httpGet probe would fail here.
+              PYTHONDONTWRITEBYTECODE: "1"
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: &port 10200
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Verified 2026-09: runs read-only as uid 1000 with
+              # PYTHONDONTWRITEBYTECODE=1 and /tmp as the only writable path.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 256Mi
+              limits:
+                memory: 1Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: wyoming-piper
+        ports:
+          wyoming:
+            port: *port
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /data
+      tmp:
+        type: emptyDir

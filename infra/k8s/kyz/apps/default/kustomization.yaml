@@ -15,6 +15,7 @@ resources:
   - ./music-assistant/ks.yaml
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
+  - ./wyoming-piper/ks.yaml
   - ./zigbee2mqtt/ks.yaml
   - ./zwave-js-ui/ks.yaml
   - ./sabnzbd/ks.yaml
