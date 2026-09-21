@@ -106,6 +106,14 @@ spec:
         storageClass: openebs-hostpath
         globalMounts:
           - path: /data
+      # Music library straight off the tank DAS (ZFS), same host path jellyfin
+      # uses. The MA "Filesystem" provider is pointed at /media/music. If we
+      # ever switch to MA's Jellyfin provider instead, drop this mount.
+      media-music:
+        type: hostPath
+        hostPath: /var/tank/nas/library/music
+        globalMounts:
+          - path: /media/music
       cache:
         type: emptyDir
         globalMounts:
