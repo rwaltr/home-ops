@@ -127,7 +127,7 @@ spec:
           postgres:
             image:
               repository: ghcr.io/immich-app/postgres
-              tag: 17-vectorchord1.1.1@sha256:236fc185fcdbc929d9a86e6f3b0dce123076f1001e3db730057629b48bf5c3f7
+              tag: 18-vectorchord1.1.1@sha256:06331084b5fd1bc011b4e0ae6fdaf2862c445a8f1ea6297d9f3578b944bb720e
             env:
               POSTGRES_USER: postgres
               POSTGRES_DB: immich
