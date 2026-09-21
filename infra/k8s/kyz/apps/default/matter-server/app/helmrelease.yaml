@@ -24,6 +24,20 @@ spec:
             image:
               repository: ghcr.io/home-assistant-libs/python-matter-server
               tag: stable@sha256:170aa093ce91c76cde4cc390918307590f0f5558fcec93f913af3cb019e6562a
+            # Image ENTRYPOINT is `matter-server`, default CMD is
+            # `--storage-path /data --paa-root-cert-dir /data/credentials`.
+            # Override CMD to add --ota-provider-dir: the upstream default is
+            # cwd()/updates = /app/updates (image WORKDIR /app, root:root 0755),
+            # which the uid-1000 runtime cannot mkdir — HA update entities then
+            # fail with `[Errno 13] Permission denied: '/app/updates'` during
+            # matter-server's OTA download. /data is the writable PVC.
+            args:
+              - --storage-path
+              - /data
+              - --paa-root-cert-dir
+              - /data/credentials
+              - --ota-provider-dir
+              - /data/updates
             env:
               TZ: America/Chicago
               MATTER_SERVER_DATA_PATH: /data
