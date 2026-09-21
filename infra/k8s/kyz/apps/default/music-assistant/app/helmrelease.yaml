@@ -47,6 +47,7 @@ spec:
                   failureThreshold: 5
               readiness:
                 enabled: true
+                custom: true
                 spec:
                   httpGet:
                     path: /
@@ -56,8 +57,9 @@ spec:
                   failureThreshold: 5
               startup:
                 enabled: true
-                failureThreshold: 30
-                periodSeconds: 10
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
             securityContext:
               allowPrivilegeEscalation: false
               # Not verified read-only yet (MA writes scratch under /app and
