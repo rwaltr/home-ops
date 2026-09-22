@@ -36,6 +36,9 @@ spec:
               - sysctl -w net.ipv6.conf.net1.accept_ra_rt_info_max_plen=64
             securityContext:
               privileged: true
+              # The pod sets runAsNonRoot/uid 1000; sysctls need root.
+              runAsUser: 0
+              runAsNonRoot: false
         containers:
           app:
             image:
