@@ -8,19 +8,24 @@
 # normally done on-device by the satellite (ESPHome does it locally); this
 # service is for satellites that stream audio to HA instead.
 #
-# No args needed: docker_run.sh already passes --uri tcp://0.0.0.0:10400, and
-# the model set is discovered from the image. Ships 5 pre-trained models —
-# okay_nabu (the HA default), hey_jarvis, hey_mycroft, alexa, hey_rhasspy — all
-# advertised and selectable per-request by HA.
+# No args beyond the custom model dir: docker_run.sh already passes
+# --uri tcp://0.0.0.0:10400, and the built-in model set is discovered from the
+# image. Ships 5 pre-trained models — okay_nabu (the HA default), hey_jarvis,
+# hey_mycroft, alexa, hey_rhasspy — plus any custom .tflite in /custom.
 #
-# No PVC: models are baked into the image and there is no other state. Custom
-# .tflite wake words would need a mounted dir plus --custom-model-dir.
+# Custom models come from fwartner/home-assistant-wakewords-collection and are
+# ~203KB each, so an init container re-fetches them into an emptyDir on every
+# start rather than a PVC holding them. That keeps this app stateless (no PVC,
+# no kopia policy, no openebs dependsOn) and makes adding a wake word a
+# one-line change to MODELS below. The collection has ~113 English wake words;
+# other on-theme options verified or worth trying: hal_v1, computer_v2, TARS,
+# wall-e, r2d2, hey_kitt, jarvis_v2, glados (glados did NOT fire at the default
+# 0.5 threshold in testing — it needs tuning or is simply weak).
 #
 # Tuning knobs, left at defaults, in case detection is too eager or too deaf:
 #   --threshold 0.5            (0.0-1.0) raise to reduce false positives
 #   --trigger-level 1          activations required before firing
 #   --refractory-seconds 2     lockout after a detection
-#   --custom-model-dir DIR     load custom .tflite models from DIR
 #   --debug                    log probabilities per frame
 #
 # NOTE: --model/--models-dir/--preload-model/--output-dir are deprecated in 2.1.0
@@ -41,11 +46,51 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "true"
+        initContainers:
+          fetch-wake-words:
+            # Same image as the app: it ships python3 + CA certs but no curl/wget.
+            image:
+              repository: docker.io/rhasspy/wyoming-openwakeword
+              tag: 2.1.0@sha256:52cb1168731a1849fc28cf339c935fde58746bbabc94226668a40ef6ddf5d42b
+            command:
+              - /usr/src/.venv/bin/python3
+              - -c
+              - |
+                import os, urllib.request
+
+                # ~203KB each, so re-fetching per start is cheaper than a PVC.
+                BASE = "https://raw.githubusercontent.com/fwartner/home-assistant-wakewords-collection/main/en"
+                MODELS = {
+                    "wheatley.tflite": f"{BASE}/wheatley/wheatley.tflite",
+                }
+                DST = "/custom"
+
+                os.makedirs(DST, exist_ok=True)
+                for name, url in MODELS.items():
+                    dest = os.path.join(DST, name)
+                    if os.path.exists(dest) and os.path.getsize(dest) > 50_000:
+                        print("present:", name, os.path.getsize(dest))
+                        continue
+                    print("fetching:", name)
+                    urllib.request.urlretrieve(url, dest)
+                    size = os.path.getsize(dest)
+                    if size < 50_000:
+                        # a 404 body would be a few hundred bytes
+                        raise SystemExit(f"ERROR: {name} looks wrong ({size} bytes)")
+                    print("  got:", name, size)
+                print("wake words ready:", sorted(os.listdir(DST)))
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
         containers:
           app:
             image:
               repository: docker.io/rhasspy/wyoming-openwakeword
               tag: 2.1.0@sha256:52cb1168731a1849fc28cf339c935fde58746bbabc94226668a40ef6ddf5d42b
+            args:
+              - --custom-model-dir
+              - /custom
             env:
               TZ: America/Chicago
               PYTHONDONTWRITEBYTECODE: "1"
@@ -104,5 +149,9 @@ spec:
           wyoming:
             port: *port
     persistence:
+      custom:
+        type: emptyDir
+        globalMounts:
+          - path: /custom
       tmp:
         type: emptyDir
