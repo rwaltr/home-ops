@@ -48,4 +48,4 @@ data:
     # NOTE: the Off-Mesh-Routable (OMR) prefix is NOT part of the dataset; the
     # border routing manager mints one. Advertise the previous prefix instead
     # if you want stable Thread addresses (and a static router route):
-    #   wrap-ot-ctl prefix add fdde:c7ce:397e:1::/64 paros med
+    #   wrap-ot-ctl prefix add <omr-prefix> paros med

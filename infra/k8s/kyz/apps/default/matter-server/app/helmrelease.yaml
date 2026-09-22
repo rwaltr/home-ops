@@ -2,7 +2,8 @@
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 # Matter server (companion for container HA — the "Matter Server" add-on
 # equivalent). HA's `matter` integration connects to its websocket :5580.
-# Thread side rides the OTBR integration (SLZB-Ultima3 OTBR, 10.10.0.101:8080).
+# Thread side runs through the in-cluster `otbr` pod; HA's OTBR integration
+# talks to its REST Service at http://otbr:8081 (see infra/k8s/.../otbr).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

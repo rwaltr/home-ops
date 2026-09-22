@@ -48,8 +48,9 @@ the management VLAN but must directly serve a second VLAN.
   mount crashloops EROFS (onboarding/migration writes the file). Seed via a
   one-shot pod; the git copy is documentation.
 - **HA integrations wired via REST config flows** (long-lived token): mqtt
-  (mosquitto), otbr (SLZB OTBR `http://10.10.0.101:8080` — remote border
-  routers work), zwave_js (ws://zwave-js-ui:3000), matter (reconfigured to
+  (mosquitto), otbr (k8s `otbr` Service `http://otbr:8081` — the border
+  router runs in-cluster since 2026-09-22, the SLZB is just the Thread RCP),
+  zwave_js (ws://zwave-js-ui:3000), matter (reconfigured to
   ws://matter-server:5580/ws). Gotcha: the MQTT flow's
   `other_settings.set_ca_cert` must be **"off"** — "auto" sends a TLS
   ClientHello to the plaintext port = mosquitto "protocol error"; empty-string
