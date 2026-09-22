@@ -29,16 +29,22 @@ data:
     fi
     log "otbr-agent reachable (state=${state})"
 
-    if wrap-ot-ctl dataset active 2>/dev/null | grep -q .; then
-      log "active dataset already present; skipping seed"
-      exit 0
+    # NOTE: `ot-ctl dataset active` prints "Error 23: NotFound" to *stdout*
+    # when no dataset is set, so test for a real field, not just non-empty
+    # output (a naive `grep -q .` wrongly reports "present").
+    if wrap-ot-ctl dataset active 2>/dev/null | grep -qi 'Active Timestamp'; then
+      log "active dataset already present"
+    else
+      log "seeding active dataset from OTBR_DATASET_TLV"
+      wrap-ot-ctl dataset set active "${OTBR_DATASET_TLV}" \
+        && log "active dataset set"
     fi
 
-    log "seeding active dataset from OTBR_DATASET_TLV"
-    wrap-ot-ctl dataset set active "${OTBR_DATASET_TLV}" \
-      && wrap-ot-ctl ifconfig up \
-      && wrap-ot-ctl thread start \
-      && log "thread network started"
+    # Always ensure the Thread interface is enabled; the agent does not
+    # restore operational state on its own.
+    wrap-ot-ctl ifconfig up 2>/dev/null || true
+    wrap-ot-ctl thread start 2>/dev/null || true
+    log "thread state: $(wrap-ot-ctl state 2>/dev/null | head -1)"
     # NOTE: the Off-Mesh-Routable (OMR) prefix is NOT part of the dataset; the
     # border routing manager mints one. Advertise the previous prefix instead
     # if you want stable Thread addresses (and a static router route):
