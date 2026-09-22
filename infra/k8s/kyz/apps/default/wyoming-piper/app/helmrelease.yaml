@@ -1,16 +1,19 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# Wyoming Piper TTS — the Assist voice. HA's `wyoming` integration points at
+# Wyoming Piper TTS — the Assist voices. HA's `wyoming` integration points at
 # tcp://wyoming-piper.default.svc.cluster.local:10200.
 #
-# Voice: en_US-glados-medium (Portal GLaDOS), a community Piper model. It is not
-# in the rhasspy/piper-voices catalogue, so an init container fetches the two
-# files into the data PVC on first start, and skips them once present. Upstream
-# splits the pair across hosts — the .onnx is a Git LFS object served by
-# media.githubusercontent.com while the .onnx.json is a plain git object served
-# by raw.githubusercontent.com — hence the try-both-and-validate logic. Without
-# the validation an LFS pointer (~130 bytes of text) or a 404 body would be
-# written to disk and piper would fail at load.
+# Default voice is Portal GLaDOS (en_US-glados-medium). Wheatley
+# (wheatley-en, fox3000foxy/piper-checkpoints-wheatley-en) is installed
+# alongside it; both are community Piper models, absent from the
+# rhasspy/piper-voices catalogue, so an init container fetches them into the
+# data PVC on first start and skips them once present. Both are selectable per
+# request in the Assist pipeline — the --voice arg only sets the default.
+#
+# The fetch tries several hosts per file and validates the result, because a
+# wrong host returns an LFS pointer (~130 bytes of text) or a 404 body rather
+# than an error; either would be written to disk and make piper fail at load.
+# See the SOURCES table below for which file lives where.
 #
 # CPU-only and fast: RTF ~0.03 on the 12-thread host (30-40x realtime), first
 # audio ~50ms. Internal-only — no route, HA reaches it in-cluster.
@@ -42,9 +45,29 @@ spec:
               - |
                 import json, os, urllib.request
 
-                FILES = ("en_US-glados-medium.onnx", "en_US-glados-medium.onnx.json")
-                RAW = "https://raw.githubusercontent.com/itsdarklikehell/GLaDOS-TTS/main"
-                MEDIA = "https://media.githubusercontent.com/media/itsdarklikehell/GLaDOS-TTS/main"
+                # name -> candidate URLs, tried in order until the content validates.
+                # A bare filename is not enough: upstream splits each voice across
+                # hosts, and a wrong host returns an LFS pointer (~130 bytes) or a
+                # 404 body rather than an error, which would land on disk and make
+                # piper fail at load.
+                SOURCES = {
+                    # Portal GLaDOS (itsdarklikehell/GLaDOS-TTS): the .onnx is a Git
+                    # LFS object, the .onnx.json is a plain git object.
+                    "en_US-glados-medium.onnx": [
+                        "https://media.githubusercontent.com/media/itsdarklikehell/GLaDOS-TTS/main/en_US-glados-medium.onnx",
+                        "https://raw.githubusercontent.com/itsdarklikehell/GLaDOS-TTS/main/en_US-glados-medium.onnx",
+                    ],
+                    "en_US-glados-medium.onnx.json": [
+                        "https://raw.githubusercontent.com/itsdarklikehell/GLaDOS-TTS/main/en_US-glados-medium.onnx.json",
+                    ],
+                    # Portal Wheatley (HuggingFace, fox3000foxy/piper-checkpoints-wheatley-en).
+                    "wheatley-en.onnx": [
+                        "https://huggingface.co/fox3000foxy/piper-checkpoints-wheatley-en/resolve/main/wheatley-en.onnx",
+                    ],
+                    "wheatley-en.onnx.json": [
+                        "https://huggingface.co/fox3000foxy/piper-checkpoints-wheatley-en/resolve/main/wheatley-en.onnx.json",
+                    ],
+                }
                 DST = "/data"
 
                 def valid(path, name):
@@ -60,16 +83,16 @@ spec:
                         return False
 
                 os.makedirs(DST, exist_ok=True)
-                for name in FILES:
+                for name, urls in SOURCES.items():
                     dest = os.path.join(DST, name)
                     if valid(dest, name):
                         print("present:", name, os.path.getsize(dest))
                         continue
-                    for base in (MEDIA, RAW):
-                        host = base.split("/")[2]
+                    for url in urls:
+                        host = url.split("/")[2]
                         try:
                             print("fetching:", name, "from", host)
-                            urllib.request.urlretrieve(f"{base}/{name}", dest)
+                            urllib.request.urlretrieve(url, dest)
                         except Exception as exc:
                             print("  failed:", host, exc)
                             continue
@@ -79,7 +102,7 @@ spec:
                         print("  rejected bad content from", host, os.path.getsize(dest))
                     else:
                         raise SystemExit(f"ERROR: could not fetch {name}")
-                print("voice files ready")
+                print("voices ready:", sorted(os.listdir(DST)))
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
