@@ -99,6 +99,15 @@ spec:
                   failureThreshold: 5
                 type: HTTP
     defaultPodOptions:
+      securityContext:
+        # The HA OTBR add-on sets these; a bare otbr-agent does not. Without
+        # IPv6 forwarding the OTBR will not route between net1 and wpan0, so
+        # nothing on the IoT VLAN can reach the Thread devices.
+        sysctls:
+          - name: net.ipv6.conf.all.forwarding
+            value: "1"
+          - name: net.ipv4.ip_forward
+            value: "1"
       annotations:
         # IoT VLAN presence so the border agent/mDNS/SRP share L2 with the
         # devices and matter-server. Static IP below the DHCP pool, pinned MAC
