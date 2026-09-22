@@ -102,9 +102,9 @@ spec:
       annotations:
         # IoT VLAN presence so the border agent/mDNS/SRP share L2 with the
         # devices and matter-server. Static IP below the DHCP pool, pinned MAC
-        # (HA .10, matter-server .11).
+        # (HA .10, matter-server .11, esphome .12).
         k8s.v1.cni.cncf.io/networks: |-
-          [{"name": "iot", "namespace": "kube-system", "ips": ["10.30.0.12/23"], "mac": "a6:30:00:10:30:0c"}]
+          [{"name": "iot", "namespace": "kube-system", "ips": ["10.30.0.13/23"], "mac": "a6:30:00:10:30:0d"}]
     service:
       app:
         controller: otbr
