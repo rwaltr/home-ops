@@ -13,6 +13,7 @@ resources:
   - ./matter-server/ks.yaml
   - ./mosquitto/ks.yaml
   - ./music-assistant/ks.yaml
+  - ./otbr/ks.yaml
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
   - ./wyoming-piper/ks.yaml

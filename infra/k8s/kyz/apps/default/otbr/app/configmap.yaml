@@ -1,0 +1,45 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otbr-bootstrap
+data:
+  seed-dataset.sh: |-
+    #!/usr/bin/env bash
+    # Seed the Thread Active Operational Dataset on first boot, then start the
+    # Thread network. OTBR persists its state (including the dataset) in
+    # /var/lib/thread, so after the first successful run this script is a no-op.
+    #
+    # It is launched detached from the container's postStart hook because
+    # otbr-agent does not answer ot-ctl until the RCP is reachable (the SLZB's
+    # Serial-over-IP tcp/6638), which can happen later than container start
+    # during the radio cut-over.
+    set -u
+
+    log() { echo "$(date -Is) $*"; }
+
+    for _ in $(seq 1 720); do
+      wrap-ot-ctl state >/dev/null 2>&1 && break
+      sleep 5
+    done
+
+    if ! state=$(wrap-ot-ctl state 2>/dev/null); then
+      log "otbr-agent never became reachable (RCP down?); not seeding dataset"
+      exit 0
+    fi
+    log "otbr-agent reachable (state=${state})"
+
+    if wrap-ot-ctl dataset active 2>/dev/null | grep -q .; then
+      log "active dataset already present; skipping seed"
+      exit 0
+    fi
+
+    log "seeding active dataset from OTBR_DATASET_TLV"
+    wrap-ot-ctl dataset set active "${OTBR_DATASET_TLV}" \
+      && wrap-ot-ctl ifconfig up \
+      && wrap-ot-ctl thread start \
+      && log "thread network started"
+    # NOTE: the Off-Mesh-Routable (OMR) prefix is NOT part of the dataset; the
+    # border routing manager mints one. Advertise the previous prefix instead
+    # if you want stable Thread addresses (and a static router route):
+    #   wrap-ot-ctl prefix add fdde:c7ce:397e:1::/64 paros med
