@@ -6,4 +6,3 @@ resources:
   - ./cameras.yaml
   - ./clients.yaml
   - ./iot.yaml
-  - ./iot-thread.yaml

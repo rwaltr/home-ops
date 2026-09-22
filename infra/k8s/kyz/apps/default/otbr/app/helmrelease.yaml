@@ -27,6 +27,22 @@ spec:
     controllers:
       otbr:
         strategy: Recreate
+        initContainers:
+          sysctl:
+            # The HA OTBR add-on sets IP forwarding; a bare otbr-agent does not.
+            # Without it the pod doesn't route net1 <-> wpan0, so nothing on the
+            # IoT VLAN can reach Thread devices. Set it in the pod netns before
+            # otbr-agent starts; k0s allows no unsafe sysctls, so this can't be
+            # a pod `securityContext.sysctls` entry (kubelet -> SysctlForbidden).
+            image:
+              repository: busybox
+              tag: stable@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+            command:
+              - sh
+              - -c
+              - sysctl -w net.ipv6.conf.all.forwarding=1 && sysctl -w net.ipv4.ip_forward=1
+            securityContext:
+              privileged: true
         containers:
           app:
             # bnutzer/otbr-tcp = openthread/otbr + socat + s6 wiring for a
@@ -99,15 +115,6 @@ spec:
                   failureThreshold: 5
                 type: HTTP
     defaultPodOptions:
-      securityContext:
-        # The HA OTBR add-on sets these; a bare otbr-agent does not. Without
-        # IPv6 forwarding the OTBR will not route between net1 and wpan0, so
-        # nothing on the IoT VLAN can reach the Thread devices.
-        sysctls:
-          - name: net.ipv6.conf.all.forwarding
-            value: "1"
-          - name: net.ipv4.ip_forward
-            value: "1"
       annotations:
         # IoT VLAN presence so the border agent/mDNS/SRP share L2 with the
         # devices and matter-server. Static IP below the DHCP pool, pinned MAC
