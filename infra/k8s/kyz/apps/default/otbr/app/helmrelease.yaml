@@ -40,7 +40,15 @@ spec:
             command:
               - sh
               - -c
-              - sysctl -w net.ipv6.conf.all.forwarding=1 && sysctl -w net.ipv4.ip_forward=1
+              - |
+                sysctl -w net.ipv6.conf.all.forwarding=1
+                sysctl -w net.ipv4.ip_forward=1
+                # forwarding=1 makes the kernel ignore RAs (accept_ra=1 only
+                # accepts when not forwarding), which strips net1's global
+                # addresses and the routes to the infra prefixes. accept_ra=2
+                # keeps accepting RAs while forwarding.
+                sysctl -w net.ipv6.conf.net1.accept_ra=2
+                sysctl -w net.ipv6.conf.net1.accept_ra_rt_info_max_plen=64
             securityContext:
               privileged: true
         containers:
