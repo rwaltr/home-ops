@@ -743,6 +743,44 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
 
+### 2026-09-22 — OTBR moved in-cluster; HA zeroconf needed per-VLAN enablement
+
+- **The Thread border router now runs in the cluster** (`apps/default/otbr`,
+  `bnutzer/otbr-tcp`): the SLZB-Ultima3 is mode "Thread to remote OTBR" — a
+  Thread RCP (radio only), Serial-over-IP `tcp/6638`, still on the mgmt VLAN
+  (its web UI is unauthenticated). The pod has a multus macvlan on vlan30-iot
+  (`10.30.0.13`), so the border agent/mDNS/SRP share L2 with the devices and
+  matter-server. This is what fixed Thread-device OTA-provider discovery. Full
+  write-up: `infra/routeros/README.md` → "Matter over Thread across VLANs".
+- **Sysctl gotchas** (all three bit us): the OTBR pod needs
+  `net.ipv6.conf.all.forwarding=1` **and** `net.ipv6.conf.net1.accept_ra=2`
+  (forwarding makes the kernel ignore RAs, which strips net1's addresses and
+  the routes to the infra prefixes); matter-server needs
+  `net.ipv6.conf.net1.accept_ra_rt_info_max_plen=64` to accept the OTBR's
+  RFC 4191 Route Information Option. k0s allows no unsafe sysctls, so all three
+  are set by **privileged init containers** (`securityContext.sysctls` →
+  kubelet `SysctlForbidden`).
+- **RouterOS**: OMR route is static to the OTBR pod's net1 link-local
+  (`fd85:2657:315b:1::/64 via fe80::a430:ff:fe10:300d%vlan30-iot`) — RouterOS
+  ignores RIOs, so it never learns the OMR from RAs. `clients -> OMR`/OTBR
+  firewall allows moved from vlan10 to vlan30. The OMR prefix is minted by the
+  border routing manager and persists in the OTBR `/var/lib/thread` PVC.
+- **HA zeroconf binds only the default interface by default.** HA's `network`
+  integration auto-enables only the default-route adapter (`eth0`/Cilium); the
+  multus VLAN interfaces are `enabled=false, auto=false`. Result: HA's mDNS
+  never left `eth0`, `/config/thread` discovered **no** border router, and
+  `thread/discover_routers` returned `{}`. Fix: enable the VLAN adapters
+  (Settings → System → Network, or the `network/configure` websocket) and
+  restart HA so zeroconf rebinds: `configured_adapters: ["eth0","net1","net2","net3"]`
+  in `/config/.storage/core.network`. This is HA **state, not GitOps** —
+  re-apply on a rebuild. Side effect: HA then surfaces discovery from every
+  VLAN (lots of new "Discovered" entries).
+- **HA's preferred Thread border agent is not auto-replaced.** A new OTBR
+  (different border agent ID) leaves `thread.datasets` pointing at the old
+  one — `_async_maybe_update_preferred_border_agent` only refreshes when the
+  agent ID matches. Set it via the `thread/set_preferred_border_agent`
+  websocket command (or the Thread panel) after moving a border router.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
@@ -811,6 +849,11 @@ session. Router-side specifics live in `infra/routeros/README.md`
 - **Structural fix**: keep the border router and the controller (HA /
   matter-server) on the same VLAN. Splitting them is what forces the route +
   firewall allow in the first place.
+- **HA's zeroconf is per-interface and defaults to the default route only.**
+  A multi-homed HA (multus VLANs) must have each adapter enabled
+  (`/config/.storage/core.network` → `configured_adapters`), or its mDNS
+  discovery — including Thread border router discovery — silently sees only
+  `eth0`. See the 2026-09-22 session entry below.
 
 ## Open questions
 
