@@ -5,6 +5,10 @@
 # MediaDash plugin to remove/re-encode broken files. The Intel iGPU is attached
 # via a DRA ResourceClaim (DeviceClass gpu.intel.com) for QuickSync — the driver
 # injects /dev/dri/renderD128 through CDI. UI at jellyfin.waltr.tech (internal).
+#
+# NOTE: metadata providers are runtime config (config PVC, Kopia-backed), not
+# declared here. The Shows library uses TheTVDB for Season/Episode so it matches
+# Sonarr. See docs/jellyfin-metadata.md to reproduce/restore.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

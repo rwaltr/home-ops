@@ -220,6 +220,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **Cloud resources**: `infra/terraform/*/` (maintenance; Pulumi planned, no code yet)
 - **Shared secrets**: `infra/shared/domains.sops.yaml`
 - **SOPS config**: `.sops.yaml`
+- **Jellyfin ↔ Sonarr metadata (TVDB plugin, library providers)**: `docs/jellyfin-metadata.md`
 - **TODOs**: `git grep "TODO:"`
 
 ## ⚠️ Important Considerations
