@@ -1,0 +1,48 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tv-transcode
+  namespace: default
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      resourceClaims:
+        - name: gpu
+          resourceClaimTemplateName: transcode-gpu
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: qsv
+          image: ghcr.io/jellyfin/jellyfin:10.11.11
+          command: ["/bin/bash", "/config/transcode.sh"]
+          env:
+            - name: TZ
+              value: America/Chicago
+            - name: QUALITY
+              value: "20"
+            - name: DEADLINE
+              value: "0545"
+          resources:
+            claims:
+              - name: gpu
+            requests:
+              cpu: "3"
+              memory: 3Gi
+          volumeMounts:
+            - name: media-tv
+              mountPath: /media/tv
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: media-tv
+          hostPath:
+            path: /var/tank/nas/library/media/tv
+        - name: config
+          configMap:
+            name: tv-transcode
