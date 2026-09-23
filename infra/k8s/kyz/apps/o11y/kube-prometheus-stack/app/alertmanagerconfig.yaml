@@ -22,6 +22,14 @@ spec:
           - name: alertname
             value: Watchdog
             matchType: =
+      # one-shot from the media transcode job (jellyfin-halt) — push once.
+      # Long repeatInterval so a stale firing alert is not re-pushed.
+      - receiver: pushover-once
+        matchers:
+          - name: alertname
+            value: TranscodeQueueEmpty
+            matchType: =
+        repeatInterval: 120h
       - receiver: pushover
         matchers:
           - name: severity
@@ -48,6 +56,34 @@ spec:
 
   receivers:
     - name: blackhole
+    # One-shot informational push (no resolved follow-up) for the media
+    # transcode job's completion notice.
+    - name: pushover-once
+      pushoverConfigs:
+        - html: true
+          message: |-
+            {{- range .Alerts }}
+              {{- if ne .Annotations.description "" }}
+                {{ .Annotations.description }}
+              {{- else if ne .Annotations.summary "" }}
+                {{ .Annotations.summary }}
+              {{- else }}
+                Alert description not available
+              {{- end }}
+            {{- end }}
+          monospace: false
+          priority: "0"
+          sendResolved: false
+          sound: gamelan
+          title: >-
+            {{ .CommonAnnotations.summary }}
+          ttl: 86400s
+          token:
+            name: alertmanager-secret
+            key: ALERTMANAGER_PUSHOVER_TOKEN
+          userKey:
+            name: alertmanager-secret
+            key: PUSHOVER_USER_KEY
     - name: pushover
       pushoverConfigs:
         - html: true

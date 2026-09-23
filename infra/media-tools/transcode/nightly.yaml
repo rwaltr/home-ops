@@ -66,6 +66,7 @@ spec:
                 - |
                   set -e
                   DONE=/media/tv/.transcode/done.txt
+                  MARK=/media/tv/.transcode/.queue-empty-notified
                   if [ -f "$DONE" ]; then
                     remaining=$(comm -23 <(sort /config/files.txt) <(sort "$DONE") | wc -l)
                   else
@@ -73,9 +74,21 @@ spec:
                   fi
                   echo "remaining transcode candidates: $remaining"
                   if [ "$remaining" -eq 0 ]; then
-                    echo "nothing to do — leaving Jellyfin up"
+                    if [ ! -f "$MARK" ]; then
+                      now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                      body="[{\"labels\":{\"alertname\":\"TranscodeQueueEmpty\",\"severity\":\"info\",\"job\":\"tv-transcode\"},\"annotations\":{\"description\":\"Every transcode candidate has been re-encoded. Nothing left to shrink; Jellyfin stays online.\",\"summary\":\"TV bloat re-encode queue is empty\"},\"startsAt\":\"$now\"}]"
+                      code=$(curl -s -o /dev/null -w "%{http_code}" -XPOST \
+                        -H "Content-Type: application/json" --data "$body" \
+                        http://kube-prometheus-stack-alertmanager.o11y.svc:9093/api/v2/alerts || echo 000)
+                      echo "alertmanager notify: HTTP $code"
+                      [ "$code" = "200" ] && touch "$MARK"
+                    else
+                      echo "already notified; not pushing again"
+                    fi
+                    echo "nothing to do - leaving Jellyfin up"
                     exit 0
                   fi
+                  rm -f "$MARK"
                   kubectl -n default patch kustomization jellyfin --type merge -p '{"spec":{"suspend":true}}'
                   kubectl -n default scale deployment/jellyfin --replicas=0
                   kubectl -n default wait --for=delete pod -l app.kubernetes.io/name=jellyfin --timeout=180s || true
@@ -83,7 +96,6 @@ spec:
               volumeMounts:
                 - name: media-tv
                   mountPath: /media/tv
-                  readOnly: true
                 - name: config
                   mountPath: /config
                   readOnly: true
