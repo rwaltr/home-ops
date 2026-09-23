@@ -1,0 +1,182 @@
+---
+# Nightly TV bloat re-encode pipeline (America/Chicago):
+#   00:30  jellyfin-halt        suspend Flux, scale Jellyfin to 0 (frees GPU)
+#   00:35  tv-transcode-nightly  run the QSV HEVC encode (stops at 05:45)
+#   05:50  jellyfin-restore      scale Jellyfin to 1, resume Flux
+# The halt step is a no-op when no candidates remain, so Jellyfin stays up.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: media-transcode
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: media-transcode
+  namespace: default
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: ["kustomizations"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: media-transcode
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: media-transcode
+    namespace: default
+roleRef:
+  kind: Role
+  name: media-transcode
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jellyfin-halt
+  namespace: default
+spec:
+  schedule: "30 0 * * *"
+  timeZone: America/Chicago
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: media-transcode
+          restartPolicy: OnFailure
+          containers:
+            - name: halt
+              image: bitnami/kubectl:latest
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -e
+                  DONE=/media/tv/.transcode/done.txt
+                  if [ -f "$DONE" ]; then
+                    remaining=$(comm -23 <(sort /config/files.txt) <(sort "$DONE") | wc -l)
+                  else
+                    remaining=$(wc -l < /config/files.txt)
+                  fi
+                  echo "remaining transcode candidates: $remaining"
+                  if [ "$remaining" -eq 0 ]; then
+                    echo "nothing to do — leaving Jellyfin up"
+                    exit 0
+                  fi
+                  kubectl -n default patch kustomization jellyfin --type merge -p '{"spec":{"suspend":true}}'
+                  kubectl -n default scale deployment/jellyfin --replicas=0
+                  kubectl -n default wait --for=delete pod -l app.kubernetes.io/name=jellyfin --timeout=180s || true
+                  echo "jellyfin halted; GPU freed"
+              volumeMounts:
+                - name: media-tv
+                  mountPath: /media/tv
+                  readOnly: true
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+          volumes:
+            - name: media-tv
+              hostPath:
+                path: /var/tank/nas/library/media/tv
+            - name: config
+              configMap:
+                name: tv-transcode
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tv-transcode-nightly
+  namespace: default
+spec:
+  schedule: "35 0 * * *"
+  timeZone: America/Chicago
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      # hard stop ~06:05 local; the script's own DEADLINE stops it at 05:45
+      activeDeadlineSeconds: 19800
+      template:
+        spec:
+          restartPolicy: Never
+          resourceClaims:
+            - name: gpu
+              resourceClaimTemplateName: transcode-gpu
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          containers:
+            - name: qsv
+              image: ghcr.io/jellyfin/jellyfin:10.11.11
+              command: ["/bin/bash", "/config/transcode.sh"]
+              env:
+                - name: TZ
+                  value: America/Chicago
+                - name: QUALITY
+                  value: "20"
+                - name: DEADLINE
+                  value: "0545"
+              resources:
+                claims:
+                  - name: gpu
+                requests:
+                  cpu: "3"
+                  memory: 3Gi
+              volumeMounts:
+                - name: media-tv
+                  mountPath: /media/tv
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+          volumes:
+            - name: media-tv
+              hostPath:
+                path: /var/tank/nas/library/media/tv
+            - name: config
+              configMap:
+                name: tv-transcode
+---
+# Safety net: bring Jellyfin back and un-suspend Flux regardless of job state.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jellyfin-restore
+  namespace: default
+spec:
+  schedule: "50 5 * * *"
+  timeZone: America/Chicago
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: media-transcode
+          restartPolicy: OnFailure
+          containers:
+            - name: restore
+              image: bitnami/kubectl:latest
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  kubectl -n default scale deployment/jellyfin --replicas=1
+                  kubectl -n default patch kustomization jellyfin --type merge -p '{"spec":{"suspend":false}}'
+                  echo "jellyfin restored and flux resumed"
