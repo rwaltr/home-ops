@@ -54,7 +54,12 @@ while IFS= read -r SRC; do
     [ "$oinc" -lt $((sinc*(100-MARGIN)/100)) ] && small_enough=yes
     secs=$(( $(date +%s) - t0 ))
     if [ "$dclose" = yes ] && [ "$small_enough" = yes ]; then
-      if [[ "$SRC" == *.mkv ]]; then DEST="$SRC"; else DEST="$base.mkv"; fi
+      dir=$(dirname "$SRC"); bn=$(basename "$SRC")
+      # rename to reflect the new codec: x264/h264/XviD/DivX -> x265,
+      # append [x265] if no codec token is present, and normalise to .mkv
+      newbn=$(printf '%s' "$bn" | sed -E 's/\[(x264|h264|h\.264|xvid|divx)\]/[x265]/gI')
+      [ "$newbn" = "$bn" ] && newbn="${bn%.*} [x265].${bn##*.}"
+      DEST="$dir/${newbn%.*}.mkv"
       mv -f "$TMP" "$DEST"
       [ "$DEST" != "$SRC" ] && rm -f "$SRC"
       save=$(( (sinc-oinc)/1048576 ))
