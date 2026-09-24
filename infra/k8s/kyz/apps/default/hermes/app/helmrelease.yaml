@@ -137,9 +137,12 @@ spec:
               HERMES_DASHBOARD_HOST: 0.0.0.0
               HERMES_DASHBOARD_PORT: &dashboardPort 9119
               HERMES_DASHBOARD_PUBLIC_URL: https://hermes.waltr.tech
-              # Self-hosted SearXNG. Harmless while the `web` toolset is disabled;
-              # re-enable search by adding `web` to toolsets + `web.search_backend: searxng`.
-              SEARXNG_URL: http://searxng.default.svc.cluster.local:8080
+              # Self-hosted Degoog via the nginx compat shim: the `searxng`
+              # provider hardcodes `/search?format=json`, which the compat port
+              # rewrites to Degoog's `/api/search`. Harmless while the `web`
+              # toolset is disabled; re-enable search by adding `web` to toolsets
+              # + `web.search_backend: searxng`.
+              SEARXNG_URL: http://degoog.default.svc.cluster.local:8080
             envFrom:
               - secretRef:
                   name: hermes-secret
