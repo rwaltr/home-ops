@@ -1,0 +1,18 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/grafana.integreatly.org/grafanadashboard_v1beta1.json
+#
+# The grafana-operator chart already ships this dashboard as a ConfigMap
+# (grafana-operator-dashboard, key grafana-operator.json) but nothing referenced it, so
+# the operator had no dashboard of its own. Same configMapRef pattern as the cilium one.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: grafana-operator
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  configMapRef:
+    name: grafana-operator-dashboard
+    key: grafana-operator.json
