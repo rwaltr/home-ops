@@ -117,6 +117,13 @@ spec:
               - "4000"
             env:
               TZ: America/Chicago
+              # OpenRouter backend key — reuses the existing hermes-secret
+              # (same 1P item) rather than duplicating it into litellm-secret.
+              OPENROUTER_API_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: hermes-secret
+                    key: OPENROUTER_API_KEY
             envFrom:
               - secretRef:
                   name: litellm-secret
@@ -256,6 +263,12 @@ spec:
                   model: openai/minicpm5-2b
                   api_base: http://127.0.0.1:11434/v1
                   api_key: ollama # required by the openai provider; unused
+              # OpenRouter cloud models ride the same proxy/key — one
+              # endpoint for local + cloud. Key comes from hermes-secret.
+              - model_name: deepseek-v4.1-flash
+                litellm_params:
+                  model: openrouter/deepseek/deepseek-v4.1-flash
+                  api_key: os.environ/OPENROUTER_API_KEY
             litellm_settings:
               # Don't 400 on params a local backend doesn't implement.
               drop_params: true
