@@ -43,9 +43,6 @@ spec:
               TZ: America/Chicago
               DEGOOG_BASE_URL: https://search.waltr.tech
               DEGOOG_PUBLIC_INSTANCE: "false"
-              # Temporary: surface settings-auth / request debug lines while
-              # diagnosing the browser login. Revert to info when done.
-              LOG_LEVEL: debug
               # Envoy is a reverse proxy we control. Without this Degoog
               # distrusts X-Forwarded-* and every client shares the proxy's IP
               # for rate-limit/honeypot decisions (docs: DEGOOG_DISTRUST_PROXY),
