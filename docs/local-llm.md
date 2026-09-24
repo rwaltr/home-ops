@@ -50,8 +50,10 @@ That machinery was removed when FunctionGemma was dropped; re-add both stages
 together. Verify the model actually _stops_ generating before trusting it (see
 "Traps" below).
 
-Then reload: models are baked at pod start, so
-`kubectl rollout restart deploy/litellm -n default`.
+Then reload: with `stakater/reloader` now running (see `apps/kube-system/reloader`),
+editing this ConfigMap — or the HelmRelease that generates it — rolls the pod
+automatically, which re-runs the init containers too. If you're working outside
+Git/Flux, force it with `kubectl rollout restart deploy/litellm -n default`.
 
 ## Traps
 

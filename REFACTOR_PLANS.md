@@ -819,8 +819,9 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   (cluster-only, no route) for LLM clients; `deep_search` left off.
 - **Secrets**: settings-gate password from 1P item `degoog`, field `password`
   → `DEGOOG_SETTINGS_PASSWORDS`. It is **env-only** and read at container
-  start, so after editing the 1P item the pod must be cycled (an
-  ExternalSecret refresh alone does not update a running container). Keep the
+  start, so after editing the 1P item the pod must be cycled — handled
+  automatically since reloader landed (2026-09-24); an ExternalSecret refresh
+  alone still does not update a running container. Keep the
   gate set on anything reachable — an unlocked instance lets anyone install
   extensions, which run code on the server.
 - **Reverse proxy**: `DEGOOG_DISTRUST_PROXY` defaults to `1`, so behind Envoy
@@ -910,8 +911,13 @@ documented in [`docs/local-llm.md`](docs/local-llm.md); the lessons:
   hardcoded to OpenAI with no base-URL option, so this is the supported path.
   It's config-flow only, so it lives in `.storage` on the HA PVC — not in Git.
 - **hermes config is re-seeded from a ConfigMap by an init container on every
-  pod start.** Editing the ConfigMap does not roll the pod (there's no reloader
-  annotation), and neither does a new secret key — restart it manually.
+  pod start.** Editing the ConfigMap does not roll the pod by itself. Fixed
+  properly on 2026-09-24 by deploying **`stakater/reloader`** (`8761e796`): the
+  repo had carried `reloader.stakater.com/auto` annotations on 13+ manifests
+  with nothing watching them. Reloader now rolls hermes (and litellm, degoog,
+  home-assistant, ...) when their config or secrets change, so the
+  manual-pod-cycle footguns recorded earlier are resolved. Verified with a
+  throwaway configmap-change test in a scratch namespace.
 
 **Expectations on this hardware.** Generation speed is memory-bandwidth bound:
 `tok/s ≈ bandwidth / model_size`. An i9-13900H gets ~60-70GB/s effective, so a
