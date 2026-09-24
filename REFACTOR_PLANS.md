@@ -835,6 +835,90 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   defaults off, so enable "Serve the SearXNG API shape" in Settings → Server
   or the compat shim returns Degoog's native shape (still has `content`).
 
+### 2026-09-24 — memory audit + local LLM gateway (LiteLLM/Ollama)
+
+**Memory audit (31Gi, no swap).** `MemAvailable` was 3.8Gi with
+`Committed_AS` 37.9Gi while PSI stayed 0.00 — no stalls yet, but no spike
+headroom either. Three findings, all fixed (commit `e382efd0`):
+
+- **ZFS ARC was effectively uncapped.** `zfs_arc_max=0` is *not* "default
+  50%" on OpenZFS 2.2+ — it means **all RAM minus 1Gi** (`c_max` was 30Gi on
+  this box). ARC held 8.1Gi for an 11Gi pool. ARC is *not* page cache: it
+  counts as **used**, and the OOM killer fires before ARC shrinks. Capped at
+  4Gi via `/etc/modprobe.d/zfs.conf`.
+- **`kopiur-webhook` leaked to 1.8Gi** against a 64Mi request with no limit,
+  over 14d. The chart's own docs say the webhook "does no kopia work, so it
+  stays light" and suggests a 512Mi limit — so this is a bug worth reporting
+  upstream. Capped at 512Mi; it recycles instead of eating the node.
+- **No swap + 17.7Gi `Inactive(anon)`** — idle anonymous memory the kernel
+  cannot reclaim without swap. Added a **4Gi zram** device (`lzo-rle`; **lz4
+  is not in the Flatcar kernel's crypto API**, only `lzo-rle`/`lzo`).
+
+Also capped `rustfs` (1536Mi; was uncapped at ~860Mi) and `cilium-agent`
+(1Gi; was uncapped at ~430Mi). Result: `MemAvailable` 3.8Gi → **8.8Gi**, plus
+a 4Gi swap backstop.
+
+Gotchas from the audit:
+
+- **Identify a container process properly.** `ps` showed a 1.8Gi
+  `/usr/local/bin/app` owned by `nobody` that looked like degoog. Map it via
+  `/proc/<pid>/cgroup` → `kubepods/…/pod<UID>` → match the UID against
+  `kubectl get pods -A -o json`. It was kopiur-webhook; degoog was fine.
+- **Ignition only runs on first boot.** Butane changes pin the ARC cap and
+  zram for a *future reprovision*, but a plain reboot loses anything applied
+  live with `echo > /sys` or `modprobe`. Both were also written to the running
+  host (`/etc/modprobe.d/zfs.conf`, `zram-swap.service` + `systemctl enable`).
+- Per-pod numbers come from cgroup v2 `memory.current`/`memory.peak` under
+  `/sys/fs/cgroup/kubepods/{burstable,besteffort}/pod*/` — peak vs request is
+  where the surprises are (radarr peaked 6.6x its request; helm-controller 13x).
+
+**Local LLM gateway.** New `apps/default/litellm` — one OpenAI-compatible
+endpoint (`litellm.default.svc.cluster.local:4000`, UI at
+`litellm.waltr.tech`) fronting ollama + OpenRouter + speaches. Operationally
+documented in [`docs/local-llm.md`](docs/local-llm.md); the lessons:
+
+- **ollama's OpenAI endpoint silently DROPS `think`.** Only the native
+  `/api/chat` honours it (verified all three paths). So *any* thinking model
+  reached through LiteLLM thinks unconditionally — 500-1500 tokens of preamble
+  per reply, i.e. 20-60s of dead air, which reads as "broken". Workaround:
+  rebuild the model with the nothink generation prompt baked into its template
+  (`sed` on `ollama show --modelfile`), which is how `qwen3-1.7b-nothink`
+  exists. Putting `/no_think` in the prompt does **not** work — the template
+  injects an empty think block; the model does not read the text token.
+- **MiniCPM5-2B was the wrong model for chat, right for decisions.** It's the
+  smallest *useful* decision model (SemIf's ladder: 0.686 balanced accuracy vs
+  Qwen3.5-4B's 0.813) — but a reasoning model at 2B on CPU. Dropped from chat;
+  weights pruned. Keep the distinction in mind before re-adding.
+- **`acon96/Home-FunctionGemma-270m` loops forever on ollama** — it repeats the
+  same `<start_function_call>` until `num_predict` runs out. The GGUF's
+  template emits the end token as *text*, so nothing stops generation, and
+  270M is too small to recover from re-prompting. Pruned. The GGUF-download
+  init container went with it. Expect the same class of problem with any
+  acon96 GGUF until ollama parses FunctionGemma's format.
+- **`roryeckel/wyoming_openai` is the opposite direction to its name** — it's
+  a *Wyoming server* fronting OpenAI backends, not an OpenAI shim for Wyoming
+  services. LiteLLM cannot front the wyoming-* pods (TCP protocol), so audio
+  is a **speaches** sidecar: a second copy of whisper/piper, bounded by
+  `STT_MODEL_TTL=300`. Consolidation path (bridge + delete wyoming-* pods) is
+  noted in the release comments.
+- **1Password Connect caches vault contents.** A newly created item is
+  invisible to ESO ("key not found in 1Password Vaults") until the connect pod
+  is restarted. Force ESO after: `kubectl annotate externalsecret <n>
+  force-sync=$(date +%s) --overwrite`.
+- **HA 2026.9 ships a native LiteLLM integration** (conversation agent,
+  auto-discovers models from `/v1/models`). HA's own OpenAI integration is
+  hardcoded to OpenAI with no base-URL option, so this is the supported path.
+  It's config-flow only, so it lives in `.storage` on the HA PVC — not in Git.
+- **hermes config is re-seeded from a ConfigMap by an init container on every
+  pod start.** Editing the ConfigMap does not roll the pod (there's no reloader
+  annotation), and neither does a new secret key — restart it manually.
+
+**Expectations on this hardware.** Generation speed is memory-bandwidth bound:
+`tok/s ≈ bandwidth / model_size`. An i9-13900H gets ~60-70GB/s effective, so a
+1.6GB Q4 model lands at ~30 tok/s measured — that's the ceiling, not a tuning
+miss. The Iris Xe iGPU shares the same system RAM, so it buys ~1.3-2x at most.
+A discrete GPU is the only real fix; smaller models (1.7B) are the free one.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
