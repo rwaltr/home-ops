@@ -269,8 +269,6 @@ spec:
                 models:
                   qwen3-1.7b-nothink:
                     context_length: 8192
-                  home-functiongemma-270m:
-                    context_length: 8192
             # Minimal, CLI-first toolset (like pi) + web search via self-hosted
             # SearXNG. The API server and CLI platforms otherwise fall back to the
             # full `hermes-*-server`/`hermes-cli` presets (~50 tool schemas/turn).
