@@ -42,10 +42,39 @@ spec:
         annotations:
           reloader.stakater.com/auto: "true"
         initContainers:
-          # First-boot model import. Runs its own throwaway `ollama serve`
-          # against the shared models PVC, creates the model, exits. Guarded
-          # by `ollama list` so restarts are no-ops.
-          models:
+          # First-boot model import, two stages (the ollama image is minimal —
+          # no curl/wget — so the download needs its own image). Guarded by a
+          # marker file on the PVC so restarts are no-ops.
+          model-download:
+            image:
+              repository: docker.io/curlimages/curl
+              tag: 8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+            command:
+              - /bin/sh
+              - -ec
+              - |
+                GGUF=/models/.minicpm5-2b-q4_k_m.gguf
+                SHA=ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd
+                if [ -f /models/.imported-minicpm5-2b ]; then
+                  echo "minicpm5-2b already imported, skipping"
+                  exit 0
+                fi
+                if [ -f "$GGUF" ] && echo "$SHA  $GGUF" | sha256sum -c - >/dev/null 2>&1; then
+                  echo "GGUF already downloaded and verified"
+                  exit 0
+                fi
+                echo "downloading MiniCPM5-2B Q4_K_M GGUF (1.56GB)..."
+                curl -fSL --retry 3 \
+                  -o "$GGUF" \
+                  https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf
+                echo "$SHA  $GGUF" | sha256sum -c -
+            resources:
+              requests:
+                cpu: 100m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+          model-import:
             image:
               repository: docker.io/ollama/ollama
               tag: 0.34.4@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
@@ -57,22 +86,16 @@ spec:
                 ollama serve &
                 pid=$!
                 trap 'kill $pid 2>/dev/null || true' EXIT
-                for i in $(seq 1 60); do
-                  curl -sf http://127.0.0.1:11434/ >/dev/null && break
-                  sleep 1
-                done
+                until ollama list >/dev/null 2>&1; do sleep 1; done
                 if ollama list | awk '{print $1}' | grep -qx 'minicpm5-2b:latest'; then
-                  echo "minicpm5-2b already imported, skipping"
+                  echo "minicpm5-2b already present"
+                  touch /models/.imported-minicpm5-2b
                   exit 0
                 fi
-                echo "downloading MiniCPM5-2B Q4_K_M GGUF (1.56GB)..."
-                curl -fSL --retry 3 \
-                  -o /models/.minicpm5-2b-q4_k_m.gguf \
-                  https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf
-                echo "ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd  /models/.minicpm5-2b-q4_k_m.gguf" | sha256sum -c -
                 printf 'FROM /models/.minicpm5-2b-q4_k_m.gguf\n' > /tmp/Modelfile
                 ollama create minicpm5-2b -f /tmp/Modelfile
                 rm -f /models/.minicpm5-2b-q4_k_m.gguf
+                touch /models/.imported-minicpm5-2b
                 ollama list
             resources:
               requests:
@@ -209,7 +232,9 @@ spec:
           litellm:
             ollama:
               - path: /models
-            models:
+            model-download:
+              - path: /models
+            model-import:
               - path: /models
       config:
         type: configMap
