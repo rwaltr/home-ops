@@ -2,23 +2,9 @@
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 # Degoog — search aggregator (SearXNG replacement).
 #
-# GitOps notes:
-#   * Degoog ships zero engines and normally installs them at runtime from the
-#     store UI. The `seed` init container keeps that declarative: it pulls a
-#     pinned commit of degoog-org/official-extensions and installs a curated
-#     engine set into /app/data/engines under the same
-#     `-official-extensions-` namespace the store would use. Only folders we
-#     own are rewritten, so store-installed extensions survive restarts.
-#   * Curated set = engines reliably reachable server-side. Google CSE is
-#     included: it scrapes Google's Programmable Search element endpoint over
-#     plain fetch (no API key, no 4play transport). Engines needing an API key
-#     (Brave API Search, The Guardian) or a browser transport (Google HTML)
-#     are opt-in via the store UI, as is Startpage (Anubis interstitial from
-#     this network).
-#   * default-engines.json / server-settings.json are seeded once, on first
-#     start. Later UI changes (engine toggles, saving defaults, generated API
-#     key) are never clobbered.
-#   * `compat` is a tiny nginx rewrite so SearXNG clients that hardcode
+# Engines and instance defaults are NOT managed here: Degoog ships zero
+# engines, and the installed set + settings live on the /app/data PVC and are
+# configured through the store UI. The PVC is the source of truth.   * `compat` is a tiny nginx rewrite so SearXNG clients that hardcode
 #     `/search?format=json` (e.g. Hermes' searxng provider) work against
 #     Degoog, which serves that shape at `/api/search`. `/api/search` itself
 #     is also reachable on the `http` port.
@@ -48,32 +34,6 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "true"
-        initContainers:
-          seed:
-            image:
-              repository: ghcr.io/degoog-org/degoog
-              tag: 0.26.0@sha256:69e28fe2dc8008981b0ea8b9270f6b5b482d107b8a3dfa71d8acdac37f4b77c0
-            command:
-              - /bin/bash
-              - /seed/seed.sh
-            securityContext:
-              runAsNonRoot: false
-              runAsUser: 0
-              runAsGroup: 0
-              allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                  - ALL
-                add:
-                  - CHOWN
-                  - DAC_OVERRIDE
-                  - FOWNER
-            resources:
-              requests:
-                cpu: 10m
-                memory: 64Mi
-              limits:
-                memory: 256Mi
         containers:
           app:
             image:
@@ -83,6 +43,9 @@ spec:
               TZ: America/Chicago
               DEGOOG_BASE_URL: https://search.waltr.tech
               DEGOOG_PUBLIC_INSTANCE: "false"
+              # Temporary: surface settings-auth / request debug lines while
+              # diagnosing the browser login. Revert to info when done.
+              LOG_LEVEL: debug
               # Envoy is a reverse proxy we control. Without this Degoog
               # distrusts X-Forwarded-* and every client shares the proxy's IP
               # for rate-limit/honeypot decisions (docs: DEGOOG_DISTRUST_PROXY),
@@ -254,18 +217,8 @@ spec:
         forceRename: degoog-data
         advancedMounts:
           degoog:
-            seed:
-              - path: /app/data
             app:
               - path: /app/data
-      seed:
-        type: configMap
-        name: degoog-seed
-        advancedMounts:
-          degoog:
-            seed:
-              - path: /seed
-                readOnly: true
       nginx-conf:
         type: configMap
         name: degoog-nginx
@@ -298,92 +251,6 @@ spec:
             mcp:
               - path: /data
     configMaps:
-      degoog-seed:
-        forceRename: degoog-seed
-        data:
-          # Curated instance defaults. Engine folders are copied by seed.sh;
-          # these ids just decide what is enabled. Web ids drive AI/API search
-          # (type=web); news/image ids only run on their own tabs.
-          default-engines.json: |
-            {
-              "degoog-org-official-extensions-brave-engine": true,
-              "degoog-org-official-extensions-bing-engine": true,
-              "degoog-org-official-extensions-duckduckgo-engine": true,
-              "degoog-org-official-extensions-google-cse-engine": true,
-              "degoog-org-official-extensions-wikipedia-engine": true,
-              "degoog-org-official-extensions-reddit-engine": true,
-              "degoog-org-official-extensions-hacker-news-engine": true,
-              "degoog-org-official-extensions-bing-news-engine": true,
-              "degoog-org-official-extensions-bing-images-engine": true,
-              "degoog-org-official-extensions-openverse-engine": true,
-              "degoog-org-official-extensions-wikimedia-commons-engine": true
-            }
-          server-settings.json: |
-            {
-              "wizard": false,
-              "settings": {
-                "searxApiEnabled": true
-              }
-            }
-          seed.sh: |
-            #!/usr/bin/env bash
-            # Seed engines + instance defaults onto the PVC. Runs on every boot,
-            # but only ever rewrites the folders we own and only writes the JSON
-            # defaults if they do not exist yet.
-            set -euo pipefail
-
-            EXT_REPO="degoog-org/official-extensions"
-            EXT_REF="60d270874129e79c13ebab8cab608c3ab52c39f6"
-            ENGINES_DIR="/app/data/engines"
-            PREFIX="degoog-org-official-extensions"
-
-            # Empirically reliable server-side engines. Verified against this
-            # image: Brave, Bing and Google CSE consistent; DuckDuckGo/Wikipedia
-            # good; Reddit rate-limits often. Startpage was dropped (unsolvable
-            # Anubis interstitial from this network).
-            SEED_ENGINES="
-            brave
-            bing
-            duckduckgo
-            google-cse
-            wikipedia
-            reddit
-            hacker-news
-            bing-news
-            bing-images
-            openverse
-            wikimedia-commons
-            "
-
-            mkdir -p "$ENGINES_DIR"
-
-            work="$(mktemp -d)"
-            trap 'rm -rf "$work"' EXIT
-
-            echo "seeding engines from ${EXT_REPO}@${EXT_REF}"
-            curl -fsSL "https://codeload.github.com/${EXT_REPO}/tar.gz/${EXT_REF}" \
-              | tar -xz -C "$work" --strip-components=1
-
-            for name in $SEED_ENGINES; do
-              src="$work/engines/$name"
-              if [ ! -d "$src" ]; then
-                echo "engine $name not in ${EXT_REF}, skipping"
-                continue
-              fi
-              dst="$ENGINES_DIR/${PREFIX}-${name}"
-              rm -rf "$dst"
-              cp -r "$src" "$dst"
-            done
-
-            # Instance defaults are one-shot: never clobber UI edits.
-            for f in default-engines.json server-settings.json; do
-              if [ ! -f "/app/data/$f" ]; then
-                cp "/seed/$f" "/app/data/$f"
-              fi
-            done
-
-            chown -R 1000:1000 /app/data
-            echo "seed complete: $(find "$ENGINES_DIR" -maxdepth 1 -mindepth 1 -type d | wc -l) engine folders"
       degoog-nginx:
         forceRename: degoog-nginx
         data:
