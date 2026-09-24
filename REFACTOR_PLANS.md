@@ -789,23 +789,22 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   v0.26.0). Chosen because AI tooling was never wired to SearXNG and Degoog
   ships a first-class **MCP sidecar**; the SearXNG JSON shape is still
   available for compatibility. Commit `bc99aade`.
-- **GitOps shape**: Degoog ships **zero engines** and normally installs them
-  from the store UI at runtime. A `seed` init container keeps it declarative:
-  it pulls a **pinned commit** (`60d2708`) of `degoog-org/official-extensions`
-  and copies a curated engine set into `/app/data/engines/`, using the exact
-  `degoog-org-official-extensions-<name>` folder naming the store uses (engine
-  id = `<folder>-engine`). Only folders we own are rewritten, so UI-installed
-  extensions survive restarts. `default-engines.json` + `server-settings.json`
-  are seeded **once** (`[ ! -f ]`) so UI edits, the generated API key and
-  engine toggles are never clobbered. Engine bumps = change `EXT_REF`.
-- **Curated engines** (11, all enabled): web = Brave (HTML), Bing, DuckDuckGo,
-  Google CSE, Wikipedia, Reddit; news = Hacker News, Bing News; images = Bing
-  Images, Openverse, Wikimedia Commons. Empirically tested against the image:
-  Brave/Bing/Google CSE consistent, DuckDuckGo/Wikipedia good, Reddit
+- **Engines and settings live on the PVC, not in Git.** A first cut preseeded
+  a curated engine set with a `seed` init container (pinned commit `60d2708`
+  of `degoog-org/official-extensions` copied into `/app/data/engines/`, plus
+  one-shot `default-engines.json` / `server-settings.json`). It was removed
+  and the PVC nuked (`374deca7`) — Degoog's store UI is the intended setup
+  path and the seed fought it. `/app/data` is the source of truth: add the
+  store repo in the UI (`https://github.com/degoog-org/official-extensions.git`),
+  install/enable engines there. Do not seed the PVC.
+- **Engine recommendations** (from testing, for when installing in the UI):
+  web = Brave (HTML), Bing, DuckDuckGo, Google CSE, Wikipedia, Reddit; news =
+  Hacker News, Bing News; images = Bing Images, Openverse, Wikimedia Commons.
+  Brave/Bing/Google CSE were consistent, DuckDuckGo/Wikipedia good, Reddit
   rate-limits often. **Startpage dropped** — it consistently returned an
   unsolvable Anubis `interstitial` from this network despite the engine's
   self-solving claim. Google HTML (4play transport), a custom-`cx` Google CSE,
-  Brave API Search and The Guardian (keys) stay opt-in via the UI.
+  Brave API Search and The Guardian (keys) are opt-in.
 - **Google CSE is NOT the paid JSON API.** Degoog's `google-cse` scrapes the
   embeddable "element" XHR endpoint (`cse.google.com/cse/element/v1`) with a
   `cx` — **no Google API key, no billing**. Works over plain `fetch`; returned
@@ -819,13 +818,22 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
 - **MCP sidecar** at `degoog.default.svc.cluster.local:4443/mcp`
   (cluster-only, no route) for LLM clients; `deep_search` left off.
 - **Secrets**: settings-gate password from 1P item `degoog`, field `password`
-  → `DEGOOG_SETTINGS_PASSWORDS`. Keep the gate set on anything reachable — an
-  unlocked instance lets anyone install extensions, which run code on the
-  server.
+  → `DEGOOG_SETTINGS_PASSWORDS`. It is **env-only** and read at container
+  start, so after editing the 1P item the pod must be cycled (an
+  ExternalSecret refresh alone does not update a running container). Keep the
+  gate set on anything reachable — an unlocked instance lets anyone install
+  extensions, which run code on the server.
+- **Reverse proxy**: `DEGOOG_DISTRUST_PROXY` defaults to `1`, so behind Envoy
+  every client shares the proxy IP for rate-limit/honeypot decisions and a
+  429 shows up in the settings UI as "incorrect password". Set
+  `DEGOOG_DISTRUST_PROXY=false` for a proxy we control (route is
+  envoy-internal).
 - **Gotchas**: app-template `persistence.<x>` has no `readOnly` key — put it
-  on the `advancedMounts` entry instead. Seed writes to a RWO PVC, so the
+  on the `advancedMounts` entry instead. The app writes to a RWO PVC, so the
   controller uses `strategy: Recreate`. Hacker News is type `news`, not `web`,
-  so it never feeds AI/API web searches — only the News tab.
+  so it never feeds AI/API web searches — only the News tab. `searxApiEnabled`
+  defaults off, so enable "Serve the SearXNG API shape" in Settings → Server
+  or the compat shim returns Degoog's native shape (still has `content`).
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
