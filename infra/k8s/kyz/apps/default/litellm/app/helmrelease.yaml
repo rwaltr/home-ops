@@ -1,0 +1,239 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# LiteLLM proxy + Ollama backend — one OpenAI-compatible endpoint for local
+# models, fronting ollama (and future backends) with key auth, spend tracking
+# and model aliasing. Hermes reaches it as a custom provider:
+#   http://litellm.default.svc.cluster.local:4000/v1
+#
+# Single pod, two containers: litellm talks to ollama over pod localhost.
+# Ollama auto-unloads idle models (KEEP_ALIVE=10m) and holds at most one
+# loaded model — this node has no disk swap, only 4Gi zram (2026-09-24 audit).
+#
+# Models: MiniCPM5-2B is NOT on the ollama registry (only the -v vision
+# variants are), so the `models` initContainer imports the official
+# openbmb/MiniCPM5-2B-GGUF Q4_K_M (1.56GB, sha256-pinned) via `ollama create`
+# on first boot. Weights are re-downloadable artifacts — no kopia backup.
+#
+# SemIf-style decision scoring works through the proxy: chat completion with
+# max_tokens=1, logprobs=true, top_logprobs=20, read option-token odds off the
+# first token. Always set top_logprobs explicitly (litellm#21932).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: litellm
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: litellm
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: litellm
+    controllers:
+      litellm:
+        strategy: Recreate # single RWO models PVC
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          # First-boot model import. Runs its own throwaway `ollama serve`
+          # against the shared models PVC, creates the model, exits. Guarded
+          # by `ollama list` so restarts are no-ops.
+          models:
+            image:
+              repository: docker.io/ollama/ollama
+              tag: 0.34.4@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
+            command:
+              - /bin/sh
+              - -ec
+              - |
+                export OLLAMA_MODELS=/models OLLAMA_HOST=127.0.0.1:11434
+                ollama serve &
+                pid=$!
+                trap 'kill $pid 2>/dev/null || true' EXIT
+                for i in $(seq 1 60); do
+                  curl -sf http://127.0.0.1:11434/ >/dev/null && break
+                  sleep 1
+                done
+                if ollama list | awk '{print $1}' | grep -qx 'minicpm5-2b:latest'; then
+                  echo "minicpm5-2b already imported, skipping"
+                  exit 0
+                fi
+                echo "downloading MiniCPM5-2B Q4_K_M GGUF (1.56GB)..."
+                curl -fSL --retry 3 \
+                  -o /models/.minicpm5-2b-q4_k_m.gguf \
+                  https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf
+                echo "ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd  /models/.minicpm5-2b-q4_k_m.gguf" | sha256sum -c -
+                printf 'FROM /models/.minicpm5-2b-q4_k_m.gguf\n' > /tmp/Modelfile
+                ollama create minicpm5-2b -f /tmp/Modelfile
+                rm -f /models/.minicpm5-2b-q4_k_m.gguf
+                ollama list
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                memory: 512Mi
+        containers:
+          app:
+            image:
+              repository: ghcr.io/berriai/litellm
+              tag: main-stable@sha256:87f34979b9f8cb274fac90ca8a4fdda07d8480de22755562a26adeb95ce20d02
+            args:
+              - --config
+              - /config/config.yaml
+              - --host
+              - 0.0.0.0
+              - --port
+              - "4000"
+            env:
+              TZ: America/Chicago
+            envFrom:
+              - secretRef:
+                  name: litellm-secret
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health/liveliness
+                    port: &port 4000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health/liveliness
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health/liveliness
+                    port: *port
+                  periodSeconds: 5
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                memory: 512Mi
+          ollama:
+            image:
+              repository: docker.io/ollama/ollama
+              tag: 0.34.4@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
+            env:
+              TZ: America/Chicago
+              OLLAMA_MODELS: /models
+              OLLAMA_HOST: 0.0.0.0:11434
+              # Memory discipline for a swap-less node: unload after 10m idle,
+              # never hold two models, no parallel request batching.
+              OLLAMA_KEEP_ALIVE: 10m
+              OLLAMA_MAX_LOADED_MODELS: "1"
+              OLLAMA_NUM_PARALLEL: "1"
+              # Default per-model context (overridable per-request). Bounds
+              # the KV cache; bump only with ARC-capped headroom in mind.
+              OLLAMA_CONTEXT_LENGTH: "8192"
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &ollamaPort 11434
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: *ollamaPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2500Mi
+              limits:
+                # Q4_K_M weights 1.56GB + 8k KV cache + runtime ~= 2.5-3Gi hot.
+                memory: 4Gi
+    service:
+      app:
+        controller: litellm
+        ports:
+          http:
+            port: 4000
+          # Exposed for direct ollama access (debug, future SemIf-side pulls).
+          ollama:
+            port: 11434
+    route:
+      app:
+        hostnames:
+          - litellm.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+        rules:
+          - backendRefs:
+              - name: litellm
+                port: 4000
+    persistence:
+      models:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 20Gi
+        storageClass: openebs-hostpath
+        forceRename: litellm-models
+        advancedMounts:
+          litellm:
+            ollama:
+              - path: /models
+            models:
+              - path: /models
+      config:
+        type: configMap
+        name: litellm-config
+        advancedMounts:
+          litellm:
+            app:
+              - path: /config
+    configMaps:
+      litellm-config:
+        forceRename: litellm-config
+        data:
+          config.yaml: |
+            model_list:
+              - model_name: minicpm5-2b
+                litellm_params:
+                  # Generic OpenAI-compatible route (not ollama_chat) so
+                  # logprobs/top_logprobs pass through spec-faithfully.
+                  model: openai/minicpm5-2b
+                  api_base: http://127.0.0.1:11434/v1
+                  api_key: ollama # required by the openai provider; unused
+            litellm_settings:
+              # Don't 400 on params a local backend doesn't implement.
+              drop_params: true
+              num_retries: 2
+            general_settings:
+              master_key: os.environ/LITELLM_MASTER_KEY

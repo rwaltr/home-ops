@@ -31,3 +31,4 @@ resources:
   - ./recyclarr/ks.yaml
   - ./degoog/ks.yaml
   - ./hermes/ks.yaml
+  - ./litellm/ks.yaml

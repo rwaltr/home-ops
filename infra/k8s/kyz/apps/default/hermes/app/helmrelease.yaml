@@ -257,6 +257,18 @@ spec:
             model:
               provider: openrouter
               default: deepseek/deepseek-v4.1-flash
+            # Local models via the in-cluster LiteLLM proxy (Ollama backend).
+            # Not the default — pick with `hermes model` or `hermes fallback
+            # add`. SemIf-style decisions: max_tokens=1 + logprobs=true +
+            # top_logprobs=20, read option odds off the first token.
+            providers:
+              litellm:
+                name: litellm
+                base_url: http://litellm.default.svc.cluster.local:4000/v1
+                key_env: LITELLM_API_KEY
+                models:
+                  minicpm5-2b:
+                    context_length: 8192
             # Minimal, CLI-first toolset (like pi) + web search via self-hosted
             # SearXNG. The API server and CLI platforms otherwise fall back to the
             # full `hermes-*-server`/`hermes-cli` presets (~50 tool schemas/turn).
