@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: jellyfin
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/jellyfin/app
+  postBuild:
+    substitute:
+      APP: jellyfin
+      PVC: jellyfin
+      KOPIUR_CRON: "H 4 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

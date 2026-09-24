@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: matter-server
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/matter-server/app
+  postBuild:
+    substitute:
+      APP: matter-server
+      PVC: matter-server
+      KOPIUR_CRON: "H 4 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

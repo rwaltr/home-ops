@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: esphome
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/esphome/app
+  postBuild:
+    substitute:
+      APP: esphome
+      PVC: esphome-config
+      KOPIUR_CRON: "H 3 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

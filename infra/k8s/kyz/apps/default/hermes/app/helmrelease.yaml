@@ -4,6 +4,11 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: hermes
+  annotations:
+    # The init container below uses shell ${GH}/${GO}; without this Flux's
+    # postBuild substitution (added for the kopiur backup component) would
+    # replace them with empty strings and break the image.
+    kustomize.toolkit.fluxcd.io/substitute: disabled
 spec:
   chartRef:
     kind: OCIRepository

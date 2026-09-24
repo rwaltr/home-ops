@@ -5,8 +5,16 @@ kind: Kustomization
 metadata:
   name: immich
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/immich/app
+  postBuild:
+    substitute:
+      APP: immich
+      PVC: immich-postgres
+      KOPIUR_CRON: "H 3 * * *"
+      KOPIUR_RUNAS: "999"
   prune: true
   sourceRef:
     kind: GitRepository

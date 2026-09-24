@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: zwave-js-ui
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/zwave-js-ui/app
+  postBuild:
+    substitute:
+      APP: zwave-js-ui
+      PVC: zwave-js-ui
+      KOPIUR_CRON: "H 4 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

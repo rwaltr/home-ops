@@ -1,5 +1,12 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+# DELIBERATELY NOT using components/kopiur/backup: HA backs up TWO PVCs
+# (config + config-cache) and the component templates a single ${PVC}. Flux
+# postBuild substitution is string-level, so a variable-length sources list
+# cannot be expressed as a component variable. Upstream onedr0p/home-ops has
+# the same exception for the same reason (its config PVC comes from the
+# component, its cache PVC is hand-written here).
+#
 # Kopia enrollment for HA's PVCs (namespace-scoped policy; repo via
 # ClusterRepository/cluster-kopia, ns admitted by the repo's tenancy label
 # on the default namespace).

@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: sabnzbd
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/sabnzbd/app
+  postBuild:
+    substitute:
+      APP: sabnzbd
+      PVC: sabnzbd
+      KOPIUR_CRON: "H 6 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

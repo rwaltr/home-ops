@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: prowlarr
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/prowlarr/app
+  postBuild:
+    substitute:
+      APP: prowlarr
+      PVC: prowlarr
+      KOPIUR_CRON: "H 9 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

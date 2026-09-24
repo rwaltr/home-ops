@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: radarr
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/radarr/app
+  postBuild:
+    substitute:
+      APP: radarr
+      PVC: radarr
+      KOPIUR_CRON: "H 8 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: slskd
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/slskd/app
+  postBuild:
+    substitute:
+      APP: slskd
+      PVC: slskd-app-data
+      KOPIUR_CRON: "H 10 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

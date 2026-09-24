@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+#
+# Kopia PVC backup for one app. Instantiated from the app's ks.yaml:
+#
+#   spec:
+#     components:
+#       - ../../../../components/kopiur/backup
+#     postBuild:
+#       substitute:
+#         APP: sonarr
+#         PVC: sonarr
+#
+# APP            SnapshotPolicy/SnapshotSchedule name — match the app's ks.yaml name.
+# PVC            The app's PersistentVolumeClaim. Verify with `kubectl get pvc -n <ns>`;
+#                it is NOT always `<app>` and NOT always `<app>-config`.
+# KOPIUR_RUNAS   uid/gid the mover reads the PVC as. Override only for apps that do
+#                not run as 1000:1000.
+#
+# copyMethod: Direct is mandatory on openebs-hostpath (no CSI snapshots): the mover
+# reads the live PVC, so snapshots are crash-consistent, not point-in-time. DBs need
+# beforeSnapshot hooks or app-native dumps.
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: ${APP}
+spec:
+  repository:
+    kind: ClusterRepository
+    name: cluster-kopia
+  sources:
+    - pvc:
+        name: ${PVC}
+      sourcePathStrategy: PvcName
+  copyMethod: Direct
+  mover:
+    # The mover must be able to READ the app's PVC. Apps whose data is mode 0700
+    # and owned by a non-1000 uid get EACCES from a default-UID mover, which
+    # surfaces as a failed snapshot rather than a permission error.
+    securityContext:
+      runAsUser: ${KOPIUR_RUNAS:=1000}
+      runAsGroup: ${KOPIUR_RUNAS:=1000}
+    podSecurityContext:
+      fsGroup: ${KOPIUR_RUNAS:=1000}
+  retention:
+    keepLatest: 7
+    keepDaily: 14
+    keepWeekly: 4

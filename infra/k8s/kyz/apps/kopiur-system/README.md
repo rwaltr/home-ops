@@ -37,42 +37,67 @@ lose it and the backups are unrecoverable, even though the data sits on tank).
 ## Onboarding an app for backups
 
 1. Label its namespace: `kopiur.home-operations.com/repo: cluster-kopia`
-2. Add to the app's manifests:
+   (already set on `default`)
+2. Find the app's actual PVC — do **not** assume it is named after the app or
+   `<app>-config`:
+
+```bash
+kubectl get pvc -n default
+```
+
+3. Reference the shared component from the app's `ks.yaml` and pass two
+   variables. Nothing else is needed — no `app/kopia.yaml`, no `resources:`
+   entry:
 
 ```yaml
-apiVersion: kopiur.home-operations.com/v1alpha1
-kind: SnapshotPolicy
-metadata:
-  name: <app>
-  namespace: <ns>
 spec:
-  repository:
-    kind: ClusterRepository
-    name: cluster-kopia
-  copyMethod: Direct # mandatory — hostpath storage, no CSI snapshots
-  sources:
-    - pvc:
-        name: <pvc>
-  retention:
-    keepDaily: 14
-    keepWeekly: 4
----
-apiVersion: kopiur.home-operations.com/v1alpha1
-kind: SnapshotSchedule
-metadata:
-  name: <app>-nightly
-  namespace: <ns>
-spec:
-  policyRef:
-    name: <app>
-  schedule:
-    cron: "H 2 * * *"
-    jitter: 30m
+  components:
+    - ../../../../components/kopiur/backup
+  postBuild:
+    substitute:
+      APP: sonarr # policy/schedule name — match the ks.yaml name
+      PVC: sonarr # the PVC from step 2
+      KOPIUR_CRON: "H 7 * * *" # spread the mover Jobs across the night
+      # KOPIUR_RUNAS: "10000"  # only if the app does not run as 1000:1000
 ```
+
+`components/kopiur/backup/` owns `copyMethod: Direct`, `sourcePathStrategy:
+PvcName`, the mover uid/gid, retention (7 latest / 14 daily / 4 weekly), and
+`jitter: 30m`. Change them once, for every app.
+
+**Gotcha — Flux substitutes `spec.postBuild` into every resource the app's
+Kustomization renders.** If any manifest under `app/` contains a shell
+`${VAR}`, Flux will blank it out. Annotate that resource (Flux honours this on
+any kind, not just ConfigMaps):
+
+```yaml
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+```
+
+`hermes/app/helmrelease.yaml` does exactly this for its init container's
+`${GH}`/`${GO}`.
+
+**Multi-PVC apps opt out.** `home-assistant/app/kopia.yaml` is deliberately
+hand-written: it backs up two PVCs, and Flux substitution is string-level, so a
+variable-length `sources` list cannot be templated. Prefer one component-backed
+PVC per app and list extras only when a second PVC genuinely needs backup.
 
 Manual trigger: a `Snapshot` CR with `policyRef`. Restore: a `Restore` CR with
 `source.snapshotRef` + `target.pvc` (creates a new PVC) — see
 [kopiur examples](https://github.com/home-operations/kopiur/tree/main/deploy/examples).
+
+### Verifying a policy before it fails
+
+A wrong PVC name does not fail fast — the operator parks the snapshot, then
+fails it hours later (`SourcePvcMissing`). Check what the cluster actually has:
+
+```bash
+kubectl get snapshotpolicies -A
+# LAST-SNAPSHOT empty + Stalled = the policy names a PVC that does not exist
+kubectl get snapshots -n default --sort-by=.metadata.creationTimestamp | tail
+```
 
 ## Validated end-to-end (2026-09-06)
 

@@ -501,7 +501,8 @@ the management VLAN but must directly serve a second VLAN.
   Revisit PXE if a second node appears.
 
 - [ ] **Phase 2: Bootstrap** — BUILT at `k8s/kyz/bootstrap/helmfile/` (rendered against live cluster, not yet applied). DAG: cilium → coredns → cert-manager → external-secrets → onepassword-connect → flux-operator/instance. Secrets: 1Password Connect + ESO — `op inject` seeds the Connect creds at bootstrap (`OP_SERVICE_ACCOUNT_TOKEN` env, prompted; no SOPS for k8s). Layout decision: `k8s/<site>/` (kyz = this site; future sites sit beside it). Run: `mise run k8s:bootstrap mouse` — needs 1P item `1password` in vault `home-ops` with OP_SESSION_JSON + OP_CONNECT_TOKEN. Model: `~/src/onedr0p/home-ops/bootstrap/helmfile/`
-- [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: alerts, backup, zeroscale
+- [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: ~~backup~~ (DONE 2026-09-25), alerts (skipped — `flux-instance/app/notifications.yaml` already centralizes Flux→Alertmanager), zeroscale
+  - `components/kopiur/backup` landed: 17/18 apps converted from hand-written `app/kopia.yaml` (741 lines deleted, 133 added). 12 renders byte-identical; the other 5 were bug fixes (below). Component vars: `APP`, `PVC`, `KOPIUR_CRON`, `KOPIUR_RUNAS:=1000`.
 - [ ] **Phase 4: Networking** — Cilium BGP resources, Envoy Gateway internal/external, cert-manager, external-dns (Cloudflare)
 - [ ] **Phase 5: Workloads** — migrate rustfs/netdata quadlets into cluster; remaining apps
 - [ ] **Phase 6: Automation** — Renovate (home-operations presets, tiered automerge), CI (butane validate, image pull check)
@@ -511,6 +512,37 @@ the management VLAN but must directly serve a second VLAN.
 1. **Uniformity beats cleverness** — every app: `ks.yaml` + `app/{kustomization,ocirepository,helmrelease}.yaml`
 2. **Push defaults to platform layer** — root Flux ks patches HelmRelease defaults (CRD handling, remediation) into every child
 3. **Kustomize components** with `${VAR:=default}` for backup/alerts/zeroscale — one line per app
+
+### What the backup-component refactor exposed (2026-09-25)
+
+1. **Four apps had been failing every night for 11 days** — `sonarr`, `radarr`,
+   `prowlarr`, `sabnzbd` had `SnapshotPolicy.spec.sources[].pvc.name: <app>-config`
+   but the real PVCs are `<app>`. The operator does not fail fast: it parks the
+   snapshot, then flips to `Failed`/`SourcePvcMissing` at the deadline. Nothing
+   alerted. `kubectl get snapshotpolicies` showed an empty `LAST-SNAPSHOT`.
+2. **`bazarr` and `seerr` had no backups at all** — their `app/kopia.yaml`
+   existed on disk but was never listed in `app/kustomization.yaml`, so the
+   policies were never applied. `slskd` is the same shape but its ks.yaml is
+   commented out, so that one is intentional.
+3. **The component is the fix, not just the cleanup** — the PVC name is now one
+   greppable line in `ks.yaml` instead of line 17 of a 38-line file, which is
+   why the drift survived unnoticed.
+4. **Flux `spec.postBuild.substitute` is string-level** — a variable-length
+   `sources` list cannot be templated, so `home-assistant` (two PVCs) keeps a
+   hand-written `kopia.yaml`. onedr0p has the same exception.
+5. **Compensating control:** Flux honours `kustomize.toolkit.fluxcd.io/substitute: disabled`
+   on *any* kind, not just ConfigMaps/Secrets. Adding `postBuild` to an app makes
+   Flux substitute into every manifest it renders, which silently blanks shell
+   `${VAR}` in HelmRelease values (`hermes`'s `${GH}`/`${GO}` init container).
+   `otbr` has the same latent hazard and is only safe because it has no `postBuild` yet.
+6. **Kopiur's `H` is Jenkins-style but bare-only** — `croner` + `substitute_h`
+   replaces a field only when it is exactly `H`, so `H(2-5)` is invalid and hour
+   windows cannot be expressed. `H H * * *` would spread all apps across the
+   full day automatically (and drop `KOPIUR_CRON` from every ks.yaml) —
+   deliberately not done here to keep the refactor behavior-preserving.
+7. **Verify rendered policies against the live cluster** — `flux build kustomization <app>
+   --path <app> --kustomization-file <ks.yaml> --dry-run` renders locally
+   without a round-trip, so a wrong PVC name can be caught before it burns a night.
 4. **Bootstrap as explicit DAG** (helmfile `needs:`), CRDs applied out-of-band to kill dependsOn chains
 5. **Zero secrets in git** — resolved at render/apply time
 6. **Renovate does the heavy lifting** — shared presets, digest automerge, min release age

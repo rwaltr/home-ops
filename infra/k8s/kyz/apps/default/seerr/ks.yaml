@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: seerr
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/seerr/app
+  postBuild:
+    substitute:
+      APP: seerr
+      PVC: seerr
+      KOPIUR_CRON: "H 12 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

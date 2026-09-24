@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: music-assistant
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/music-assistant/app
+  postBuild:
+    substitute:
+      APP: music-assistant
+      PVC: music-assistant
+      KOPIUR_CRON: "H 2 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

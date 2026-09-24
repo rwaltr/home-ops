@@ -6,8 +6,15 @@ kind: Kustomization
 metadata:
   name: wyoming-whisper
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/wyoming-whisper/app
+  postBuild:
+    substitute:
+      APP: wyoming-whisper
+      PVC: wyoming-whisper
+      KOPIUR_CRON: "H 2 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

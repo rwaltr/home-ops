@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
+#
+# Nightly cadence for the policy above. `H` is a deterministic per-schedule offset
+# (FNV-1a of the schedule UID), so apps sharing an hour still land on different
+# minutes; `jitter` spreads them further. KOPIUR_CRON assigns the hour — pass a
+# distinct value per app so the mover Jobs do not all start at once, e.g.
+# "H 7 * * *". The operator only accepts a bare `H` per field (`H(2-5)` is not
+# Jenkins-compatible here), so hour ranges cannot be expressed in one expression.
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: ${APP}-nightly
+spec:
+  policyRef:
+    name: ${APP}
+  schedule:
+    cron: "${KOPIUR_CRON:=H 3 * * *}"
+    jitter: 30m
+    runOnCreate: false

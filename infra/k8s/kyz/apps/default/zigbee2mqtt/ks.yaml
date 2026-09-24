@@ -5,8 +5,15 @@ kind: Kustomization
 metadata:
   name: zigbee2mqtt
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/zigbee2mqtt/app
+  postBuild:
+    substitute:
+      APP: zigbee2mqtt
+      PVC: zigbee2mqtt
+      KOPIUR_CRON: "H 4 * * *"
   prune: true
   sourceRef:
     kind: GitRepository
