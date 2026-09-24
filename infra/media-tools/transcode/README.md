@@ -75,7 +75,7 @@ kubectl -n default apply -f tv-transcode-job.yaml
 - **Completion notification:** when no candidates remain, `jellyfin-halt` posts a
   one-shot alert (`TranscodeQueueEmpty`) to Alertmanager, which pushes to
   Pushover via the `pushover-once` receiver (`sendResolved: false`, so no
-  follow-up "resolved" push). A marker (`.transcode/.queue-empty-notified`)
-  ensures it fires once; it re-arms if new candidates are added.
+  follow-up "resolved" push). A ConfigMap marker (`transcode-queue-notified`)
+  ensures it fires once; it is deleted (re-armed) if new candidates are added.
 - To queue more, regenerate `candidates.txt` (e.g. lower the bitrate floor to
   6 Mbps) and refresh the ConfigMap; `done.txt` prevents re-doing old files.
