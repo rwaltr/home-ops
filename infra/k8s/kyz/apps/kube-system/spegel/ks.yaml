@@ -6,7 +6,7 @@ metadata:
   name: spegel
 spec:
   interval: 1h
-  path: ./kubernetes/apps/kube-system/spegel/app
+  path: ./infra/k8s/kyz/apps/kube-system/spegel/app
   prune: true
   sourceRef:
     kind: GitRepository
