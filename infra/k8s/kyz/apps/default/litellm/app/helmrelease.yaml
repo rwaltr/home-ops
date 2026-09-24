@@ -208,6 +208,52 @@ spec:
               limits:
                 # Q4_K_M weights 1.56GB + 8k KV cache + runtime ~= 2.5-3Gi hot.
                 memory: 4Gi
+          # OpenAI-compatible STT/TTS (faster-whisper + piper) so LiteLLM can
+          # front audio models too. The wyoming protocol has no OpenAI shim,
+          # so this is a SECOND copy of whisper/piper alongside the wyoming-*
+          # pods (which HA keeps using) — STT_MODEL_TTL bounds the cost.
+          # Future consolidation: swap HA's wyoming integration to
+          # roryeckel/wyoming_openai (wyoming server -> OpenAI backend)
+          # pointing here, then delete the wyoming-* pods.
+          speaches:
+            image:
+              repository: ghcr.io/speaches-ai/speaches
+              tag: 0.8.3-cpu@sha256:21e3df06d842fb7802ab470dd77c25f0e8c0d22950e8d8c6ae886e851af53ef8
+            env:
+              TZ: America/Chicago
+              WHISPER__INFERENCE_DEVICE: cpu
+              WHISPER__COMPUTE_TYPE: int8
+              # Unload whisper after 5m idle — small-int8 is ~500Mi we don't
+              # need held while nobody is transcribing.
+              STT_MODEL_TTL: "300"
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: &speachesPort 8000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *speachesPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                # whisper small-int8 ~500Mi + piper voice ~150Mi + runtime.
+                memory: 2Gi
     service:
       app:
         controller: litellm
@@ -217,6 +263,9 @@ spec:
           # Exposed for direct ollama access (debug, future SemIf-side pulls).
           ollama:
             port: 11434
+          # Direct speaches access (debug, voice/model probing).
+          audio:
+            port: 8000
     route:
       app:
         hostnames:
@@ -243,6 +292,10 @@ spec:
               - path: /models
             model-import:
               - path: /models
+            speaches:
+              # HF cache shares the weights PVC (whisper/piper download on
+              # first use — first transcription request will be slow).
+              - path: /home/ubuntu/.cache/huggingface
       config:
         type: configMap
         name: litellm-config
@@ -269,6 +322,23 @@ spec:
                 litellm_params:
                   model: openrouter/deepseek/deepseek-v4.1-flash
                   api_key: os.environ/OPENROUTER_API_KEY
+              # Audio via the in-pod speaches sidecar. The request's `voice`
+              # param passes straight through to piper (e.g.
+              # en_US-glados-medium to match the wyoming-piper voice).
+              - model_name: whisper
+                litellm_params:
+                  model: openai/Systran/faster-whisper-small
+                  api_base: http://127.0.0.1:8000/v1
+                  api_key: speaches # required by the openai provider; unused
+                model_info:
+                  mode: audio_transcription
+              - model_name: piper
+                litellm_params:
+                  model: openai/rhasspy/piper-voices
+                  api_base: http://127.0.0.1:8000/v1
+                  api_key: speaches # required by the openai provider; unused
+                model_info:
+                  mode: audio_speech
             litellm_settings:
               # Don't 400 on params a local backend doesn't implement.
               drop_params: true
