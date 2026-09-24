@@ -8,4 +8,5 @@ resources:
   - ./namespace.yaml
   - ./grafana-operator/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
+  - ./smartctl-exporter/ks.yaml
   - ./grafana-operator/instance/ks.yaml

@@ -1,0 +1,117 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/prometheusrule_v1.json
+#
+# SMART alerts for mouse's 7 disks: sda-sdf make up two raidz1 vdevs (each
+# tolerates exactly one failure) and nvme0n1 is the OS disk.
+#
+# Every rule is severity: critical on purpose. AlertmanagerConfig routes only
+# severity=critical to Pushover, and its inhibitRule makes a critical suppress
+# its warning counterpart, so a severity: warning rule here would never reach
+# anyone — which is why the chart's own rule set (all warning) is disabled.
+#
+# The ATA rules filter attribute_value_type="raw". smartctl_exporter emits four
+# series per attribute (raw/thresh/value/worst), and the value/worst variants are
+# normalised 0-100, so without the filter `> 0` would match healthy disks too.
+# These attribute names only exist on ATA disks; SCSI/SAS/NVMe have none, so no
+# extra device filter is needed.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: smartctl-exporter-rules
+spec:
+  groups:
+    - name: smartctl-exporter.rules
+      rules:
+        - alert: SmartDeviceSmartStatusFailed
+          expr: smartctl_device_smart_status != 1
+          for: 5m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} reports a SMART status other than PASSED, or smartctl could not read it.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceCriticalWarning
+          expr: smartctl_device_critical_warning != 0
+          for: 5m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} is in a critical state (NVMe critical warning bitmask {{ $value }}).
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceMediaErrors
+          expr: smartctl_device_media_errors != 0
+          for: 5m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} has {{ $value }} media errors.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceHighTemperature
+          expr: smartctl_device_temperature{temperature_type="current"} > 65
+          for: 5m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} is at {{ $value }}°C, above the 65°C threshold.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceAvailableSpareUnderThreshold
+          expr: smartctl_device_available_spare_threshold > smartctl_device_available_spare
+          for: 5m
+          annotations:
+            summary: >-
+              SSD {{ $labels.device }} on {{ $labels.instance }} has fallen below its available spare threshold — it is out of replacement blocks.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceNvmeWearHigh
+          expr: smartctl_device_percentage_used > 90
+          for: 1h
+          annotations:
+            summary: >-
+              SSD {{ $labels.device }} on {{ $labels.instance }} is at {{ $value }}% of its rated write endurance.
+          labels:
+            severity: critical
+
+        - alert: SmartDevicePendingSectors
+          expr: |-
+            smartctl_device_attribute{attribute_name="Current_Pending_Sector",attribute_value_type="raw"} > 0
+          for: 15m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} has {{ $value }} sectors waiting to be remapped. These are already unreadable on this disk; on raidz1 each one spends redundancy that a second failure would remove.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceReallocatedSectors
+          expr: |-
+            smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",attribute_value_type="raw"} > 0
+          for: 1h
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} has reallocated {{ $value }} sectors. Non-zero means the platters are already consuming their spare-sector pool.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceUncorrectable
+          expr: |-
+            smartctl_device_attribute{attribute_name="Offline_Uncorrectable",attribute_value_type="raw"} > 0
+          for: 1h
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} reports {{ $value }} uncorrectable errors from an offline scan.
+          labels:
+            severity: critical
+
+        - alert: SmartDeviceInterfaceSlow
+          expr: |-
+            smartctl_device_interface_speed{speed_type="current"} != on(device, instance, namespace, pod) smartctl_device_interface_speed{speed_type="max"}
+          for: 5m
+          annotations:
+            summary: >-
+              Drive {{ $labels.device }} on {{ $labels.instance }} negotiated a slower link than it supports ({{ $value }} bit/s). Usually a cable or backplane seating problem rather than the disk itself.
+          labels:
+            severity: critical

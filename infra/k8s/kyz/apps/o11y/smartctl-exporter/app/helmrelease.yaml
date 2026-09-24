@@ -1,0 +1,50 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+#
+# Per-disk SMART for mouse. The chart deploys a privileged DaemonSet that mounts
+# the host /dev and shells out to smartctl, so it sees the raw block devices
+# underneath ZFS: sda-sdf (two raidz1 vdevs) plus nvme0n1 (OS). SMART sits below
+# the pool, so this is the only early warning that exists before a vdev degrades.
+#
+# The chart's default tolerations already include NoSchedule=Exists, so on this
+# single-node cluster it lands on the control-plane node without extra config.
+# Device auto-detection works because a privileged container is bound the host
+# /dev (the exporter reports device="/dev/sda"). If the dashboard ever comes up
+# empty, pin the set explicitly with:
+#   config:
+#     device_include: /dev/sd.*
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app smartctl-exporter
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: smartctl-exporter
+  interval: 1h
+  values:
+    fullnameOverride: *app
+    # The chart ships a RoleBinding whose only roleRef is the ClusterRole
+    # "unrestricted-psp". PodSecurityPolicy was removed in k8s 1.25 and this
+    # cluster is on 1.36, so it is a binding to a role that cannot exist and
+    # grants nothing. Disabling it drops only that object — the ServiceAccount is
+    # governed by serviceAccount.create and is still created.
+    rbac:
+      create: false
+    serviceMonitor:
+      enabled: true
+    # Rules live in ./prometheusrule.yaml rather than here: the chart's built-in
+    # rules are severity: warning, and AlertmanagerConfig only routes
+    # severity=critical to Pushover (a critical also inhibits its warning
+    # counterpart), so every chart-supplied rule would be delivered nowhere.
+    prometheusRules:
+      enabled: false
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        # Bounded like every other system component here — the node has no disk
+        # swap (2026-09-24 memory audit, REFACTOR_PLANS.md). Limit sits above the
+        # request because each collection shells out to smartctl once per device.
+        memory: 128Mi
