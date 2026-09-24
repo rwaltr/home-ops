@@ -267,7 +267,9 @@ spec:
                 base_url: http://litellm.default.svc.cluster.local:4000/v1
                 key_env: LITELLM_API_KEY
                 models:
-                  minicpm5-2b:
+                  qwen3-1.7b-nothink:
+                    context_length: 8192
+                  home-functiongemma-270m:
                     context_length: 8192
             # Minimal, CLI-first toolset (like pi) + web search via self-hosted
             # SearXNG. The API server and CLI platforms otherwise fall back to the

@@ -9,10 +9,20 @@
 # Ollama auto-unloads idle models (KEEP_ALIVE=10m) and holds at most one
 # loaded model — this node has no disk swap, only 4Gi zram (2026-09-24 audit).
 #
-# Models: MiniCPM5-2B is NOT on the ollama registry (only the -v vision
-# variants are), so the `models` initContainer imports the official
-# openbmb/MiniCPM5-2B-GGUF Q4_K_M (1.56GB, sha256-pinned) via `ollama create`
-# on first boot. Weights are re-downloadable artifacts — no kopia backup.
+# Models (all local-only; OpenRouter rides along for cloud):
+#   qwen3-1.7b-nothink  — responsive general chat (~34 tok/s here). Qwen3
+#     thinks by default and ollama's OpenAI endpoint DROPS the `think` param
+#     (verified: only the native /api/chat honours it), so the model is
+#     rebuilt with the nothink generation prompt baked into its template.
+#   home-functiongemma-270m — acon96/home-llm's HA-control model (260MB,
+#     ~220 tok/s). Function-calling specialist: it emits Gemma's native
+#     <start_function_call> syntax, which the Home LLM integration parses.
+#     Useless for general chat ("capital of France" -> nonsense). Not on the
+#     ollama registry, so the initContainers import the GGUF from HF
+#     (sha256-pinned).
+# MiniCPM5-2B was swapped out for the above (slow chat: reasoning preamble;
+# weak tool calling). Its weights stay on the PVC — re-add with a Modelfile.
+# Weights are re-downloadable artifacts — no kopia backup.
 #
 # SemIf-style decision scoring works through the proxy: chat completion with
 # max_tokens=1, logprobs=true, top_logprobs=20, read option-token odds off the
@@ -53,20 +63,20 @@ spec:
               - /bin/sh
               - -ec
               - |
-                GGUF=/models/.minicpm5-2b-q4_k_m.gguf
-                SHA=ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd
-                if [ -f /models/.imported-minicpm5-2b ]; then
-                  echo "minicpm5-2b already imported, skipping"
+                GGUF=/models/.home-functiongemma-270m-q5_k_m.gguf
+                SHA=b5a878803b2ca0fb03b03833481a021688fc55d11b57c36e781966e38bb15719
+                if [ -f /models/.imported-home-functiongemma-270m ]; then
+                  echo "home-functiongemma-270m already imported, skipping"
                   exit 0
                 fi
                 if [ -f "$GGUF" ] && echo "$SHA  $GGUF" | sha256sum -c - >/dev/null 2>&1; then
                   echo "GGUF already downloaded and verified"
                   exit 0
                 fi
-                echo "downloading MiniCPM5-2B Q4_K_M GGUF (1.56GB)..."
+                echo "downloading Home-FunctionGemma-270m q5_k_m GGUF (260MB)..."
                 curl -fSL --retry 3 \
                   -o "$GGUF" \
-                  https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf
+                  https://huggingface.co/acon96/Home-FunctionGemma-270m/resolve/main/Home-FunctionGemma-270m.q5_k_m.gguf
                 echo "$SHA  $GGUF" | sha256sum -c -
             resources:
               requests:
@@ -87,15 +97,24 @@ spec:
                 pid=$!
                 trap 'kill $pid 2>/dev/null || true' EXIT
                 until ollama list >/dev/null 2>&1; do sleep 1; done
-                if ollama list | awk '{print $1}' | grep -qx 'minicpm5-2b:latest'; then
-                  echo "minicpm5-2b already present"
-                  touch /models/.imported-minicpm5-2b
-                  exit 0
+                # qwen3:1.7b comes from the ollama registry (`pull` is a no-op
+                # when current).
+                ollama pull qwen3:1.7b
+                # Bake the nothink variant: ollama only honours `think` on its
+                # native API, so force the empty-think generation prompt into
+                # the template. The model's own nothink branch always emits
+                # ' thinking\n\n</think>\n\n' after <|im_start|>assistant.
+                if ! ollama list | awk '{print $1}' | grep -qx 'qwen3-1.7b-nothink:latest'; then
+                  ollama show qwen3:1.7b --modelfile > /tmp/mf
+                  sed 's/if and \$\.IsThinkSet (not \$\.Think) -/if true -/' /tmp/mf > /tmp/mf-nothink
+                  ollama create qwen3-1.7b-nothink -f /tmp/mf-nothink
                 fi
-                printf 'FROM /models/.minicpm5-2b-q4_k_m.gguf\n' > /tmp/Modelfile
-                ollama create minicpm5-2b -f /tmp/Modelfile
-                rm -f /models/.minicpm5-2b-q4_k_m.gguf
-                touch /models/.imported-minicpm5-2b
+                if ! ollama list | awk '{print $1}' | grep -qx 'home-functiongemma-270m:latest'; then
+                  printf 'FROM /models/.home-functiongemma-270m-q5_k_m.gguf\n' > /tmp/Modelfile
+                  ollama create home-functiongemma-270m -f /tmp/Modelfile
+                  rm -f /models/.home-functiongemma-270m-q5_k_m.gguf
+                fi
+                touch /models/.imported-home-functiongemma-270m
                 ollama list
             resources:
               requests:
@@ -206,7 +225,8 @@ spec:
                 cpu: 500m
                 memory: 2500Mi
               limits:
-                # Q4_K_M weights 1.56GB + 8k KV cache + runtime ~= 2.5-3Gi hot.
+                # Largest resident local model is qwen3-1.7b (1.4GB) + 8k KV
+                # cache + runtime. 4Gi leaves room for a 4B-class swap later.
                 memory: 4Gi
           # OpenAI-compatible STT/TTS (faster-whisper + piper) so LiteLLM can
           # front audio models too. The wyoming protocol has no OpenAI shim,
@@ -309,11 +329,19 @@ spec:
         data:
           config.yaml: |
             model_list:
-              - model_name: minicpm5-2b
+              - model_name: qwen3-1.7b-nothink
                 litellm_params:
                   # Generic OpenAI-compatible route (not ollama_chat) so
                   # logprobs/top_logprobs pass through spec-faithfully.
-                  model: openai/minicpm5-2b
+                  model: openai/qwen3-1.7b-nothink
+                  api_base: http://127.0.0.1:11434/v1
+                  api_key: ollama # required by the openai provider; unused
+              - model_name: home-functiongemma-270m
+                litellm_params:
+                  # HA device control (acon96/home-llm). Emits Gemma's native
+                  # <start_function_call> text; the Home LLM integration parses
+                  # it. Conversation-latency model, not a chat model.
+                  model: openai/home-functiongemma-270m
                   api_base: http://127.0.0.1:11434/v1
                   api_key: ollama # required by the openai provider; unused
               # OpenRouter cloud models ride the same proxy/key — one
