@@ -48,3 +48,8 @@ spec:
       requests:
         cpu: 100m
         memory: 256Mi
+      limits:
+        # Uncapped it sat at ~860Mi steady / 925Mi peak (audit 2026-09-24).
+        # 1.5Gi leaves headroom over the observed peak without letting it
+        # grow unbounded on a swap-less node.
+        memory: 1536Mi

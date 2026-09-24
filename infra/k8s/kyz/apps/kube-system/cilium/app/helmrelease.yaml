@@ -75,6 +75,14 @@ spec:
       serviceMonitor:
         enabled: true
         trustCRDsExist: true
+    # Agent was uncapped at ~430Mi RSS (audit 2026-09-24). 1Gi is ~2.3x the
+    # observed usage — bound it without risking an OOM networking blip.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
     rollOutCiliumPods: true
     routingMode: native
     securityContext:

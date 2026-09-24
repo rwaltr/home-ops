@@ -38,6 +38,16 @@ storage:
         inline: |
           zfs
 
+    # ZFS ARC cap. zfs_arc_max=0 (default) means "all RAM minus 1Gi" on
+    # OpenZFS 2.2+ — on a 32Gi single-node k0s box the ARC (8Gi and growing
+    # for an 11Gi pool, audit 2026-09-24) starves pods, and the OOM killer
+    # fires before ARC shrinks. Cap at 4Gi.
+    - path: /etc/modprobe.d/zfs.conf
+      mode: 0644
+      contents:
+        inline: |
+          options zfs zfs_arc_max=4294967296
+
     # Bare-metal NIC (i226-LM, matched by MAC): static 10.10.0.10.
     # Sorts before 25-primary.network so it wins on the real hardware;
     # the qemu VM's virtio MAC doesn't match and falls through to DHCP.
@@ -154,6 +164,30 @@ storage:
 
 systemd:
   units:
+    # zram swap: 4Gi, lzo-rle (lz4 is NOT in the Flatcar kernel's crypto
+    # API — only lzo-rle/lzo). With zero swap, ~17Gi of idle anonymous
+    # memory was unreclaimable (audit 2026-09-24); this lets the kernel
+    # page out cold heap instead of OOMing on spikes.
+    - name: zram-swap.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Configure zram swap device
+        After=systemd-modules-load.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/sbin/modprobe zram
+        ExecStart=/usr/bin/sh -c 'echo lzo-rle > /sys/block/zram0/comp_algorithm'
+        ExecStart=/usr/bin/sh -c 'echo 4G > /sys/block/zram0/disksize'
+        ExecStart=/usr/bin/mkswap /dev/zram0
+        ExecStart=/usr/bin/swapon --priority 100 /dev/zram0
+        ExecStop=/usr/bin/swapoff /dev/zram0
+
+        [Install]
+        WantedBy=multi-user.target
+
     # Import the existing 'tank' pool + mount its datasets.
     # Production pool was created by hand; never create here.
     # Idempotent: import -a / mount -a are no-ops when already done.

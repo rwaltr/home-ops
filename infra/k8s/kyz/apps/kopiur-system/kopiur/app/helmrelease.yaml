@@ -25,3 +25,12 @@ spec:
       tls:
         # self-signed at runtime — no cert-manager, no hook Job
         mode: self
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          # Chart says the webhook "does no kopia work, so it stays light",
+          # yet it grew to 1.8Gi RSS over 14d (audit 2026-09-24) — leak or
+          # unbounded cache. Cap so it recycles instead of eating the node.
+          memory: 512Mi
