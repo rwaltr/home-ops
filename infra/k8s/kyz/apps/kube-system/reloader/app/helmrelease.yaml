@@ -1,0 +1,55 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Reloader — restarts workloads when their referenced ConfigMap/Secret changes.
+#
+# This makes the existing `reloader.stakater.com/auto: "true"` annotations in
+# the repo actually work (13+ manifests carry them; none were doing anything
+# because nothing was watching). It removes two documented manual-restart
+# footguns: hermes re-seeds its config from a ConfigMap via an init container,
+# and degoog reads its settings env at container start.
+#
+# `default` reload strategy = watch both env-var and volume-referenced
+# ConfigMaps/Secrets on annotated workloads (not just explicit
+# `configmap.reloader.stakater.com/reload` annotations).
+#
+# Cluster-wide by design: annotated workloads live in default, network and
+# external-secrets namespaces. RBAC is the chart's ClusterRole (read-only on
+# configmaps/secrets + patch on workloads).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: reloader
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: reloader
+      version: 2.2.17
+      sourceRef:
+        kind: HelmRepository
+        name: stakater
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: reloader
+    reloader:
+      watchGlobally: true
+      reloadStrategy: default
+      logLevel: info
+      deployment:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            # Bounded like every other system component here — the node has no
+            # disk swap (see the 2026-09-24 memory audit in REFACTOR_PLANS.md).
+            memory: 64Mi
+      podMonitor:
+        enabled: true

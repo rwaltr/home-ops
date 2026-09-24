@@ -16,9 +16,9 @@ resources:
   # - ./drm-exporter/ks.yaml
   # - ./generic-device-plugin/ks.yaml
   - ./intel-gpu-resource-driver/ks.yaml
+  - ./reloader/ks.yaml
   # - ./metrics-server/ks.yaml
   # - ./multus/ks.yaml
   # - ./ocharted/ks.yaml
   # - ./snapshot-controller/ks.yaml
-  # - ./reloader/ks.yaml
   # - ./spegel/ks.yaml

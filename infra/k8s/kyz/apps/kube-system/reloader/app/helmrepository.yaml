@@ -1,0 +1,11 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/source.toolkit.fluxcd.io/helmrepository_v1.json
+# Stakater charts are not published as OCI artifacts, so this one uses a
+# classic HelmRepository (same as rustfs).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: stakater
+spec:
+  interval: 1h
+  url: https://stakater.github.io/stakater-charts
