@@ -17,17 +17,21 @@ MARGIN="${MARGIN:-10}"   # require at least this % smaller
 
 mkdir -p "$WORK"; touch "$DONE"
 
+# Deadline as an epoch. DEADLINE is HHMM local; if that time already passed
+# today, it means "tomorrow" (runs often start before midnight).
+DL_EPOCH=$(date -d "today ${DEADLINE:0:2}:${DEADLINE:2:2}" +%s)
+[ "$DL_EPOCH" -le "$(date +%s)" ] && DL_EPOCH=$((DL_EPOCH + 86400))
+
 log() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
 
 log "=== run start quality=$QUALITY deadline=$DEADLINE pid=$$ ==="
 ok=0; skip=0; fail=0
 while IFS= read -r SRC; do
   [ -z "$SRC" ] && continue
-  if [ ! -f "$SRC" ]; then log "MISSING  $SRC"; continue; fi
   if grep -qxF "$SRC" "$DONE"; then continue; fi
+  if [ ! -f "$SRC" ]; then log "MISSING  $SRC"; continue; fi
 
-  now=$(date +%H%M)
-  if [ "$now" -ge "$DEADLINE" ]; then log "DEADLINE $now reached — stopping (processed $ok this run)"; break; fi
+  if [ "$(date +%s)" -ge "$DL_EPOCH" ]; then log "DEADLINE reached — stopping (processed $ok this run)"; break; fi
 
   codec=$("$FP" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 "$SRC" 2>/dev/null)
   if [ "$codec" != "h264" ]; then
