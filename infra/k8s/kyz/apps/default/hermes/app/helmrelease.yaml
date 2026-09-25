@@ -149,6 +149,10 @@ spec:
               # toolset is disabled; re-enable search by adding `web` to toolsets
               # + `web.search_backend: searxng`.
               SEARXNG_URL: http://degoog.default.svc.cluster.local:8080
+              # Home Assistant REST API (in-cluster). HASS_TOKEN comes from
+              # hermes-secret (1P item `home-assistant-secret`); enables the
+              # `homeassistant` toolset for device control.
+              HASS_URL: http://home-assistant.default.svc.cluster.local:8123
             envFrom:
               - secretRef:
                   name: hermes-secret
@@ -283,10 +287,12 @@ spec:
                 - terminal
                 - file
                 - web
+                - homeassistant
               cli:
                 - terminal
                 - file
                 - web
+                - homeassistant
               # Phone-facing Discord DM channel (Teletran). Listed explicitly —
               # a platform with no entry falls back to the full ~50-schema
               # preset instead of this minimal CLI-style set.
@@ -294,6 +300,7 @@ spec:
                 - terminal
                 - file
                 - web
+                - homeassistant
             web:
               search_backend: searxng
             tools:

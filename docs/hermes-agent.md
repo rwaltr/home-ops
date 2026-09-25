@@ -137,6 +137,29 @@ Wiring:
 4. PR → merge → reloader rolls the pod. Verify `hermes gateway status` shows
    Discord connected and send a test message from the phone.
 
+### Phase 1.5 — Home Assistant control
+
+Give Teletran the `homeassistant` toolset so it can read and act on the smart
+home from Discord ("turn off the office lights", "is the dryer still
+running?", "what's the bedroom temperature?").
+
+- Credentials: `HASS_URL=http://home-assistant.default.svc.cluster.local:8123`
+  (plain env) and `HASS_TOKEN` from 1P item `home-assistant-secret`
+  (`prometheus_token` — the long-lived token Prometheus already scrapes with).
+- Tools: `ha_list_entities`, `ha_get_state`, `ha_list_services`,
+  `ha_call_service`. Dangerous domains (`shell_command`, `python_script`,
+  `hassio`, `rest_command`, ...) are hard-blocked inside the tool.
+- Added to `platform_toolsets` for discord/cli/api_server.
+
+Deliberately **not** enabled yet:
+
+- The HA **platform** adapter (state-change events → agent, replies as
+  persistent notifications). It is closed by default and needs an explicit
+  `watch_domains`/`watch_entities` allowlist; useful if Teletran should
+  _react_ to the house (dryer finished, door opened) rather than only answer.
+- Routing HA **Assist** conversations to Teletran's OpenAI-compatible API, so
+  voice/text in the Home Assistant app reaches the agent.
+
 ### Phase 2 — Repo + toolchain
 
 1. **Toolchain for free:** clone `rwaltr/home-ops` and run `mise install` in
