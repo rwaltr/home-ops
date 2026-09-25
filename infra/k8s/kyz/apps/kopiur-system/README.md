@@ -41,25 +41,25 @@ lose it and the backups are unrecoverable, even though the data sits on tank).
 2. Find the app's actual PVC — do **not** assume it is named after the app or
    `<app>-config`:
 
-```bash
-kubectl get pvc -n default
-```
+   ```bash
+   kubectl get pvc -n default
+   ```
 
 3. Reference the shared component from the app's `ks.yaml` and pass two
    variables. Nothing else is needed — no `app/kopia.yaml`, no `resources:`
    entry:
 
-```yaml
-spec:
-  components:
-    - ../../../../components/kopiur/backup
-  postBuild:
-    substitute:
-      APP: sonarr # policy/schedule name — match the ks.yaml name
-      PVC: sonarr # the PVC from step 2
-      KOPIUR_CRON: "H 7 * * *" # spread the mover Jobs across the night
-      # KOPIUR_RUNAS: "10000"  # only if the app does not run as 1000:1000
-```
+   ```yaml
+   spec:
+     components:
+       - ../../../../components/kopiur/backup
+     postBuild:
+       substitute:
+         APP: sonarr # policy/schedule name — match the ks.yaml name
+         PVC: sonarr # the PVC from step 2
+         KOPIUR_CRON: "H 7 * * *" # spread the mover Jobs across the night
+         # KOPIUR_RUNAS: "10000"  # only if the app does not run as 1000:1000
+   ```
 
 `components/kopiur/backup/` owns `copyMethod: Direct`, `sourcePathStrategy:
 PvcName`, the mover uid/gid, retention (7 latest / 14 daily / 4 weekly), and

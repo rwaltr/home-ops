@@ -6,11 +6,11 @@ Sonarr manages the TV library using **TheTVDB** metadata (episode numbering,
 titles). Jellyfin's `Shows` library was configured with **TMDb only**, so the
 two disagreed on episode ordering. The clearest example:
 
-| Episode | Sonarr / TVDB (aired) | Jellyfin / TMDb (default) |
-| ------- | --------------------- | ------------------------- |
-| S01E24  | Off the Rails         | Thomas' Christmas Party   |
-| S01E25  | Down the Mine         | Off the Rails             |
-| S01E26  | Thomas' Christmas Party | Down the Mine           |
+| Episode | Sonarr / TVDB (aired)   | Jellyfin / TMDb (default) |
+| ------- | ----------------------- | ------------------------- |
+| S01E24  | Off the Rails           | Thomas' Christmas Party   |
+| S01E25  | Down the Mine           | Off the Rails             |
+| S01E26  | Thomas' Christmas Party | Down the Mine             |
 
 The files on disk are numbered to match Sonarr, so Jellyfin displayed the wrong
 title for the wrong file. Series 11 has a similar rotated block (E21–E26).
@@ -19,11 +19,11 @@ title for the wrong file. Series 11 has a similar rotated block (E21–E26).
 
 ## Current configuration
 
-- **Plugin:** `TheTVDB` `22.0.0.0` installed (Settings → Plugins → *The TVDB*).
+- **Plugin:** `TheTVDB` `22.0.0.0` installed (Settings → Plugins → _The TVDB_).
 - **Shows library** (`a656b907eb3a73532e40e44b968d0225`) metadata fetchers:
-  - `Season`  → `["TheTVDB", "TheMovieDb"]`
+  - `Season` → `["TheTVDB", "TheMovieDb"]`
   - `Episode` → `["TheTVDB", "TheMovieDb", "The Open Movie Database"]`
-  - `Series`  → left as `["TheMovieDb", …]` on purpose, so series artwork /
+  - `Series` → left as `["TheMovieDb", …]` on purpose, so series artwork /
     descriptions for the rest of the library are not churned.
 - **Backups:** Jellyfin's config lives on the `jellyfin` PVC, which is enrolled
   in Kopia (`app/kopia.yaml`, nightly, keep 7/14/4). The plugin and library
@@ -104,8 +104,8 @@ curl -sf -X POST "${H[@]}" \
 
 ## Known caveat: TVDB has more than one order
 
-TheTVDB exposes several orderings per series (*aired*, *official*, *DVD*,
-*absolute*). **Sonarr uses the aired order; the Jellyfin plugin uses the
+TheTVDB exposes several orderings per series (_aired_, _official_, _DVD_,
+_absolute_). **Sonarr uses the aired order; the Jellyfin plugin uses the
 series' default (official) order.** They normally agree but diverge on a few
 series, e.g. Thomas & Friends:
 
@@ -144,7 +144,7 @@ curl -s "${H[@]}" "${BASE}/Shows/${SERIES_ID}/Episodes"
 
 ## Related
 
-- `infra/k8s/kyz/apps/default/jellyfin/` — the app manifests (plugin is *not*
+- `infra/k8s/kyz/apps/default/jellyfin/` — the app manifests (plugin is _not_
   declared there; it is installed at runtime and captured by the Kopia backup).
 - Library repair notes for Thomas & Friends (mixed-folders / mislabelled files)
   are in the git history around 2026-09.

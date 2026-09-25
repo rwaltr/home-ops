@@ -31,7 +31,7 @@ helm-diff = { version = "latest", bin = "diff", bin_path = "diff/bin", rename_ex
 #   `mise run lint` / `mise run fmt` — see .mise/tasks/lint/)
 actionlint = "latest"
 zizmor = "latest"
-oxfmt = "latest"
+oxfmt = "0.70.0"
 shellcheck = "latest"
 "npm:markdownlint-cli2" = "latest"
 "pipx:yamllint" = "latest"

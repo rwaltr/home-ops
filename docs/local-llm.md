@@ -78,12 +78,12 @@ completions`, `/api/chat`, and prompt-level `/no_think`. Only the native
   Ask for a short completion and count: if it repeats instead of stopping, drop
   it.
 
-- **Audio models are duplicated.** The wyoming-_ pods serve Home Assistant over
+- **Audio models are duplicated.** The `wyoming-*` pods serve Home Assistant over
   the Wyoming TCP protocol, which LiteLLM cannot speak, and no
   OpenAI→Wyoming shim exists (`roryeckel/wyoming_openai` is the reverse
   direction). So speaches holds its own whisper + piper. That's bounded by
   `STT_MODEL_TTL=300` (whisper unloads after 5m idle). To de-duplicate, bridge
-  HA at the wyoming_openai server and delete the wyoming-_ pods.
+  HA at the wyoming_openai server and delete the `wyoming-*` pods.
 
 - **First STT call downloads ~460MB** (Systran/faster-whisper-small) onto the
   models PVC. Expect a slow first request.

@@ -16,7 +16,7 @@
 
 ---
 - id: kitt_charge_reminder
-  alias: KITT: plug-in reminder
+  alias: "KITT: plug-in reminder"
   description: >-
     When the car arrives home, wait 30 minutes, wake the car, then if it still
     isn't charging, nudge whoever is home. Wake avoids stale-charging false

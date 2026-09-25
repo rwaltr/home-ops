@@ -11,14 +11,14 @@ is **direct play**: the client decodes the file as-is, no server work.
 
 Audit of 5,900 movie + episode items taken from Jellyfin's `MediaStreams`:
 
-| Video codec | Items | Direct play? |
-| ----------- | ----- | ------------ |
-| h264        | 3,257 | yes          |
-| mpeg4 (XviD/DivX) | **1,448** | **never** |
-| hevc        | 906   | yes (modern Android/Apple) |
-| theora      | **161** | **never** |
-| msmpeg4v3   | **108** | **never** |
-| vp9 / vc1 / av1 | 20 | mixed |
+| Video codec       | Items     | Direct play?               |
+| ----------------- | --------- | -------------------------- |
+| h264              | 3,257     | yes                        |
+| mpeg4 (XviD/DivX) | **1,448** | **never**                  |
+| hevc              | 906       | yes (modern Android/Apple) |
+| theora            | **161**   | **never**                  |
+| msmpeg4v3         | **108**   | **never**                  |
+| vp9 / vc1 / av1   | 20        | mixed                      |
 
 Containers: `mkv` 3,692, **`avi` 1,553**, `mp4` 480, `ogg` 161.
 
@@ -33,12 +33,12 @@ Opus). Those are the permanent transcode tax.
 
 ## Target profile
 
-| Stream | Target | Rationale |
-| ------ | ------ | --------- |
-| Video  | H.264 (High@L4.1) or HEVC | universally / widely direct-playable |
-| Audio  | AAC, DD+, DD, AC3, MP3 | decoded natively by Android + Apple clients |
-| Container | MKV or MP4 | |
-| Subtitles | SRT preferred; PGS ok on Android | |
+| Stream    | Target                           | Rationale                                   |
+| --------- | -------------------------------- | ------------------------------------------- |
+| Video     | H.264 (High@L4.1) or HEVC        | universally / widely direct-playable        |
+| Audio     | AAC, DD+, DD, AC3, MP3           | decoded natively by Android + Apple clients |
+| Container | MKV or MP4                       |                                             |
+| Subtitles | SRT preferred; PGS ok on Android |                                             |
 
 Audio-only transcodes are cheap compared to video, but they still burn CPU on
 every play, so they are worth avoiding too.
@@ -50,14 +50,14 @@ every play, so they are worth avoiding too.
 
 Before this change only the **WEB-2160p (Combined)** profile was managed, and
 the Radarr half of the config used **Sonarr's trash_ids** — every Radarr custom
-format was silently skipped (Radarr had *zero* custom formats). The profile the
+format was silently skipped (Radarr had _zero_ custom formats). The profile the
 library actually uses, **HD-1080p (id 4)**, was unmanaged in both apps.
 
 Now Recyclarr manages, by explicit `name` so existing assignments survive:
 
-| Service | Profile | TRaSH source |
-| ------- | ------- | ------------ |
-| Sonarr  | HD-1080p | `WEB-1080p` (`72dae194fc92bf828f32cde7744e51a1`) |
+| Service | Profile  | TRaSH source                                           |
+| ------- | -------- | ------------------------------------------------------ |
+| Sonarr  | HD-1080p | `WEB-1080p` (`72dae194fc92bf828f32cde7744e51a1`)       |
 | Radarr  | HD-1080p | `HD Bluray + WEB` (`d1d67249d3890e49bc12e275d989a7e9`) |
 
 `upgrade.allowed: false` is set on both so adopting the TRaSH quality set does
@@ -93,7 +93,7 @@ mistake.
 - **`Baby Einstein Classics` is not trackable.** TVDB series `112061` has no
   year and **all 34 episodes have no air date**, so Sonarr counts
   `episodeCount: 0` and will never search. `year` is TVDB-owned and a `PUT
-  /api/v3/series/{id}` with `year: 2010` (TMDB's value) is silently ignored, as
+/api/v3/series/{id}` with `year: 2010` (TMDB's value) is silently ignored, as
   is a forced `RefreshSeries`. A replacement entry does not exist. Left in
   place but **unmonitored**; the real fix is adding the year/air dates upstream
   at TVDB.
@@ -101,7 +101,7 @@ mistake.
   are archives here, not active fetchers — worth remembering before assuming a
   missing profile is why something is not downloading.
 
-### Audio scores are deliberately *not* TRaSH defaults
+### Audio scores are deliberately _not_ TRaSH defaults
 
 TRaSH scores lossless audio highly — TrueHD ATMOS **+5000**, TrueHD +2750,
 DTS-HD MA +2500, FLAC/PCM +2250, while AAC is only +1000. Those defaults assume
@@ -109,13 +109,13 @@ an AV receiver doing passthrough. Here the clients are Android/Apple, where
 DTS/TrueHD/FLAC/PCM force a server-side audio transcode, so the scores are
 inverted for the HD profile:
 
-| Score | Formats |
-| ----- | ------- |
-| +1000 | AAC, DD+ |
-| +750  | DD |
-| +500  | MP3 |
-| −500  | DTS |
-| −1000 | DTS-HD MA, TrueHD, FLAC, PCM |
+| Score | Formats                         |
+| ----- | ------------------------------- |
+| +1000 | AAC, DD+                        |
+| +750  | DD                              |
+| +500  | MP3                             |
+| −500  | DTS                             |
+| −1000 | DTS-HD MA, TrueHD, FLAC, PCM    |
 | −1500 | TrueHD ATMOS, ATMOS (undefined) |
 
 TRaSH's `x265 (HD)` custom format lands at −10000 in both profiles, which is
@@ -143,7 +143,7 @@ Correct Radarr ids: `FLUX e098247bc6652dd88c76644b275260ed`,
 `No-RlsGroup ae9b7c9ebde1f3bd336a8cbd1ec4c5e5`,
 `Obfuscated 7357cf5161efbf8c4d5d0c30b4815ee2`,
 `Retags 5c44f52a8714fdd79bb4d98e2673be1f`, 4K profile
-`05fbf054ac8ad0303335026cc2632f1a` (*WEBDL 2160p (Combined)*).
+`05fbf054ac8ad0303335026cc2632f1a` (_WEBDL 2160p (Combined)_).
 
 ## Part 2 — remediation (fix what is already on disk)
 
@@ -164,26 +164,26 @@ offline.
 
 The official repo (`Unmanic/unmanic-plugins`, branch `repo` — 56 plugins).
 Note the stock example in Unmanic's own schema points at `Josh5/unmanic-plugins`,
-which is the author's *personal* repo (10 plugins); use the `Unmanic/` one.
+which is the author's _personal_ repo (10 plugins); use the `Unmanic/` one.
 
 ### The flow
 
 **File test** (what enters the queue) — `limit_library_search_by_ffprobe_data`
 is deliberately **first**:
 
-| # | Plugin | Purpose |
-| - | ------ | ------- |
-| 1 | `limit_library_search_by_ffprobe_data` | the gate (below) |
-| 2 | `ignore_files_recently_modified` | `10min` — don't grab an in-flight import |
-| 3 | `ignore_hardlinked_files` | don't disturb torrent seeding hardlinks |
-| 4 | `reject_files_larger_than_original` | safety net |
-| 5 | `audio_transcoder` | |
-| 6 | `video_transcoder` | |
+| #   | Plugin                                 | Purpose                                  |
+| --- | -------------------------------------- | ---------------------------------------- |
+| 1   | `limit_library_search_by_ffprobe_data` | the gate (below)                         |
+| 2   | `ignore_files_recently_modified`       | `10min` — don't grab an in-flight import |
+| 3   | `ignore_hardlinked_files`              | don't disturb torrent seeding hardlinks  |
+| 4   | `reject_files_larger_than_original`    | safety net                               |
+| 5   | `audio_transcoder`                     |                                          |
+| 6   | `video_transcoder`                     |                                          |
 
 **Worker** — `video_transcoder`, `audio_transcoder`,
 `reject_files_larger_than_original`.
 **Post-processor (task result)** — `notify_sonarr`, `notify_radarr`
-(`rename_files: true`, so the *arr apps re-read MediaInfo and rename).
+(`rename_files: true`, so the \*arr apps re-read MediaInfo and rename).
 
 ### The gate
 
@@ -200,7 +200,7 @@ are left alone.
 
 > **Ordering is load-bearing.** In `unmanic/libs/filetest.py` the plugin loop
 > `break`s on the **first** plugin that returns a verdict, and plugins execute
-> in `LibraryPluginFlow.position` order — *not* the order shown by
+> in `LibraryPluginFlow.position` order — _not_ the order shown by
 > `POST /plugins/flow`. The gate must therefore be **first**. Put it last and
 > it never runs: `video_transcoder` votes first and every H.264/HEVC file gets
 > queued. (Also: the gate only ever sets `add_file_to_pending_tasks = False`;
@@ -221,18 +221,18 @@ queueing a rescan and rename.
 Unmanic's libraries/plugins/flows are runtime state on the config PVC (like
 Sonarr/Radarr), configured here through the API v2:
 
-| Call | Purpose |
-| ---- | ------- |
-| `POST /unmanic/api/v2/settings/write` | global settings (workers, scan interval) |
-| `POST .../settings/library/write` | create a library / enable its plugins |
-| `POST .../plugins/repos/update` + `/plugins/repos/reload` | add the official repo |
-| `POST .../plugins/install` | install a plugin by `plugin_id` |
-| `POST .../plugins/settings/update` | write a plugin's settings (send the full list back) |
-| `POST .../plugins/flow/save` | set flow membership/order |
-| `POST .../pending/test` | dry-run the file test for one path |
+| Call                                                      | Purpose                                             |
+| --------------------------------------------------------- | --------------------------------------------------- |
+| `POST /unmanic/api/v2/settings/write`                     | global settings (workers, scan interval)            |
+| `POST .../settings/library/write`                         | create a library / enable its plugins               |
+| `POST .../plugins/repos/update` + `/plugins/repos/reload` | add the official repo                               |
+| `POST .../plugins/install`                                | install a plugin by `plugin_id`                     |
+| `POST .../plugins/settings/update`                        | write a plugin's settings (send the full list back) |
+| `POST .../plugins/flow/save`                              | set flow membership/order                           |
+| `POST .../pending/test`                                   | dry-run the file test for one path                  |
 
 The UI is at `unmanic.waltr.tech`. API keys for the notify plugins live in the
-global (library-independent) plugin settings — not SOPS, same as the *arr apps'
+global (library-independent) plugin settings — not SOPS, same as the \*arr apps'
 own configs.
 
 ## Backlog size

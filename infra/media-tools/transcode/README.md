@@ -14,9 +14,9 @@ The `TranscodeQueueEmpty` Pushover notice was removed with them.
 downtime, watches the libraries) — see `docs/jellyfin-direct-play.md`. This GPU
 tooling is kept only for deliberate, one-off bulk passes.
 
-| File | Purpose |
-| ---- | ------- |
-| `transcode.sh` | The encoder; resumable, deadline-aware, safe replace + rename |
+| File                    | Purpose                                                                 |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `transcode.sh`          | The encoder; resumable, deadline-aware, safe replace + rename           |
 | `tv-transcode-job.yaml` | One-off `Job` (+ `ResourceClaimTemplate/transcode-gpu`) for manual runs |
 
 ## Manual run

@@ -9,7 +9,7 @@ guard that stops it. Written after the 2026-09-24 "downloadathon" pulled four
 - Sonarr has **no working language guard on its own** — it imported a release
   literally named `Bluey.S01E06.TRUEFRENCH.1080p.WEB.H264-FTMVHD`.
 - Radarr's built-in `Original Language` check **does** work (it rejected every
-  German release of *Dead Space: Downfall*).
+  German release of _Dead Space: Downfall_).
 - Fix is a **manual** release profile in each app: `ignored` terms
   (`TRUEFRENCH`, `VFF`, `VOSTFR`, `DEUTSCH`, …). It is **not** Recyclarr-managed,
   so it is not in git — see [Drift](#drift).
@@ -31,12 +31,12 @@ nothing objected to the language.
 Why Sonarr's own checks did not catch it:
 
 - **Quality profiles have no `language` field in Sonarr v4.** `GET
-  /api/v3/qualityprofile/4` returns keys
+/api/v3/qualityprofile/4` returns keys
   `cutoff, cutoffFormatScore, formatItems, id, items, minFormatScore,
-  minUpgradeFormatScore, name, upgradeAllowed` — there is no `language`.
-- Sonarr *does* auto-create a **`Language: Not Original`** custom format
+minUpgradeFormatScore, name, upgradeAllowed` — there is no `language`.
+- Sonarr _does_ auto-create a **`Language: Not Original`** custom format
   (`LanguageSpecification`, id 42, score `-10000`, present on profile 4). It
-  rejects `TRUEFRENCH` correctly *now* — but did not at grab time, most likely
+  rejects `TRUEFRENCH` correctly _now_ — but did not at grab time, most likely
   because the series' `originalLanguage` was not yet `English` when the grab
   was evaluated. So it cannot be relied on as the only guard.
 - `Bluey (2018)` reports `originalLanguage: English`, and the release still
@@ -56,11 +56,11 @@ kubectl -n default exec deploy/jellyfin -- sh -c "curl -s \
 
 Then bucket each item by the set of audio languages:
 
-| Bucket | Meaning |
-|---|---|
-| has `eng`/`und`/`mul` | fine |
-| only real foreign codes (`fre`, `ger`, `ita`, …) | **suspect — fix** |
-| only `unk` | undetermined; ffprobe cannot help, needs ASR |
+| Bucket                                           | Meaning                                      |
+| ------------------------------------------------ | -------------------------------------------- |
+| has `eng`/`und`/`mul`                            | fine                                         |
+| only real foreign codes (`fre`, `ger`, `ita`, …) | **suspect — fix**                            |
+| only `unk`                                       | undetermined; ffprobe cannot help, needs ASR |
 
 ### 2. Confirm suspects with ffprobe
 
@@ -70,7 +70,7 @@ ffprobe -v error -select_streams a -show_entries stream_tags=language -of csv=p=
 
 ### 3. Resolve `unk` with ASR
 
-`unk` is written into the *file's* stream tag — Jellyfin is reading it
+`unk` is written into the _file's_ stream tag — Jellyfin is reading it
 correctly, so ffprobe adds nothing. Only transcription tells you the language.
 Sample ~30 s from 40 % into each file and transcribe via the cluster's
 `wyoming-whisper` (`default.svc:10300`). Run it **inside a pod that has ffmpeg,
@@ -87,13 +87,13 @@ foreign audio.
 
 8 of 6,307 items had foreign-only audio:
 
-| Item | Audio | Verdict |
-|---|---|---|
-| Bluey S01E06 / S01E11 / S01E12 / S01E13 | `fre` | wrong — deleted + re-searched |
-| Dead Space: Downfall (2008) | `ger` | wrong — deleted, re-acquire failing |
-| The 24 Hour War (2016) | `war` | **mis-tag** — audio is English; retagged to `eng` |
-| Belle de Jour (1967) | `fra` | correct — original language |
-| Malena (2000) | `ita` | correct — original language |
+| Item                                    | Audio | Verdict                                           |
+| --------------------------------------- | ----- | ------------------------------------------------- |
+| Bluey S01E06 / S01E11 / S01E12 / S01E13 | `fre` | wrong — deleted + re-searched                     |
+| Dead Space: Downfall (2008)             | `ger` | wrong — deleted, re-acquire failing               |
+| The 24 Hour War (2016)                  | `war` | **mis-tag** — audio is English; retagged to `eng` |
+| Belle de Jour (1967)                    | `fra` | correct — original language                       |
+| Malena (2000)                           | `ita` | correct — original language                       |
 
 `war` is the ISO code for Waray, a Philippine language — a bogus tag on a US
 documentary. Retag in place without re-encoding:
@@ -104,7 +104,7 @@ ffmpeg -v error -i IN -map 0 -c copy -metadata:s:a:0 language=eng \
 ```
 
 Beware filename scanning: a grep for language words matched 25 files, **all
-false positives** — episode *titles* like "Passengers and Polish", "The French
+false positives** — episode _titles_ like "Passengers and Polish", "The French
 Mistake", "French Horns", "Turning Japanese".
 
 ## The guard
@@ -119,8 +119,8 @@ LATINO  ITALIAN.DL  SPANISH.DL  PORTUGUESE.DL  RUSSIAN.DL  DUTCH.DL
 
 Deliberately **excluded**: bare `FRENCH`, `GERMAN`, `ITALIAN`, `SPANISH`, and
 `MULTI`. Those are substring matches, so bare language words would block
-legitimate titles (*The French Connection*, *The Italian Job*, *The Spanish
-Prisoner*) — and `MULTI` releases are fine here, most of the working Bluey
+legitimate titles (_The French Connection_, _The Italian Job_, _The Spanish
+Prisoner_) — and `MULTI` releases are fine here, most of the working Bluey
 library is `MULTI` with English included.
 
 Verify with an interactive search; Sonarr reports rejection reasons:
@@ -149,7 +149,7 @@ curl -s -H 'X-Api-Key: <key>' -H 'Content-Type: application/json' \
 
 ## Residual risk
 
-- Re-acquisition of *Dead Space: Downfall* is failing: every English release
+- Re-acquisition of _Dead Space: Downfall_ is failing: every English release
   Radarr finds is blocklisted, dead, or under the profile's 3.7 GB size floor.
   It stays monitored so RSS will catch one if it appears.
 - Language tags are only as good as the release name. A release with no
