@@ -1038,6 +1038,58 @@ MediaInfo. Validated: 216 MB XviD/MP3 → 151 MB H.264/AAC MKV.
 Retired alongside this: the nightly TV-bloat CronJobs and their now-dead
 `TranscodeQueueEmpty` Alertmanager route (`c354be8e`).
 
+### 2026-09-25 (later) — non-English releases: audit + guard
+
+Making every Recyclarr-managed profile `upgrade.allowed: true` (`8da46195`) —
+the library is curated, not an archive — had an unintended side effect worth
+watching: Sonarr started re-searching everything, and the downloadathon pulled
+**four TRUEFRENCH Bluey episodes**. Full write-up:
+**`docs/jellyfin-language-filtering.md`**.
+
+**Audit.** Jellyfin's `MediaStreams` over 6,307 items found exactly **8** with
+foreign-only audio: Bluey S01E06/E11/E12/E13 (`fre`), *Dead Space: Downfall*
+(`ger`), *The 24 Hour War* (`war` — a bogus tag, audio is English),
+*Belle de Jour* (`fra`) and *Malena* (`ita`) — the last two are correct,
+they are original-language films. The 275 items tagged `unk` were resolved by
+**ASR**, not ffprobe: `unk` is written into the file's stream tag, so ffprobe
+just echoes it back. Sampling 30 s from each and transcribing via
+`wyoming-whisper` gave min englishness 0.143 / median 0.571 / **zero below
+0.10** — all English.
+
+**The mechanism** (Sonarr history, Bluey S01E06): correct English BluRay
+*grabbed* 19:42 → *downloadFailed* 19:47 → `Bluey.S01E06.TRUEFRENCH…-FTMVHD`
+*grabbed* 19:48 → imported 19:59. Nothing objected to the language.
+
+**Lessons.**
+- **Sonarr v4 quality profiles have no `language` field at all** — the API
+  returns only `cutoff, cutoffFormatScore, formatItems, id, items,
+  minFormatScore, minUpgradeFormatScore, name, upgradeAllowed`. Language is a
+  custom-format concern now, not a profile setting.
+- Sonarr *does* auto-create a `Language: Not Original` CF (`-10000`, on profile
+  4) and it rejects `TRUEFRENCH` correctly **now** — but it did not at grab
+  time, so it is not sufficient on its own. Radarr's equivalent
+  (`Original Language (English) is wanted, but found German`) worked fine.
+- **A release profile is the guard that actually holds.** `Block Non-English
+  Releases` in both apps, `tags: []` (empty ⇒ all series/movies), `ignored:
+  TRUEFRENCH VFF VFQ VOSTFR SUBFRENCH DEUTSCH CASTELLANO LATINO ITALIAN.DL
+  SPANISH.DL PORTUGUESE.DL RUSSIAN.DL DUTCH.DL`. Bare `FRENCH`/`GERMAN`/`ITALIAN`
+  are **excluded on purpose** — these are substring matches and would block
+  *The French Connection* / *The Italian Job*. So is `MULTI`; most of the
+  working Bluey library is `MULTI` **with** English.
+- **Release profiles are not Recyclarr-managed**, so they live only in the app
+  databases — a config wipe loses them. Recreate recipe is in the doc.
+- Filename grepping for language words is worthless here: 25 hits, **all**
+  episode titles ("Passengers and Polish", "The French Mistake", "Turning
+  Japanese").
+- `kubectl exec` **without `-i` forwards no stdin** — a `while read` loop fed
+  that way silently produced zero rows and looked like a probe bug.
+
+Also retagged *The 24 Hour War*'s audio stream `war` → `eng` in place
+(`-map 0 -c copy -metadata:s:a:0 language=eng`, no re-encode).
+*Dead Space: Downfall* is deleted but not yet replaced: every English release
+Radarr finds is blocklisted, dead, or under the 3.7 GB profile size floor.
+Left monitored so RSS picks it up if one appears.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
