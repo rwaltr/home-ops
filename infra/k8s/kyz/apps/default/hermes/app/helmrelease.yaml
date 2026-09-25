@@ -41,6 +41,31 @@ spec:
                 set -euo pipefail
                 install -m 600 -o 10000 -g 10000 /config/config.yaml /opt/data/config.yaml
                 install -m 600 -o 10000 -g 10000 /config/SOUL.md /opt/data/SOUL.md
+                # In-cluster kubeconfig. tokenFile keeps the (rotating) projected SA
+                # token fresh without baking a token into the file.
+                mkdir -p /opt/data/.kube
+                printf '%s\n' \
+                  'apiVersion: v1' \
+                  'kind: Config' \
+                  'clusters:' \
+                  '- name: in-cluster' \
+                  '  cluster:' \
+                  '    server: https://kubernetes.default.svc' \
+                  '    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt' \
+                  'contexts:' \
+                  '- name: in-cluster' \
+                  '  context:' \
+                  '    cluster: in-cluster' \
+                  '    user: hermes' \
+                  '    namespace: default' \
+                  'current-context: in-cluster' \
+                  'users:' \
+                  '- name: hermes' \
+                  '  user:' \
+                  '    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token' \
+                  > /opt/data/.kube/config
+                chmod 600 /opt/data/.kube/config
+                chown -R 10000:10000 /opt/data/.kube
                 mkdir -p /opt/data/workspace
                 chown 10000:10000 /opt/data/workspace
                 # Skip bundled-skill seeding (skills are disabled; SOUL/config carry the brief).
@@ -108,6 +133,14 @@ spec:
                 fi
                 if [ ! -x "$P/bin/mise" ]; then
                   curl -LsSf https://mise.run | env MISE_INSTALL_PATH="$P/bin/mise" sh
+                fi
+                # kubectl straight from dl.k8s.io: no GitHub API, no mise
+                # rate-limit dependency. The repo toolchain (flux, helm, ...) can
+                # be installed later by the agent with `mise install` if wanted.
+                if [ ! -x "$P/bin/kubectl" ]; then
+                  KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+                  curl -fsSL -o "$P/bin/kubectl" "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+                  chmod 755 "$P/bin/kubectl"
                 fi
                 if [ ! -x "$P/bin/gh" ]; then
                   GH=2.101.0
@@ -186,6 +219,7 @@ spec:
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
               GITHUB_REPO: rwaltr/home-ops
               REPO_DIR: /opt/data/workspace/home-ops
+              KUBECONFIG: /opt/data/.kube/config
               # No 👀/✅/❌ processing reactions on user messages.
               DISCORD_REACTIONS: "false"
               # Keep mise from refusing the repo's .mise.toml as untrusted; the
@@ -262,12 +296,6 @@ spec:
               - -c
               - |
                 set -euo pipefail
-                export PATH=/opt/data/.local/bin:/opt/hermes/.venv/bin:$PATH
-                REPO_DIR=${REPO_DIR:-/opt/data/workspace/home-ops}
-                export MISE_TRUSTED_CONFIG_PATHS=$REPO_DIR
-                if [ -d "$REPO_DIR/.git" ] && [ ! -f /opt/data/.mise-repo-installed ]; then
-                  ( cd "$REPO_DIR" && mise install >/dev/null 2>&1 || true; mise reshim >/dev/null 2>&1 || true; command -v kubectl >/dev/null 2>&1 && touch /opt/data/.mise-repo-installed ) || true
-                fi
                 exec python3 /scripts/git-broker.py loop
             env:
               GITHUB_APP_CLIENT_ID:
@@ -293,7 +321,9 @@ spec:
                   - DAC_OVERRIDE
                   - FOWNER
     defaultPodOptions:
-      automountServiceAccountToken: false
+      # Needed for the in-cluster kubeconfig (tokenFile in /opt/data/.kube/config)
+      # and read-only cluster access via the `hermes` ServiceAccount.
+      automountServiceAccountToken: true
       enableServiceLinks: false
       securityContext:
         runAsNonRoot: false
