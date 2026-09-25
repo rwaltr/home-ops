@@ -123,18 +123,18 @@ Discord requirements (developer portal):
 
 Wiring:
 
-1. 1Password item `hermes`: `discord_bot_token`, `discord_allowed_users`,
-   `discord_home_channel`, `discord_home_channel_name`.
-2. `externalsecret.yaml`: map them to `DISCORD_BOT_TOKEN`,
-   `DISCORD_ALLOWED_USERS`, `DISCORD_HOME_CHANNEL`, `DISCORD_HOME_CHANNEL_NAME`.
-3. `helmrelease.yaml` config: add an explicit
+1. 1Password item `discordbot` already holds `token` and `rwaltruserid`;
+   `externalsecret.yaml` reads them and maps to `DISCORD_BOT_TOKEN` and
+   `DISCORD_ALLOWED_USERS`. (A home channel for cron/notification delivery,
+   `DISCORD_HOME_CHANNEL`, can be added later once a channel is chosen.)
+2. `helmrelease.yaml` config: add an explicit
    `platform_toolsets.discord: [terminal, file, web]`.
    **Gotcha:** a platform with no `platform_toolsets` entry falls back to the
    full ~50-schema preset — always list it explicitly.
-4. Seed a `SOUL.md` naming the agent Teletran. It currently lives only on the
+3. Seed a `SOUL.md` naming the agent Teletran. It currently lives only on the
    PVC; move it into the `hermes-config` ConfigMap and have the config init
    container install it alongside `config.yaml` so it is git-tracked.
-5. PR → merge → reloader rolls the pod. Verify `hermes gateway status` shows
+4. PR → merge → reloader rolls the pod. Verify `hermes gateway status` shows
    Discord connected and send a test message from the phone.
 
 ### Phase 2 — Repo + toolchain
