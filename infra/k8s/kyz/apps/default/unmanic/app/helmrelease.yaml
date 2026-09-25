@@ -1,0 +1,117 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Unmanic — persistent library optimiser. Watches the TV + movie libraries and
+# re-encodes anything that cannot direct play, then Sonarr/Radarr rename from
+# the new MediaInfo.
+#
+# CPU-ONLY ON PURPOSE. The iGPU is an exclusive DRA device, so any GPU worker
+# would force Jellyfin to scale to 0. x264 veryfast measured ~49.6x realtime on
+# the i9-13900H, so a CPU worker keeps up with imports while Jellyfin stays
+# online the whole time. CPU is capped so a long transcode cannot starve
+# Jellyfin.
+#
+# NOTE: libraries, plugin repo and the plugin flow are runtime config on the
+# config PVC (like Sonarr/Radarr), not declared here. See
+# docs/jellyfin-direct-play.md for the flow to reproduce.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: unmanic
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: unmanic
+  values:
+    fullnameOverride: unmanic
+    controllers:
+      unmanic:
+        strategy: Recreate
+        containers:
+          app:
+            image:
+              repository: ghcr.io/unmanic/unmanic
+              tag: 0.4.1@sha256:36a705923193db6b8ca7abd5b57b81a7309d04aedd320ec0ef4e9ac5970be885
+            env:
+              TZ: America/Chicago
+              PUID: "1000"
+              PGID: "1000"
+              # CPU workers. Each worker runs one ffmpeg at a time.
+              NUMBER_OF_WORKERS: "2"
+              # Periodic full library scan (inotify handles new files too).
+              SCHEDULE_FULL_SCAN_MINUTES: "60"
+              RUN_FULL_SCAN_ON_START: "false"
+            probes:
+              liveness:
+                enabled: true
+                spec:
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                spec:
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 250m
+                memory: 512Mi
+              limits:
+                # Cap so a long re-encode cannot starve Jellyfin.
+                cpu: "4"
+                memory: 4Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: unmanic
+        ports:
+          http:
+            port: &port 8888
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - unmanic.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      config:
+        existingClaim: unmanic-config
+        globalMounts:
+          - path: /config
+      cache:
+        existingClaim: unmanic-cache
+        globalMounts:
+          - path: /tmp/unmanic
+      # Media from tank (ZFS DAS) — READ-WRITE: Unmanic replaces files in place.
+      media-movies:
+        type: hostPath
+        hostPath: /var/tank/nas/library/media/movies
+        globalMounts:
+          - path: /media/movies
+      media-tv:
+        type: hostPath
+        hostPath: /var/tank/nas/library/media/tv
+        globalMounts:
+          - path: /media/tv

@@ -1,0 +1,29 @@
+---
+# Explicit PVCs (rather than app-template-created) so the names are stable and
+# can be referenced from both the HelmRelease and the kopia SnapshotPolicy.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: unmanic-config
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Working/cache space for in-flight transcodes. Unmanic copies the source into
+# here and writes the result before moving it back, so it must fit the largest
+# file (biggest movie ~30 GB). Lives on the node NVMe via openebs-hostpath.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: unmanic-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      storage: 50Gi
