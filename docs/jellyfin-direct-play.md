@@ -63,6 +63,22 @@ Now Recyclarr manages, by explicit `name` so existing assignments survive:
 `upgrade.allowed: false` is set on both so adopting the TRaSH quality set does
 **not** trigger a mass re-download of the existing library.
 
+### The auxiliary profiles (scores only)
+
+TRaSH has **no SD, no 720p-only and no "Any" profile** — the lowest it goes is
+`WEB 1080p` / `HD Bluray + WEB` / `Base Profile`. So `Any`, `SD`, `HD-720p`,
+`Ultra-HD` and `HD - 720p/1080p` are declared by `name` with the `qualities`
+key **omitted**: Recyclarr then manages only their custom-format scores and
+leaves each quality list exactly as-is. That matters, because `SD` and
+`HD - 720p/1080p` carry the SD-only kids catalogue (Sesame Street, Mister
+Rogers, Bob the Builder, Wishbone, I Love Lucy) — point them at a TRaSH 1080p
+list and those shows stop matching anything.
+
+Every profile gets the Unwanted set and the full direct-play audio scores. A
+sync should report `0 contain quality changes and N contain updated scores`;
+if it reports quality changes on an aux profile, `qualities` has been added by
+mistake.
+
 ### Audio scores are deliberately *not* TRaSH defaults
 
 TRaSH scores lossless audio highly — TrueHD ATMOS **+5000**, TrueHD +2750,
