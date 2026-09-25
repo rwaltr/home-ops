@@ -162,15 +162,23 @@ Deliberately **not** enabled yet:
 
 ### Phase 2 — Repo + toolchain
 
-1. **Toolchain for free:** clone `rwaltr/home-ops` and run `mise install` in
-   it — the repo's `.mise.toml` pins `kubectl`, `flux`, `helm`,
-   `kustomize`, `terraform`, `pre-commit`, and the linters. (Teletran does
-   not use the `sops`/`age` entries — see the no-secret-handling decision.)
-2. Clone to `/opt/data/workspace/home-ops` (persisted on the PVC); set git
-   identity to the bot; point `terminal.cwd` at the repo; register a project.
-3. `gh` auth: inject `GH_TOKEN` from 1P via ESO so push/PR work.
-4. Ship repo conventions to the agent: Hermes loads `AGENTS.md` from the CWD,
-   and `REFACTOR_PLANS.md` is the map — no extra wiring needed.
+Implemented with three pieces in the Hermes pod:
+
+1. **`gitcreds` sidecar** — mints a `teletran-x` GitHub **App installation
+   token** (JWT from the client ID + private key in 1P item `github-bot`),
+   resolves the repo's installation, and writes `gh`'s `hosts.yml` plus a git
+   credential store. Refreshes every 40 min (installation tokens expire hourly).
+   No static PAT, no long-lived token in the pod spec.
+2. **`repo` init** — clones `rwaltr/home-ops` to `/opt/data/workspace/home-ops`
+   (persisted) before the app starts; non-fatal, so a GitHub hiccup cannot block
+   the pod. `terminal.cwd` points at the checkout.
+3. **Toolchain** — the sidecar runs `mise install` once in the checkout, which
+   pulls the repo's pinned `kubectl`, `flux`, `helm`, `kustomize`, `terraform`,
+   `pre-commit`, and linters. (Teletran does not use the `sops`/`age` entries.)
+
+Hermes loads `AGENTS.md` from the working directory and `REFACTOR_PLANS.md` is
+the map, so conventions come for free. The App needs Contents/Pull
+requests read-write (and Workflows write to touch `.github/workflows`).
 
 ### Phase 3 — Cluster access (read-first)
 
