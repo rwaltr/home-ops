@@ -186,6 +186,8 @@ spec:
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
               GITHUB_REPO: rwaltr/home-ops
               REPO_DIR: /opt/data/workspace/home-ops
+              # No 👀/✅/❌ processing reactions on user messages.
+              DISCORD_REACTIONS: "false"
               # Keep mise from refusing the repo's .mise.toml as untrusted; the
               # sidecar installs the pinned toolchain from it.
               MISE_TRUSTED_CONFIG_PATHS: /opt/data/workspace/home-ops
@@ -394,6 +396,18 @@ spec:
                 enabled: "off"
               connectors:
                 enabled: false
+            # Keep the Discord DM channel quiet: no tool-progress bubbles and no
+            # busy acks. Interim assistant messages and long-running notifications
+            # stay on so a long turn does not look dead. Reactions are turned off
+            # separately via DISCORD_REACTIONS (adapter-level, not a display key).
+            display:
+              platforms:
+                discord:
+                  tool_progress: "off"
+                  busy_ack_detail: false
+                  busy_steer_ack_enabled: false
+                  interim_assistant_messages: true
+                  long_running_notifications: true
             terminal:
               backend: local
               cwd: /opt/data/workspace/home-ops
