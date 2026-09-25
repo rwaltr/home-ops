@@ -13,8 +13,10 @@
 #     (Sesame Street, Mister Rogers, Bob the Builder, Wishbone, I Love Lucy) —
 #     forcing them onto a 1080p-only TRaSH list would make them find nothing.
 #
-# `upgrade.allowed: false` on HD-1080p preserves current behaviour: adopt the
-# TRaSH quality set + scores for *new* grabs without a mass re-download.
+# `upgrade.allowed: true` on every managed profile: this library is actively
+# curated, not an archive — monitored items should keep upgrading to better
+# releases. (It was false while we adopted the TRaSH quality sets, to avoid a
+# mass re-download in one go.)
 #
 # AUDIO IS INTENTIONALLY NOT TRaSH DEFAULT. TRaSH scores lossless highly
 # (TrueHD ATMOS +5000, TrueHD +2750, DTS-HD MA +2500, AAC only +1000) because
@@ -41,28 +43,40 @@ sonarr:
       type: series
     quality_profiles:
       - trash_id: c4cadd6b35b95f62c3d47a408e53e2f7 # WEB-2160p (Combined)
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD-1080p
         trash_id: 72dae194fc92bf828f32cde7744e51a1 # WEB-1080p
         upgrade:
-          allowed: false
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       # --- aux: scores only, quality lists untouched ---
       - name: Any
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: SD
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD-720p
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: Ultra-HD
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD - 720p/1080p
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
     custom_formats:
@@ -167,28 +181,40 @@ radarr:
       type: movie
     quality_profiles:
       - trash_id: 05fbf054ac8ad0303335026cc2632f1a # WEBDL 2160p (Combined)
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD-1080p
         trash_id: d1d67249d3890e49bc12e275d989a7e9 # HD Bluray + WEB
         upgrade:
-          allowed: false
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       # --- aux: scores only, quality lists untouched ---
       - name: Any
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: SD
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD-720p
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: Ultra-HD
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
       - name: HD - 720p/1080p
+        upgrade:
+          allowed: true
         reset_unmatched_scores:
           enabled: true
     custom_formats:
