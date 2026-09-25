@@ -1,0 +1,73 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/batch/cronjob_v1.json
+#
+# Runs `zpool status` on the host and writes node-exporter textfile metrics.
+#
+# privileged is required, not defensive: `chroot /host zpool status` fails with
+# "Failed to initialize the libzfs library" unprivileged, and still fails with
+# just CAP_SYS_ADMIN added even though /dev/zfs (char 10:249) is visible — libzfs
+# needs the device cgroup that privileged bypasses. Verified both ways on mouse.
+# Reads only: this mounts the host root read-only.
+#
+# nodeName is pinned because the pool lives on this node's DAS; a second node
+# would need its own instance (and would collide on the shared textfile path).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: zfs-vdev-exporter
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: zfs-vdev-exporter
+        spec:
+          restartPolicy: Never
+          nodeName: mouse
+          tolerations:
+            - operator: Exists
+          securityContext:
+            runAsUser: 0
+          containers:
+            - name: zpool-status
+              image: busybox:1.37
+              command:
+                - /scripts/zfs-vdev.sh
+              securityContext:
+                privileged: true
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  # Bounded like every other system component here — no disk swap
+                  # (2026-09-24 memory audit, REFACTOR_PLANS.md).
+                  memory: 64Mi
+              volumeMounts:
+                - name: host
+                  mountPath: /host
+                  readOnly: true
+                - name: textfile
+                  mountPath: /textfile
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: host
+              hostPath:
+                path: /
+            - name: textfile
+              hostPath:
+                # Shared with node-exporter's --collector.textfile.directory.
+                path: /var/lib/node_exporter/textfile
+                type: DirectoryOrCreate
+            - name: scripts
+              configMap:
+                name: zfs-vdev-exporter
+                defaultMode: 0755

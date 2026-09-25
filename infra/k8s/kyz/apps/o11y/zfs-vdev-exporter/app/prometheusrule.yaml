@@ -1,0 +1,55 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Vdev-level ZFS alerting, which the pool-level ZfsUnexpectedPoolState rule in the
+# kube-prometheus-stack HelmRelease cannot provide: a faulted vdev member leaves
+# node_zfs_zpool_state{state="online"} at 1.
+#
+# Every rule is severity: critical — AlertmanagerConfig routes only severity=critical
+# to Pushover, and its inhibitRule makes a critical suppress its warning counterpart.
+#
+# Motivating incident: sde1 faulted 2026-09-22 03:17 and left tank/raidz1-0 with two
+# healthy members out of three for three days with no alert.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zfs-vdev-exporter-rules
+spec:
+  groups:
+    - name: zfs-vdev-exporter.rules
+      rules:
+        - alert: ZfsVdevNotOnline
+          expr: zfs_vdev_online == 0
+          for: 5m
+          annotations:
+            summary: >-
+              ZFS vdev {{ $labels.vdev }} in pool {{ $labels.pool }} is {{ $labels.state }}. If this is a raidz1 member, that vdev now has no redundancy left.
+          labels:
+            severity: critical
+
+        # Catches a disk degrading *before* it faults. Plain subtraction on a
+        # gauge rather than increase(), so no counter-reset artefacts; a
+        # `zpool clear` resetting the counters yields a negative delta, not a fire.
+        - alert: ZfsVdevErrorsIncreasing
+          expr: zfs_vdev_errors - (zfs_vdev_errors offset 6h) > 0
+          for: 5m
+          annotations:
+            summary: >-
+              ZFS vdev {{ $labels.vdev }} in pool {{ $labels.pool }} accumulated new {{ $labels.type }} errors in the last 6h (now {{ $value }} new since the 6h mark).
+          labels:
+            severity: critical
+
+        # A frozen textfile is otherwise silent: the exporter stops updating but
+        # node-exporter keeps serving the last values forever. absent() covers the
+        # file being deleted, the age check covers it being stale.
+        - alert: ZfsVdevMetricsStale
+          expr: |-
+            absent(zfs_vdev_textfile_timestamp_seconds)
+            or
+            (time() - zfs_vdev_textfile_timestamp_seconds > 3600)
+          for: 15m
+          annotations:
+            summary: >-
+              ZFS vdev metrics have not been written for over an hour. The zfs-vdev-exporter CronJob is not running, so vdev faults are currently invisible.
+          labels:
+            severity: critical

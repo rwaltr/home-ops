@@ -9,4 +9,5 @@ resources:
   - ./grafana-operator/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
   - ./smartctl-exporter/ks.yaml
+  - ./zfs-vdev-exporter/ks.yaml
   - ./grafana-operator/instance/ks.yaml

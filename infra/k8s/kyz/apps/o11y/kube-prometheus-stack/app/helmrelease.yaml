@@ -79,6 +79,24 @@ spec:
                   storage: 50Gi
     prometheus-node-exporter:
       fullnameOverride: node-exporter
+      # Textfile collector for host facts node_exporter cannot gather itself —
+      # currently the ZFS vdev states written by o11y/zfs-vdev-exporter.
+      #
+      # The two filesystem excludes below are the chart's own defaults and must be
+      # repeated: setting extraArgs replaces the list wholesale, so omitting them
+      # silently starts exporting /dev, /proc and /run/containerd mounts.
+      extraArgs:
+        - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+        - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+        - --collector.textfile.directory=/textfile
+      extraVolumes:
+        - name: textfile
+          hostPath:
+            path: /var/lib/node_exporter/textfile
+            type: DirectoryOrCreate
+      extraVolumeMounts:
+        - name: textfile
+          mountPath: /textfile
     kube-state-metrics:
       fullnameOverride: kube-state-metrics
     grafana:

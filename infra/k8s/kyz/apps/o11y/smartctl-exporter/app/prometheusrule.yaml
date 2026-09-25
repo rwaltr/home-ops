@@ -115,3 +115,19 @@ spec:
               Drive {{ $labels.device }} on {{ $labels.instance }} negotiated a slower link than it supports ({{ $value }} bit/s). Usually a cable or backplane seating problem rather than the disk itself.
           labels:
             severity: critical
+
+        # A disk whose SMART cannot be read emits no smartctl_device series at all,
+        # so every rule above is silently unable to fire for it — absent is not
+        # alerting. This is exactly how sde1 faulted on 2026-09-22 with its SMART
+        # unreadable the whole time, and it doubles as an exporter-down check
+        # (count collapses to 0).
+        #
+        # 7 = nvme0 (OS) + sda..sdf. Bump this when a disk is added.
+        - alert: SmartctlDeviceMissing
+          expr: count(smartctl_device) < 7
+          for: 15m
+          annotations:
+            summary: >-
+              Only {{ $value }} of 7 disks are reporting SMART. A disk is not answering smartctl so its health is unknown, or the smartctl-exporter DaemonSet is down and every disk is unmonitored.
+          labels:
+            severity: critical
