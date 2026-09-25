@@ -151,7 +151,7 @@ spec:
               TZ: America/Chicago
               HERMES_HOME: /opt/data
               # Toolchain installed by the `tools` init container (persisted on the PVC).
-              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/opt/data/.local/go/bin:/opt/data/.local/homebrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/teletran/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/opt/data/.local/go/bin:/opt/data/.local/homebrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
               MISE_DATA_DIR: /opt/data/.local/share/mise
               MISE_CACHE_DIR: /opt/data/.cache/mise
               MISE_CONFIG_DIR: /opt/data/.config/mise
@@ -282,6 +282,10 @@ spec:
               capabilities:
                 drop:
                   - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
     defaultPodOptions:
       automountServiceAccountToken: false
       enableServiceLinks: false
@@ -531,6 +535,22 @@ spec:
                 git("config", "--global", "user.email", "teletran-x[bot]@users.noreply.github.com")
 
 
+            def install_gh_wrapper():
+                """gh rejects an App installation token as a stored login (it probes
+                /user, which those tokens cannot read), so shadow the real binary with a
+                wrapper that exports GH_TOKEN from the brokered hosts.yml."""
+                bin_dir = "/opt/data/teletran/bin"
+                os.makedirs(bin_dir, exist_ok=True)
+                wrapper = os.path.join(bin_dir, "gh")
+                with open(wrapper, "w") as fh:
+                    fh.write(
+                        "#!/bin/sh\n"
+                        "token=$(sed -n 's/^ *oauth_token: //p' \"${GH_CONFIG_DIR:-/opt/data/.config/gh}/hosts.yml\" 2>/dev/null)\n"
+                        '[ -n "$token" ] && GH_TOKEN="$token" export GH_TOKEN\n'
+                        'exec /opt/data/.local/bin/gh "$@"\n'
+                    )
+                os.chmod(wrapper, 0o755)
+
             def sync_repo():
                 if os.path.isdir(os.path.join(WORKSPACE, ".git")):
                     git("-C", WORKSPACE, "fetch", "--prune", "origin")
@@ -546,6 +566,7 @@ spec:
                         token, login, expires = mint()
                         publish(token)
                         configure_git()
+                        install_gh_wrapper()
                         sync_repo()
                         print(f"[git-broker] installation token for {login} (expires {expires})", flush=True)
                     except Exception as exc:
