@@ -79,6 +79,28 @@ sync should report `0 contain quality changes and N contain updated scores`;
 if it reports quality changes on an aux profile, `qualities` has been added by
 mistake.
 
+### Profile hygiene (audit 2026-09-25)
+
+- **`HD - 720p/1080p` cannot match SD.** It allows only 720p/1080p — no SDTV,
+  DVD or 480p. Five SD-era kids series sat on it with **zero** files while
+  monitored (Wishbone, Bear in the Big Blue House, Mister Rogers'
+  Neighborhood, Bob the Builder, Sesame Street — ≈3,200 episodes), so Sonarr
+  could never match a release. Moved to `SD`. `I Love Lucy` was already on `SD`
+  and working (118/180), which is what pointed at the profile rather than the
+  indexers.
+- **`Planes: Fire & Rescue` was on `Any`**, which permits CAM/TS/WORKPRINT →
+  moved to `HD-1080p`.
+- **`Baby Einstein Classics` is not trackable.** TVDB series `112061` has no
+  year and **all 34 episodes have no air date**, so Sonarr counts
+  `episodeCount: 0` and will never search. `year` is TVDB-owned and a `PUT
+  /api/v3/series/{id}` with `year: 2010` (TMDB's value) is silently ignored, as
+  is a forced `RefreshSeries`. A replacement entry does not exist. Left in
+  place but **unmonitored**; the real fix is adding the year/air dates upstream
+  at TVDB.
+- **342/346 movies and 60/87 series are intentionally unmonitored.** Both apps
+  are archives here, not active fetchers — worth remembering before assuming a
+  missing profile is why something is not downloading.
+
 ### Audio scores are deliberately *not* TRaSH defaults
 
 TRaSH scores lossless audio highly — TrueHD ATMOS **+5000**, TrueHD +2750,
