@@ -1,7 +1,24 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/recyclarr/recyclarr/refs/tags/v8.0.0/schemas/config-schema.json
-# TRaSH-Guides sync: WEB-2160p quality profile + standard unwanted/CF set
-# (onedr0p pattern). Keys injected via SONARR_API_KEY/RADARR_API_KEY env.
+# TRaSH-Guides sync for Sonarr + Radarr (keys via SONARR_API_KEY/RADARR_API_KEY).
+#
+# Two profiles are managed per service:
+#   * WEB-2160p (Combined) — the 4K profile (unchanged; TRaSH defaults)
+#   * HD-1080p             — the profile this library actually uses. Declared
+#                            with an explicit `name` so Recyclarr targets the
+#                            existing "HD-1080p" profile and the 343 movie /
+#                            80 series assignments survive the sync.
+#
+# `upgrade.allowed: false` on HD-1080p preserves current behaviour: adopt the
+# TRaSH quality set + scores for *new* grabs without triggering a mass
+# re-download of the existing library.
+#
+# AUDIO IS INTENTIONALLY NOT TRaSH DEFAULT. TRaSH scores lossless highly
+# (TrueHD ATMOS +5000, TrueHD +2750, DTS-HD MA +2500, AAC only +1000) because
+# its defaults assume a receiver doing passthrough. This stack is Jellyfin
+# served to Android/Apple clients, where DTS/DTS-HD/TrueHD/FLAC/PCM force a
+# server-side audio transcode. So the direct-playable codecs are preferred and
+# lossless is penalised. See docs/jellyfin-direct-play.md.
 sonarr:
   series:
     base_url: http://sonarr.default.svc.cluster.local:8989
@@ -23,6 +40,12 @@ sonarr:
       - trash_id: c4cadd6b35b95f62c3d47a408e53e2f7 # WEB-2160p (Combined)
         reset_unmatched_scores:
           enabled: true
+      - name: HD-1080p
+        trash_id: 72dae194fc92bf828f32cde7744e51a1 # WEB-1080p
+        upgrade:
+          allowed: false
+        reset_unmatched_scores:
+          enabled: true
     custom_formats:
       - # FLUX trumps REPACKS
         trash_ids:
@@ -38,6 +61,37 @@ sonarr:
           - 06d66ab109d4d2eddb2794d21526d140 # Retags
         assign_scores_to:
           - trash_id: c4cadd6b35b95f62c3d47a408e53e2f7
+      # --- direct-play audio: prefer what clients decode natively ---
+      - trash_ids:
+          - a50b8a0c62274a7c38b09a9619ba9d86 # AAC
+          - 63487786a8b01b7f20dd2bc90dd4a477 # DD+
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: 1000 }
+      - trash_ids:
+          - dbe00161b08a25ac6154c55f95e6318d # DD
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: 750 }
+      - trash_ids:
+          - 3e8b714263b26f486972ee1e0fe7606c # MP3
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: 500 }
+      # --- direct-play audio: penalise tracks that force a server transcode ---
+      - trash_ids:
+          - 5964f2a8b3be407d083498e4459d05d0 # DTS
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: -500 }
+      - trash_ids:
+          - c429417a57ea8c41d57e6990a8b0033f # DTS-HD MA
+          - 1808e4b9cee74e064dfae3f1db99dbfe # TrueHD
+          - 851bd64e04c9374c51102be3dd9ae4cc # FLAC
+          - 30f70576671ca933adbdcfc736a69718 # PCM
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: -1000 }
+      - trash_ids:
+          - 0d7824bb924701997f874e7ff7d4844a # TrueHD ATMOS
+          - b6fbafa7942952a13e17e2b1152b539a # ATMOS (undefined)
+        assign_scores_to:
+          - { trash_id: 72dae194fc92bf828f32cde7744e51a1, score: -1500 }
 
 radarr:
   movie:
@@ -52,16 +106,53 @@ radarr:
     quality_definition:
       type: movie
     quality_profiles:
-      - trash_id: 551d339faed64f12b9922e9ba10e4d8a # WEB-2160p (Combined)
+      - trash_id: 05fbf054ac8ad0303335026cc2632f1a # WEBDL 2160p (Combined)
+        reset_unmatched_scores:
+          enabled: true
+      - name: HD-1080p
+        trash_id: d1d67249d3890e49bc12e275d989a7e9 # HD Bluray + WEB
+        upgrade:
+          allowed: false
         reset_unmatched_scores:
           enabled: true
     custom_formats:
       - # Unwanted
         trash_ids:
-          - 5d9fd1b1e06cd8a475462f40214b7df6 # FLUX (trumps REPACKS)
-          - 32b367365729d530ca1c124a0b180c64 # Bad Dual Groups
-          - 82d40da2bc6923f41e14394075dd4b03 # No-RlsGroup
-          - e1a997ddb54e3ecbfe06341ad323c458 # Obfuscated
-          - 06d66ab109d4d2eddb2794d21526d140 # Retags
+          - e098247bc6652dd88c76644b275260ed # FLUX (trumps REPACKS)
+          - b6832f586342ef70d9c128d40c07b872 # Bad Dual Groups
+          - ae9b7c9ebde1f3bd336a8cbd1ec4c5e5 # No-RlsGroup
+          - 7357cf5161efbf8c4d5d0c30b4815ee2 # Obfuscated
+          - 5c44f52a8714fdd79bb4d98e2673be1f # Retags
         assign_scores_to:
-          - trash_id: 551d339faed64f12b9922e9ba10e4d8a
+          - trash_id: 05fbf054ac8ad0303335026cc2632f1a
+      # --- direct-play audio: prefer what clients decode natively ---
+      - trash_ids:
+          - 240770601cc226190c367ef59aba7463 # AAC
+          - 185f1dd7264c4562b9022d963ac37424 # DD+
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: 1000 }
+      - trash_ids:
+          - c2998bd0d90ed5621d8df281e839436e # DD
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: 750 }
+      - trash_ids:
+          - 6ba9033150e7896bdc9ec4b44f2b230f # MP3
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: 500 }
+      # --- direct-play audio: penalise tracks that force a server transcode ---
+      - trash_ids:
+          - 1c1a4c5e823891c75bc50380a6866f73 # DTS
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: -500 }
+      - trash_ids:
+          - dcf3ec6938fa32445f590a4da84256cd # DTS-HD MA
+          - 3cafb66171b47f226146a0770576870f # TrueHD
+          - a570d4a0e56a2874b64e5bfa55202a1b # FLAC
+          - e7c2fcae07cbada050a0af3357491d7b # PCM
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: -1000 }
+      - trash_ids:
+          - 496f355514737f7d83bf7aa4d24f8169 # TrueHD ATMOS
+          - 417804f7f2c4308c1f4c5d380d4c4475 # ATMOS (undefined)
+        assign_scores_to:
+          - { trash_id: d1d67249d3890e49bc12e275d989a7e9, score: -1500 }
