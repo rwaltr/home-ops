@@ -186,6 +186,9 @@ spec:
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
               GITHUB_REPO: rwaltr/home-ops
               REPO_DIR: /opt/data/workspace/home-ops
+              # Keep mise from refusing the repo's .mise.toml as untrusted; the
+              # sidecar installs the pinned toolchain from it.
+              MISE_TRUSTED_CONFIG_PATHS: /opt/data/workspace/home-ops
               # Home Assistant REST API (in-cluster). HASS_TOKEN comes from
               # hermes-secret (1P item `home-assistant-secret`); enables the
               # `homeassistant` toolset for device control.
@@ -259,8 +262,9 @@ spec:
                 set -euo pipefail
                 export PATH=/opt/data/.local/bin:/opt/hermes/.venv/bin:$PATH
                 REPO_DIR=${REPO_DIR:-/opt/data/workspace/home-ops}
+                export MISE_TRUSTED_CONFIG_PATHS=$REPO_DIR
                 if [ -d "$REPO_DIR/.git" ] && [ ! -f /opt/data/.mise-repo-installed ]; then
-                  (cd "$REPO_DIR" && mise trust >/dev/null 2>&1 || true; mise install >/dev/null 2>&1 && touch /opt/data/.mise-repo-installed) || true
+                  ( cd "$REPO_DIR" && mise install >/dev/null 2>&1 || true; mise reshim >/dev/null 2>&1 || true; command -v kubectl >/dev/null 2>&1 && touch /opt/data/.mise-repo-installed ) || true
                 fi
                 exec python3 /scripts/git-broker.py loop
             env:
@@ -445,6 +449,10 @@ spec:
               and/or `docs/`).
             - Read `AGENTS.md` and `REFACTOR_PLANS.md` before changing host or
               cluster config.
+            - Never invoke the `hermes` CLI (chat, send, gateway, serve, etc.) from
+              the terminal. Your reply already goes to the platform. A nested
+              `hermes send` waits on the session lease your own turn is holding
+              and deadlocks the conversation.
             - Home Assistant: report state before acting. Confirm before anything
               touching locks, alarms, or power.
 
