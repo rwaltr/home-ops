@@ -10,9 +10,12 @@ using the Intel iGPU via QuickSync. Typical result: 18 Mbps → ~4 Mbps
 have been deleted; only the manual one-shot Job remains for ad-hoc runs.
 The `TranscodeQueueEmpty` Pushover notice was removed with them.
 
+**For ongoing/new imports, use Unmanic instead** (CPU-only, no Jellyfin
+downtime, watches the libraries) — see `docs/jellyfin-direct-play.md`. This GPU
+tooling is kept only for deliberate, one-off bulk passes.
+
 | File | Purpose |
 | ---- | ------- |
-| `candidates.txt` | Input list (`/media/tv` paths), highest bitrate first |
 | `transcode.sh` | The encoder; resumable, deadline-aware, safe replace + rename |
 | `tv-transcode-job.yaml` | One-off `Job` (+ `ResourceClaimTemplate/transcode-gpu`) for manual runs |
 
@@ -24,7 +27,7 @@ its Flux Kustomization suspended first, then restored afterwards:
 ```bash
 cd infra/media-tools/transcode
 
-# ship the script + candidate list
+# ship the script + candidate list (regenerate candidates.txt if needed)
 kubectl -n default create configmap tv-transcode \
   --from-file=transcode.sh --from-file=files.txt=candidates.txt \
   --dry-run=client -o yaml | kubectl apply -f -

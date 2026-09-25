@@ -992,6 +992,52 @@ documented in [`docs/local-llm.md`](docs/local-llm.md); the lessons:
 miss. The Iris Xe iGPU shares the same system RAM, so it buys ~1.3-2x at most.
 A discrete GPU is the only real fix; smaller models (1.7B) are the free one.
 
+### 2026-09-25 — direct play: TRaSH prevention + Unmanic remediation
+
+The library transcoded on nearly every play. Audit from Jellyfin's own
+`MediaStreams` (5,900 items): **27 % used a video codec no client can direct
+play** (mpeg4/XviD 1,448, msmpeg4v3 108, theora 161), 1,553 were AVI, and ~700
+streams used audio most clients cannot decode (dts 297, truehd 11, opus 362).
+Full write-up and reproduce steps: **`docs/jellyfin-direct-play.md`**.
+
+**Prevention (Recyclarr, `72cbb61d`).** The profile the library actually uses,
+`HD-1080p` (id 4), was unmanaged — only `WEB-2160p (Combined)` was in the
+config, and the Radarr half used **Sonarr's trash_ids**, so Radarr had *zero*
+custom formats and logged `Invalid trash_id` every night. Both apps now manage
+`HD-1080p` by explicit `name` (343 movie / 80 series assignments survive),
+`upgrade: false` so adopting the TRaSH quality set does not trigger a mass
+re-download, and the audio custom formats are scored **inverted from TRaSH's
+defaults**: TRaSH rewards lossless (TrueHD ATMOS +5000, DTS-HD MA +2500, AAC
+then only +1000) because it assumes a receiver doing passthrough, but here
+DTS/TrueHD/FLAC/PCM force a server-side audio transcode.
+
+**Remediation (Unmanic, `5ea255f0`).** Standing **CPU-only** worker — the iGPU
+is an exclusive DRA device, so a GPU worker would force Jellyfin offline;
+x264 veryfast is ~49.6× realtime here. `ghcr.io/unmanic/unmanic` (the app's own
+registry, digest-pinned), 2 workers, 4-core cap, 5Gi config + 50Gi cache PVCs,
+TV + Movies libraries.
+
+The trap worth remembering: **`unmanic/libs/filetest.py` breaks on the first
+plugin that returns a verdict, and plugins execute in
+`LibraryPluginFlow.position` order — not the order `POST /plugins/flow`
+reports.** The ffprobe gate (`limit_library_search_by_ffprobe_data`) only ever
+sets `add_file_to_pending_tasks = False`; put it last and it never runs, so
+`video_transcoder` votes first and *every* H.264/HEVC file gets queued. Gate
+first, `add_all_matching_values: false`. Caught on a probe file with workers
+paused, so nothing was re-encoded.
+
+Also: `number_of_workers` was `null` — the `NUMBER_OF_WORKERS` env alone did
+not create workers. Unmanic's own schema examples point at
+`Josh5/unmanic-plugins` (the author's *personal* repo, 10 plugins); the official
+feed is `Unmanic/unmanic-plugins` (56). Unmanic refuses to delete its
+"default" library, so that row was repurposed as TV rather than duplicated.
+Output profile: libx264 veryfast CRF 20 + AAC (channels preserved) → MKV, with
+`notify_sonarr`/`notify_radarr` (`rename_files: true`) so the *arr apps re-read
+MediaInfo. Validated: 216 MB XviD/MP3 → 151 MB H.264/AAC MKV.
+
+Retired alongside this: the nightly TV-bloat CronJobs and their now-dead
+`TranscodeQueueEmpty` Alertmanager route (`c354be8e`).
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
