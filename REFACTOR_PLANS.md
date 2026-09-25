@@ -501,8 +501,8 @@ the management VLAN but must directly serve a second VLAN.
   Revisit PXE if a second node appears.
 
 - [ ] **Phase 2: Bootstrap** — BUILT at `k8s/kyz/bootstrap/helmfile/` (rendered against live cluster, not yet applied). DAG: cilium → coredns → cert-manager → external-secrets → onepassword-connect → flux-operator/instance. Secrets: 1Password Connect + ESO — `op inject` seeds the Connect creds at bootstrap (`OP_SERVICE_ACCOUNT_TOKEN` env, prompted; no SOPS for k8s). Layout decision: `k8s/<site>/` (kyz = this site; future sites sit beside it). Run: `mise run k8s:bootstrap mouse` — needs 1P item `1password` in vault `home-ops` with OP_SESSION_JSON + OP_CONNECT_TOKEN. Model: `~/src/onedr0p/home-ops/bootstrap/helmfile/`
-- [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: ~~backup~~ (DONE 2026-09-25), alerts (skipped — `flux-instance/app/notifications.yaml` already centralizes Flux→Alertmanager), zeroscale
-  - `components/kopiur/backup` landed: 17/18 apps converted from hand-written `app/kopia.yaml` (741 lines deleted, 133 added). 12 renders byte-identical; the other 5 were bug fixes (below). Component vars: `APP`, `PVC`, `KOPIUR_CRON`, `KOPIUR_RUNAS:=1000`.
+- [ ] **Phase 3: GitOps layout** — `kubernetes/{apps,components,flux}`; root ks with HelmRelease default patches; components: ~~backup~~ (DONE 2026-09-25), alerts (skipped — `flux-instance/app/notifications.yaml` already centralizes Flux→Alertmanager), ~~zeroscale~~ (evaluated + rejected 2026-09-25, see below)
+  - `components/kopiur/backup` landed: 17/18 apps converted from hand-written `app/kopia.yaml` (+293/−769 across 56 files). 11 renders byte-identical; the other 7 were bug fixes (below). Component vars: `APP`, `PVC`, `KOPIUR_CRON`, `KOPIUR_RUNAS:=1000`.
 - [ ] **Phase 4: Networking** — Cilium BGP resources, Envoy Gateway internal/external, cert-manager, external-dns (Cloudflare)
 - [ ] **Phase 5: Workloads** — migrate rustfs/netdata quadlets into cluster; remaining apps
 - [ ] **Phase 6: Automation** — Renovate (home-operations presets, tiered automerge), CI (butane validate, image pull check)
@@ -512,6 +512,41 @@ the management VLAN but must directly serve a second VLAN.
 1. **Uniformity beats cleverness** — every app: `ks.yaml` + `app/{kustomization,ocirepository,helmrelease}.yaml`
 2. **Push defaults to platform layer** — root Flux ks patches HelmRelease defaults (CRD handling, remediation) into every child
 3. **Kustomize components** with `${VAR:=default}` for backup/alerts/zeroscale — one line per app
+
+### zeroscale: evaluated and rejected (2026-09-25)
+
+Investigated as a memory lever on the single-node cluster. **Not doing it.** The
+reasons are worth keeping so this does not get re-opened from the same surface
+impression:
+
+1. **Upstream's zeroscale does not idle anything down.** It is an HPA with
+   `minReplicas: 0`/`maxReplicas: 1` driven by the External metric
+   `probe_success{job="nfs_probe"}`. That probe is a blackbox `tcp_connect` to
+   `expanse.internal:2049` — their NFS server, which is always up. So
+   `probe_success == 1` permanently and the HPA holds those 15 apps at 1 replica.
+   They scale to 0 only if the storage backend becomes unreachable. Reading the
+   component list alone makes it look like an idle-down mechanism; it is not.
+2. **The trigger is the entire problem.** An HPA cannot probe the app's own
+   HTTPRoute: at 0 replicas Envoy has no endpoints and returns 503, the probe
+   fails, and the app never wakes. Upstream avoids this only by probing
+   something that is up independently of the app. Real wake-on-request needs
+   KEDA's HTTP add-on to intercept and buffer the request at the ingress.
+3. **The *arr stack calls itself on a schedule, outside any user request.**
+   sonarr/radarr poll prowlarr for RSS/indexer sync every 15-60 min, bazarr and
+   seerr query sonarr/radarr, recyclarr syncs on a cron. Idling prowlarr or
+   sonarr breaks those callers, and a request-driven trigger never sees the
+   calls that would have to bring them back.
+4. **The prize is small and the idle memory is in the wrong shape.** Working set
+   in `default`: the safely-idle set (bazarr 663Mi, seerr 505Mi, esphome 207Mi —
+   nothing consumes their APIs) is only ~1.4Gi and needs the KEDA HTTP add-on to
+   wake. The *arr headline figure (~3.3Gi) is the set that breaks its own
+   inter-app calls. The largest genuinely-idle chunk is wyoming-whisper at 2.3Gi,
+   and HA talks to it over Wyoming's TCP protocol, so neither `probe_success`
+   nor an HTTP add-on can trigger it.
+
+If node memory becomes a problem again, the lever is model sizing / explicit
+limits (see the 2026-09-24 memory audit), not autoscaling. Revisit only if a
+second node appears and something like KEDA is wanted for its own sake.
 
 ### What the backup-component refactor exposed (2026-09-25)
 
