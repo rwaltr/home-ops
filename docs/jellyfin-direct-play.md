@@ -109,10 +109,93 @@ Correct Radarr ids: `FLUX e098247bc6652dd88c76644b275260ed`,
 
 ## Part 2 — remediation (fix what is already on disk)
 
-Prevention only helps future grabs; the existing ~1,617 incompatible files
-still transcode. A persistent worker (**Unmanic**) watches the libraries,
-transcodes to the target profile and leaves the result in place for
-Sonarr/Radarr to rename. See the next section once deployed.
+**Unmanic** (`infra/k8s/kyz/apps/default/unmanic/`) is the standing worker.
+It scans the TV + movie libraries hourly, on inotify for new files, and
+re-encodes anything that cannot direct play. CPU-only, so Jellyfin never goes
+offline.
+
+- Image: `ghcr.io/unmanic/unmanic:0.4.1` (the app repo's own registry), pinned
+  by digest. `unmanic-config` 5Gi + `unmanic-cache` 50Gi PVCs; the cache is
+  excluded from the kopia SnapshotPolicy.
+- `NUMBER_OF_WORKERS=2`, CPU limit 4 cores — a long re-encode cannot starve
+  Jellyfin.
+- Libraries: **TV** `/media/tv` and **Movies** `/media/movies`,
+  scanner + inotify enabled, scan every 60 min.
+
+### Plugin feed
+
+The official repo (`Unmanic/unmanic-plugins`, branch `repo` — 56 plugins).
+Note the stock example in Unmanic's own schema points at `Josh5/unmanic-plugins`,
+which is the author's *personal* repo (10 plugins); use the `Unmanic/` one.
+
+### The flow
+
+**File test** (what enters the queue) — `limit_library_search_by_ffprobe_data`
+is deliberately **first**:
+
+| # | Plugin | Purpose |
+| - | ------ | ------- |
+| 1 | `limit_library_search_by_ffprobe_data` | the gate (below) |
+| 2 | `ignore_files_recently_modified` | `10min` — don't grab an in-flight import |
+| 3 | `ignore_hardlinked_files` | don't disturb torrent seeding hardlinks |
+| 4 | `reject_files_larger_than_original` | safety net |
+| 5 | `audio_transcoder` | |
+| 6 | `video_transcoder` | |
+
+**Worker** — `video_transcoder`, `audio_transcoder`,
+`reject_files_larger_than_original`.
+**Post-processor (task result)** — `notify_sonarr`, `notify_radarr`
+(`rename_files: true`, so the *arr apps re-read MediaInfo and rename).
+
+### The gate
+
+```
+stream_field   = $.streams[*].codec_name            (JSONata)
+allowed_values = mpeg4,msmpeg4v3,theora,vc1,mpeg2video,\
+                 dts,truehd,flac,pcm_s16le
+add_all_matching_values = false
+```
+
+So only files whose video is XviD/DivX/Theora/VC-1/MPEG-2 **or** whose audio
+is DTS/TrueHD/FLAC/PCM get queued. H.264/HEVC video and AAC/AC3/MP3/Opus audio
+are left alone.
+
+> **Ordering is load-bearing.** In `unmanic/libs/filetest.py` the plugin loop
+> `break`s on the **first** plugin that returns a verdict, and plugins execute
+> in `LibraryPluginFlow.position` order — *not* the order shown by
+> `POST /plugins/flow`. The gate must therefore be **first**. Put it last and
+> it never runs: `video_transcoder` votes first and every H.264/HEVC file gets
+> queued. (Also: the gate only ever sets `add_file_to_pending_tasks = False`;
+> `add_all_matching_values` must stay false so matching files fall through to
+> the encoder.)
+
+### Output profile
+
+`video_transcoder`: `h264` / `libx264` / `veryfast` / CRF 20 / container `mkv`.
+`audio_transcoder`: `aac`, `max_channel_count: same_as_source`.
+
+Validated on `Beast Wars S02E05 [SDTV][MP3 2.0][XviD].avi` (216 MB) →
+`[SDTV][AAC 2.0][x264].mkv` (151 MB, H.264 + AAC 2.0), with `notify_sonarr`
+queueing a rescan and rename.
+
+### Reproducing the configuration
+
+Unmanic's libraries/plugins/flows are runtime state on the config PVC (like
+Sonarr/Radarr), configured here through the API v2:
+
+| Call | Purpose |
+| ---- | ------- |
+| `POST /unmanic/api/v2/settings/write` | global settings (workers, scan interval) |
+| `POST .../settings/library/write` | create a library / enable its plugins |
+| `POST .../plugins/repos/update` + `/plugins/repos/reload` | add the official repo |
+| `POST .../plugins/install` | install a plugin by `plugin_id` |
+| `POST .../plugins/settings/update` | write a plugin's settings (send the full list back) |
+| `POST .../plugins/flow/save` | set flow membership/order |
+| `POST .../pending/test` | dry-run the file test for one path |
+
+The UI is at `unmanic.waltr.tech`. API keys for the notify plugins live in the
+global (library-independent) plugin settings — not SOPS, same as the *arr apps'
+own configs.
 
 ## Backlog size
 
