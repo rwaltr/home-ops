@@ -43,10 +43,10 @@ PRs, o11y dashboards, Flatcar/Butane work validated in a VM.
    `discord.py`'s gateway (outbound websocket), so it needs **no public
    ingress** and works behind CGNAT. SMS (Twilio, needs an inbound webhook) and
    email (IMAP poll) are deferred as optional async channels.
-2. **Push identity: reuse the existing GitHub App `teletran-x`**, not rwaltr's
-   account. The app is already wired for CI (`BOT_APP_ID`/`BOT_APP_PRIVATE_KEY`
-   secrets) and its private key lives in 1Password item `github-bot` (used by
-   `konflate` as `GITHUB_BOT_APP_CLIENT_ID`/`GITHUB_BOT_APP_PRIVATE_KEY`).
+2. **Push identity: reuse the existing GitHub App `teletraan-x`**, not rwaltr's
+   account. The app is wired for CI (`BOT_APP_ID`/`BOT_APP_PRIVATE_KEY`
+   secrets); its client ID and private key live in 1Password item
+   `teletraan-x github app` (fields `client` / `secret`).
 3. **Name: Teletran.** The agent adopts the Autobot supercomputer identity —
    Discord application/bot display name, `SOUL.md` persona, dashboard title.
    The G1 archetype (loyal, watchful, dryly put-upon, precise) seeds the soul.
@@ -62,20 +62,19 @@ PRs, o11y dashboards, Flatcar/Butane work validated in a VM.
    The Tailscale operator (`envoy.yaml` already references it as future) stays
    the eventual path for the dashboard/other clients.
 
-## GitHub App: `teletran-x` (the open engineering question)
+## GitHub App: `teletraan-x` (brokered by the `gitcreds` sidecar)
 
 Hermes has **no native GitHub App support**, and GitHub App installation tokens
 **expire after one hour**. So the app cannot be dropped in as a static
 `GH_TOKEN`. The app identity must be brokered:
 
-- Known-good inputs already exist: 1Password item **`github-bot`** holds
-  `GITHUB_BOT_APP_CLIENT_ID` and `GITHUB_BOT_APP_PRIVATE_KEY`.
-- Needed additionally: the **numeric App ID** and the **installation ID** for
-  `rwaltr/home-ops` (resolvable from the API once App ID + key are available).
+- Credentials: 1Password item **`teletraan-x github app`** (`client`, `secret`).
+  The client ID is a valid JWT issuer (GitHub recommends it over the numeric
+  App ID); the broker resolves the installation ID from the repo at runtime.
 - **Approach A (preferred): token-broker sidecar.** A tiny container mints a
   JWT from the App ID + private key, exchanges it for an installation token
   every ~45 min, and writes it to `gh`'s `hosts.yml` / a git credential store on
-  the shared `/opt/data`. `gh` and `git` then act as `teletran-x`; secrets stay
+  the shared `/opt/data`. `gh` and `git` then act as `teletraan-x`; secrets stay
   out of the agent's own environment. One new container, no new service.
 - Approach B: on-demand git/gh credential helper (no sidecar, but secrets in
   the app container env and added latency/caching complexity).
@@ -164,8 +163,9 @@ Deliberately **not** enabled yet:
 
 Implemented with three pieces in the Hermes pod:
 
-1. **`gitcreds` sidecar** — mints a `teletran-x` GitHub **App installation
-   token** (JWT from the client ID + private key in 1P item `github-bot`),
+1. **`gitcreds` sidecar** — mints a `teletraan-x` GitHub **App installation
+   token** (JWT from the client ID + private key in 1P item
+   `teletraan-x github app`),
    resolves the repo's installation, and writes `gh`'s `hosts.yml` plus a git
    credential store. Refreshes every 40 min (installation tokens expire hourly).
    No static PAT, no long-lived token in the pod spec.
