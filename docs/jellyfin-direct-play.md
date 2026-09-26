@@ -222,7 +222,7 @@ loudnorm=I=-16:TP=-1.5:LRA=11
 ```
 
 **The trap:** `normalize_audio_volume` is a `sub_setting` with `display: hidden`,
-and in `lib/plugin_stream_mapper.py` the loudnorm append sits *inside* the
+and in `lib/plugin_stream_mapper.py` the loudnorm append sits _inside_ the
 `if enable_smart_audio_filters:` block:
 
 ```python
@@ -233,19 +233,19 @@ if self.settings.get_setting('enable_smart_audio_filters'):
 ```
 
 Setting `normalize_volume` alone does **nothing**. `test_stream_needs_processing`
-returns `True` only when smart filters is on *and* (normalize is on *or* a
+returns `True` only when smart filters is on _and_ (normalize is on _or_ a
 downmix is needed), which is why both had to be flipped.
 
 **Why `audio_transcoder` and not the stock `normalise_aac` plugin:**
 
-| | `normalise_aac` | `audio_transcoder` (chosen) |
-| --- | --- | --- |
-| Target | `I=-24 LRA=7` — broadcast, squashes film dynamics | `I=-16 LRA=11` — preserves range |
-| Codecs | AAC only | whatever the flow already re-encodes |
-| Bitrate | none set → ffmpeg default (~128k) | explicit `-b:a 192k` |
-| Extra cost | new plugin in the flow | none — same op |
+|            | `normalise_aac`                                   | `audio_transcoder` (chosen)          |
+| ---------- | ------------------------------------------------- | ------------------------------------ |
+| Target     | `I=-24 LRA=7` — broadcast, squashes film dynamics | `I=-16 LRA=11` — preserves range     |
+| Codecs     | AAC only                                          | whatever the flow already re-encodes |
+| Bitrate    | none set → ffmpeg default (~128k)                 | explicit `-b:a 192k`                 |
+| Extra cost | new plugin in the flow                            | none — same op                       |
 
-Because it rides along on files the flow was *already* re-encoding to lossy AAC
+Because it rides along on files the flow was _already_ re-encoding to lossy AAC
 (the DTS/TrueHD/lossless/old-video-codec set), normalization adds no additional
 fidelity loss. It does **not** touch the ~2,054 AAC files that never enter the
 flow — those already direct play, and normalizing them would mean re-encoding
@@ -257,8 +257,8 @@ lands ~1 dB off target; 0.8 dB of that is the LRA compression, which is expected
 and not a bug.
 
 > Runtime proof pending: the two jobs running when the setting changed had
-already launched their `ffmpeg`, so the first task picked up *after* the change
-is the one to inspect (`cat /proc/$(pgrep ffmpeg | head -1)/cmdline | tr '\0'
+> already launched their `ffmpeg`, so the first task picked up _after_ the change
+> is the one to inspect (`cat /proc/$(pgrep ffmpeg | head -1)/cmdline | tr '\0'
 ' ' | grep -c loudnorm`).
 
 Validated on `Beast Wars S02E05 [SDTV][MP3 2.0][XviD].avi` (216 MB) →
