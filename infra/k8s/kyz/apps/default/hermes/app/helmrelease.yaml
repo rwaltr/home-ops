@@ -110,6 +110,7 @@ spec:
                   secretKeyRef:
                     name: hermes-secret
                     key: GITHUB_APP_PRIVATE_KEY
+              GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -308,6 +309,7 @@ spec:
                   secretKeyRef:
                     name: hermes-secret
                     key: GITHUB_APP_PRIVATE_KEY
+              GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
