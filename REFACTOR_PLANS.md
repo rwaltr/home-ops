@@ -1090,6 +1090,34 @@ Also retagged *The 24 Hour War*'s audio stream `war` → `eng` in place
 Radarr finds is blocklisted, dead, or under the 3.7 GB profile size floor.
 Left monitored so RSS picks it up if one appears.
 
+### 2026-09-26 — resilver complete; audio loudness normalization
+
+**The pool is healthy again.** `tank` is `ONLINE`: the `sde1` replacement
+resilvered **2.18 T in 21:01:14 with 0 errors**, finishing 02:14:49. It had been
+running at 22.8 MB/s while SAB par2-repair, two Unmanic transcodes and Jellyfin
+reads all fought for the same spindles — killing the two transcodes and pausing
+Unmanic dropped node load 8.8 → 4.85. (Note the resilver issue rate barely moved
+when they stopped, 22.9 → 23.3 MB/s; the scan was already the limit, so the
+real win was the CPU/IO headroom for everything else, not a faster resilver.)
+Unmanic was resumed once the pool was clean.
+
+**Audio loudness normalization** enabled on `audio_transcoder` for both
+libraries (TV id 1, Movies id 3) — `loudnorm=I=-16:TP=-1.5:LRA=11`, riding along
+on files the flow already re-encodes to AAC 192k. Details, including why
+`normalise_aac` was rejected (I=-24/LRA=7 would squash film dynamics, AAC-only,
+and no bitrate setting so ffmpeg falls back to ~128k):
+**`docs/jellyfin-direct-play.md`**.
+
+**The lesson:** `normalize_audio_volume` is a hidden `sub_setting` and is
+inert on its own — in `plugin_stream_mapper.py` the loudnorm append lives
+*inside* `if enable_smart_audio_filters:`. Flipping it alone returned
+`{"success": true}` and changed nothing. Both flags must be set. Same failure
+signature as the gate-ordering trap from 2026-09-25: a plugin setting that
+reports success while doing nothing.
+
+Measured before/after on a quiet rip: `I Love Lucy S05E18 [SDTV][MP3 2.0]` is
+**-18.5 LUFS** in, **-15.2 LUFS** out — a gentle correction, not a re-master.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

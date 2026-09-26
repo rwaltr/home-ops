@@ -212,6 +212,55 @@ are left alone.
 `video_transcoder`: `h264` / `libx264` / `veryfast` / CRF 20 / container `mkv`.
 `audio_transcoder`: `aac`, `max_channel_count: same_as_source`.
 
+### Audio loudness normalization (2026-09-26)
+
+Enabled on `audio_transcoder` for **both** libraries: `enable_smart_audio_filters:
+true` **and** `normalize_audio_volume: true`, which applies
+
+```
+loudnorm=I=-16:TP=-1.5:LRA=11
+```
+
+**The trap:** `normalize_audio_volume` is a `sub_setting` with `display: hidden`,
+and in `lib/plugin_stream_mapper.py` the loudnorm append sits *inside* the
+`if enable_smart_audio_filters:` block:
+
+```python
+if self.settings.get_setting('enable_smart_audio_filters'):
+    ...
+    if self.settings.get_setting('normalize_audio_volume'):
+        smart_filters.append({"loudnorm": {"filter": "loudnorm=I=-16:TP=-1.5:LRA=11"}})
+```
+
+Setting `normalize_volume` alone does **nothing**. `test_stream_needs_processing`
+returns `True` only when smart filters is on *and* (normalize is on *or* a
+downmix is needed), which is why both had to be flipped.
+
+**Why `audio_transcoder` and not the stock `normalise_aac` plugin:**
+
+| | `normalise_aac` | `audio_transcoder` (chosen) |
+| --- | --- | --- |
+| Target | `I=-24 LRA=7` — broadcast, squashes film dynamics | `I=-16 LRA=11` — preserves range |
+| Codecs | AAC only | whatever the flow already re-encodes |
+| Bitrate | none set → ffmpeg default (~128k) | explicit `-b:a 192k` |
+| Extra cost | new plugin in the flow | none — same op |
+
+Because it rides along on files the flow was *already* re-encoding to lossy AAC
+(the DTS/TrueHD/lossless/old-video-codec set), normalization adds no additional
+fidelity loss. It does **not** touch the ~2,054 AAC files that never enter the
+flow — those already direct play, and normalizing them would mean re-encoding
+audio for no compatibility gain.
+
+Measured on a representative quiet rip (`I Love Lucy S05E18 [SDTV][MP3 2.0]`):
+input **-18.5 LUFS** / LRA 7.9 → output **-15.2 LUFS**. Single-pass `loudnorm`
+lands ~1 dB off target; 0.8 dB of that is the LRA compression, which is expected
+and not a bug.
+
+> Runtime proof pending: the two jobs running when the setting changed had
+already launched their `ffmpeg`, so the first task picked up *after* the change
+is the one to inspect (`cat /proc/$(pgrep ffmpeg | head -1)/cmdline | tr '\0'
+' ' | grep -c loudnorm`).
+
 Validated on `Beast Wars S02E05 [SDTV][MP3 2.0][XviD].avi` (216 MB) →
 `[SDTV][AAC 2.0][x264].mkv` (151 MB, H.264 + AAC 2.0), with `notify_sonarr`
 queueing a rescan and rename.
