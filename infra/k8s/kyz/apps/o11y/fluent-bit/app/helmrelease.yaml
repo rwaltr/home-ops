@@ -1,0 +1,114 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+#
+# Fluent Bit — the log collector, one DaemonSet on the single node. Tails
+# /var/log/containers/*.log (the kubelet's CRI symlinks), enriches each record
+# with pod metadata via the `kubernetes` filter, and ships it to VictoriaLogs
+# over the documented /insert/jsonline endpoint.
+#
+# Why Fluent Bit and not the Vector agent the VictoriaLogs chart ships by
+# default: memory. Fluent Bit settles around 30-50Mi with this pipeline, Vector
+# Agent around 150-250Mi. Same job, a third of the footprint.
+#
+# Buffering is memory-only on purpose (`Retry_Limit 5`, `Mem_Buf_Limit 2MB`).
+# Fluent Bit's filesystem buffer would need another hostPath and unbounded disk
+# on a node whose OS disk is already carrying every PVC. The trade is that a
+# collector restart can lose the few lines in flight; see docs/logging.md.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app fluent-bit
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: fluent-bit
+  interval: 1h
+  values:
+    fullnameOverride: *app
+    kind: DaemonSet
+    logLevel: info
+    flush: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        # Bounded like every other system component here (2026-09-24 memory
+        # audit, REFACTOR_PLANS.md). Fluent Bit recycles at the cap rather than
+        # stalling the node.
+        memory: 96Mi
+    # The node carries no taint today. On a single-node cluster a taint that
+    # appears later would silently stop all log collection, and a toleration
+    # costs nothing.
+    tolerations:
+      - operator: Exists
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    # The chart's default volume set also mounts /var/lib/docker/containers,
+    # which does not exist on this node (k0s runs containerd). Replaced with
+    # just the two paths that are actually needed.
+    daemonSetVolumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: etcmachineid
+        hostPath:
+          path: /etc/machine-id
+          type: File
+    daemonSetVolumeMounts:
+      - name: varlog
+        mountPath: /var/log
+      - name: etcmachineid
+        mountPath: /etc/machine-id
+        readOnly: true
+    # The chart's `helm test` pod; never wanted in a GitOps-managed app.
+    testFramework:
+      enabled: false
+    config:
+      service: |
+        [SERVICE]
+            Daemon Off
+            Flush {{ .Values.flush }}
+            Log_Level {{ .Values.logLevel }}
+            Parsers_File /fluent-bit/etc/parsers.conf
+            Parsers_File /fluent-bit/etc/conf/custom_parsers.conf
+            HTTP_Server On
+            HTTP_Listen 0.0.0.0
+            HTTP_Port {{ .Values.metricsPort }}
+            Health_Check On
+      # Container logs only. The chart's default second input reads the host
+      # systemd journal, which would need /var/log/journal mounted from the
+      # host; host/kubelet logs are not in scope for this pipeline.
+      inputs: |
+        [INPUT]
+            Name tail
+            Path /var/log/containers/*.log
+            multiline.parser docker, cri
+            Tag kube.*
+            Mem_Buf_Limit 2MB
+            Skip_Long_Lines On
+      # Keep_Log On is deliberate: with the chart default (`Off`) the `log` key
+      # is dropped for records that happen to be JSON, and `_msg_field=log`
+      # below would then have nothing to name the message from.
+      filters: |
+        [FILTER]
+            Name kubernetes
+            Match kube.*
+            Merge_Log On
+            Keep_Log On
+            K8S-Logging.Parser On
+            K8S-Logging.Exclude On
+      outputs: |
+        [OUTPUT]
+            Name http
+            Match kube.*
+            Host victoria-logs.o11y.svc.cluster.local
+            Port 9428
+            URI /insert/jsonline?_stream_fields=kubernetes.namespace_name,kubernetes.pod_name,kubernetes.container_name,stream&_msg_field=log&_time_field=date&ignore_fields=log.offset
+            Format json_lines
+            Json_date_Format iso8601
+            Compress gzip
+            Retry_Limit 5

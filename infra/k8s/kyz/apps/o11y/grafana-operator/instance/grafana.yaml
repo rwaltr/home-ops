@@ -43,6 +43,14 @@ spec:
                     secretKeyRef:
                       name: grafana-admin-password-secret
                       key: GF_SECURITY_ADMIN_PASSWORD
+                # The VictoriaLogs datasource plugin. Not bundled with Grafana
+                # and not an "official" datasource type, so it has to be
+                # installed. Pin the version: `latest` here would survive a
+                # Grafana restart with a different plugin build and no diff.
+                # Installs into /var/lib/grafana/plugins, which is the
+                # grafana-data PVC, so readOnlyRootFilesystem stays on.
+                - name: GF_INSTALL_PLUGINS
+                  value: victoriametrics-logs-datasource 0.32.0
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

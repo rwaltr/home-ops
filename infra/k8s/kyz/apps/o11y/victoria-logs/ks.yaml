@@ -1,0 +1,22 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: victoria-logs
+spec:
+  dependsOn:
+    - name: kube-prometheus-stack # the ServiceMonitor CRD
+      namespace: o11y
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/o11y/victoria-logs/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: o11y
+  # wait: true — this holds the log store PVC. A rejected pod should surface as
+  # a failed Kustomization instead of a pipeline that quietly drops everything
+  # Fluent Bit sends at it.
+  wait: true

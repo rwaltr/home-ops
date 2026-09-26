@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: fluent-bit
+spec:
+  dependsOn:
+    - name: victoria-logs # nothing to ship to until the store exists
+      namespace: o11y
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/o11y/fluent-bit/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: o11y
+  # wait: true — a DaemonSet that does not come up means zero logs cluster-wide,
+  # which is invisible from inside Grafana until someone needs the logs.
+  wait: true

@@ -222,6 +222,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **SOPS config**: `.sops.yaml`
 - **Jellyfin ↔ Sonarr metadata (TVDB plugin, library providers)**: `docs/jellyfin-metadata.md`
 - **Local LLM gateway (LiteLLM + Ollama + Speaches)**: `docs/local-llm.md`
+- **Cluster logging (VictoriaLogs + Fluent Bit)**: `docs/logging.md`
 - **TODOs**: `git grep "TODO:"`
 
 ## ⚠️ Important Considerations

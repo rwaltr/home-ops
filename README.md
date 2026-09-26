@@ -60,6 +60,7 @@ Key platform apps:
 
 - **Storage** — OpenEBS localpv-provisioner, `openebs-hostpath` class (non-default, NVMe) — the tank pool deliberately stays outside the PVC lifecycle
 - **Backups** — [kopiur](https://github.com/home-operations/kopiur) + kopia → in-cluster RustFS (S3) on `tank/backup/k8s` (see [apps/kopiur-system](infra/k8s/kyz/apps/kopiur-system/README.md))
+- **Logging** — VictoriaLogs (store) + Fluent Bit (collector), 14d retention, queried from Grafana (see [docs/logging.md](docs/logging.md))
 - **Secrets** — 1Password Connect + External Secrets (`kopia`, `pushover`, … items in vault `home-ops`)
 
 ### 🌐 Terraform

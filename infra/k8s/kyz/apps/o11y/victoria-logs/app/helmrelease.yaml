@@ -1,0 +1,56 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+#
+# VictoriaLogs — the log store, single-node mode (one StatefulSet, one PVC).
+#
+# Chosen over Loki for one reason: memory. This is a single process with no
+# cache/compactor/index-gateway tiers and it keeps its full-text index in the
+# same files as the log data, so there is no memcached, no boltdb-shipper cache
+# and no separate index store to size. The smallest sane Loki single-binary
+# deployment asks for 500Mi+; this asks for 64Mi and is capped at 256Mi.
+#
+# Retention is deliberately belt-and-braces: 14d by age AND an 8Gi ceiling, so
+# a log burst can never fill the node's only OS disk.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app victoria-logs
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-logs
+  interval: 1h
+  values:
+    server:
+      # Renders Service/StatefulSet as plain `victoria-logs`, so the Grafana
+      # datasource URL and the Fluent Bit output host are the short
+      # `victoria-logs.o11y.svc.cluster.local`. The chart default would be
+      # `victoria-logs-victoria-logs-single-server`.
+      fullnameOverride: *app
+      persistentVolume:
+        enabled: true
+        size: 10Gi
+        storageClassName: openebs-hostpath
+      # Age-based retention plus the disk ceiling that protects the node.
+      retentionPeriod: 14d
+      retentionDiskSpaceUsage: 8Gi
+      resources:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          # A hard ceiling, not a target: the node has no disk swap and ~6Gi
+          # MemAvailable (2026-09-24 memory audit, REFACTOR_PLANS.md).
+          memory: 256Mi
+      serviceMonitor:
+        enabled: true
+    # The chart ships a Vector agent as a dependency and enables it by default
+    # (`vector.enabled: true`, role Agent). That agent tails the same container
+    # logs our own Fluent Bit DaemonSet already ships, so leaving it on would
+    # double the collector memory and double every ingested byte.
+    vector:
+      enabled: false
+    # Chart-supplied dashboards are not used; Grafana is fed by the operator and
+    # repo-owned dashboards elsewhere in o11y.
+    dashboards:
+      enabled: false
