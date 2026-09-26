@@ -26,8 +26,6 @@ spec:
   values:
     fullnameOverride: *app
     kind: DaemonSet
-    logLevel: info
-    flush: 1
     resources:
       requests:
         cpu: 10m
@@ -37,6 +35,13 @@ spec:
         # audit, REFACTOR_PLANS.md). Fluent Bit recycles at the cap rather than
         # stalling the node.
         memory: 96Mi
+    # The chart creates a ClusterRole/ClusterRoleBinding: get/list/watch on
+    # `namespaces` and `pods` only — no secrets, no nodes/nodes-proxy (those are
+    # behind rbac.nodeAccess/eventsAccess, both off). It is cluster-wide because
+    # the `kubernetes` filter needs pod metadata from every namespace, and
+    # without it records arrive with no pod/namespace fields at all.
+    rbac:
+      create: true
     # The node carries no taint today. On a single-node cluster a taint that
     # appears later would silently stop all log collection, and a toleration
     # costs nothing.
@@ -67,12 +72,19 @@ spec:
     # The chart's `helm test` pod; never wanted in a GitOps-managed app.
     testFramework:
       enabled: false
+    # `flush` and `logLevel` are deliberately *not* set as values. They exist in
+    # the chart's values.yaml but no template reads them — only the chart's own
+    # default `config.service` string references them, and that string is
+    # replaced below. Kept as literals there so the render never depends on
+    # templating inside an overridden value, and so nothing looks like a
+    # chart-defined knob. `metricsPort` above stays interpolated: that one *is*
+    # read by the chart's pod template.
     config:
       service: |
         [SERVICE]
             Daemon Off
-            Flush {{ .Values.flush }}
-            Log_Level {{ .Values.logLevel }}
+            Flush 1
+            Log_Level info
             Parsers_File /fluent-bit/etc/parsers.conf
             Parsers_File /fluent-bit/etc/conf/custom_parsers.conf
             HTTP_Server On

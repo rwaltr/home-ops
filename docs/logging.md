@@ -44,6 +44,16 @@ Stream fields are what VictoriaLogs indexes per-stream, so keep that list small
 and high-cardinality-free — adding `log.offset` or a request id there is how you
 blow up the index.
 
+## Permissions
+
+The collector runs with the chart's own ServiceAccount and ClusterRole:
+`get`/`list`/`watch` on **`pods` and `namespaces` only**, cluster-wide. That is
+what the `kubernetes` filter needs to attach pod/namespace/container fields to
+each record; without it records arrive unlabelled. No secrets, no
+`nodes`/`nodes/proxy`, no write verbs — the chart's `rbac.nodeAccess` and
+`rbac.eventsAccess` are both off. The log store itself needs no RBAC
+(`victoria-logs` runs as an ordinary workload with a PVC).
+
 ## Querying
 
 Grafana → **Explore** → datasource **victoria-logs**. LogsQL, not PromQL.

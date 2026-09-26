@@ -1175,6 +1175,24 @@ SA/ConfigMap/ClusterRole/Binding/Service/DaemonSet named `fluent-bit`), and
 `kustomize build` clean on both app dirs, the o11y group and the Flux root.
 Not verified in-cluster — the PR is the review point.
 
+**konflate review on PR #870** raised two cautions; both are handled in the same
+branch, and the second is the one worth remembering.
+
+- *New cluster-wide ClusterRoleBinding* — it is the chart's own ServiceAccount
+  role: `get`/`list`/`watch` on `pods` and `namespaces` only, no secrets, no
+  `nodes`/`nodes/proxy` (`rbac.nodeAccess`/`eventsAccess` stay off). Cluster-wide
+  is required — the `kubernetes` filter enriches records from every namespace.
+  Now stated in the HelmRelease comment and `docs/logging.md`.
+- *`flush`/`logLevel` set as values no chart template consumes* — correct, and
+  subtle. Both keys exist in the chart's `values.yaml`, but **no template reads
+  them**: only the chart's *default* `config.service` string references them.
+  Because we override that string, the override renders correctly (`flush: 7` →
+  `Flush 7`, verified) while depending on templating inside an overridden value —
+  a shape that would break silently on a chart refactor. Both are now literals in
+  the string; `metricsPort` stays a value because the pod template really does
+  read it. **Lesson: a value that renders is not proof the chart defines it —
+  check the chart's templates, not the rendered output.**
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
