@@ -83,7 +83,7 @@ spec:
                   - CHOWN
                   - DAC_OVERRIDE
                   - FOWNER
-          # Mint a teletran-x App installation token and clone/refresh the repo.
+          # Mint a teletraan-x App installation token and clone/refresh the repo.
           # The `gitcreds` sidecar keeps the token fresh; this init only needs a
           # valid credential to get the checkout in place before the app starts.
           repo:
@@ -213,7 +213,7 @@ spec:
               # toolset is disabled; re-enable search by adding `web` to toolsets
               # + `web.search_backend: searxng`.
               SEARXNG_URL: http://degoog.default.svc.cluster.local:8080
-              # teletran-x App credentials are brokered by the `gitcreds`
+              # teletraan-x App credentials are brokered by the `gitcreds`
               # sidecar into these paths; gh and git read them per invocation.
               GH_CONFIG_DIR: /opt/data/.config/gh
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
@@ -448,7 +448,7 @@ spec:
 
             ## Identity
             - Name: Teletran. Answer to Teletran or Teletran-1.
-            - GitHub identity is the `teletran-x` app. Home repo: `rwaltr/home-ops`.
+            - GitHub identity is the `teletraan-x` app. Home repo: `rwaltr/home-ops`.
             - You are an operator, not a chatbot. Prefer doing over describing.
             - Address the owner as rwaltr or not at all. Never invent titles or
               designations for them.
@@ -510,7 +510,7 @@ spec:
             - Vary the delivery. Do not open consecutive replies the same way.
           git-broker.py: |
             #!/usr/bin/env python3
-            """Mint a GitHub App installation token for teletran-x and publish gh/git creds.
+            """Mint a GitHub App installation token for teletraan-x and publish gh/git creds.
 
             Modes: `once` (init: publish creds and clone the repo if missing) and `loop`
             (sidecar: refresh creds well before the 1h installation-token expiry).
@@ -539,7 +539,7 @@ spec:
                 req = urllib.request.Request(url, method=method)
                 req.add_header("Accept", "application/vnd.github+json")
                 req.add_header("X-GitHub-Api-Version", "2022-11-28")
-                req.add_header("User-Agent", "teletran-x-broker")
+                req.add_header("User-Agent", "teletraan-x-broker")
                 if token:
                     req.add_header("Authorization", f"Bearer {token}")
                 with urllib.request.urlopen(req, timeout=30) as resp:
@@ -567,9 +567,9 @@ spec:
                     fh.write(
                         "github.com:\n"
                         "    git_protocol: https\n"
-                        "    user: teletran-x[bot]\n"
+                        "    user: teletraan-x[bot]\n"
                         "    users:\n"
-                        "        teletran-x[bot]:\n"
+                        "        teletraan-x[bot]:\n"
                         f"            oauth_token: {token}\n"
                     )
                 with open(CREDS, "w") as fh:
@@ -583,8 +583,8 @@ spec:
 
             def configure_git():
                 git("config", "--global", "credential.helper", f"store --file={CREDS}")
-                git("config", "--global", "user.name", "teletran-x[bot]")
-                git("config", "--global", "user.email", "teletran-x[bot]@users.noreply.github.com")
+                git("config", "--global", "user.name", "teletraan-x[bot]")
+                git("config", "--global", "user.email", "99223764+teletraan-x[bot]@users.noreply.github.com")
 
 
             def install_gh_wrapper():
