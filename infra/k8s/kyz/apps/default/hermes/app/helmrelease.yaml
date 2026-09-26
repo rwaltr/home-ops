@@ -68,6 +68,9 @@ spec:
                   > /opt/data/.kube/config
                 chmod 600 /opt/data/.kube/config
                 chown -R 10000:10000 /opt/data/.kube
+                # Seed the repo-conventions skill (git-tracked, re-seeded each start).
+                mkdir -p /opt/data/skills/home-ops
+                install -m 600 -o 10000 -g 10000 /config/home-ops-SKILL.md /opt/data/skills/home-ops/SKILL.md
                 mkdir -p /opt/data/workspace
                 chown 10000:10000 /opt/data/workspace
                 # Skip bundled-skill seeding (skills are disabled; SOUL/config carry the brief).
@@ -145,6 +148,29 @@ spec:
                   curl -fsSL -o "$P/bin/kubectl" "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
                   chmod 755 "$P/bin/kubectl"
                 fi
+                # flux: the GitOps diagnostic surface (get ks / logs / trace).
+                # GitHub release ASSET downloads are not API-rate-limited (only
+                # the API is), and mise can't authenticate to third-party repos
+                # with a home-ops-scoped App token, so fetch + verify directly.
+                if [ ! -x "$P/bin/flux" ]; then
+                  FLUX=2.9.5
+                  base="https://github.com/fluxcd/flux2/releases/download/v${FLUX}"
+                  curl -fsSL -o /tmp/flux.tgz "$base/flux_${FLUX}_linux_amd64.tar.gz"
+                  curl -fsSL -o /tmp/flux.sums "$base/flux_${FLUX}_checksums.txt"
+                  ( cd /tmp && grep "flux_${FLUX}_linux_amd64.tar.gz" flux.sums | sha256sum -c - )
+                  tar -xzf /tmp/flux.tgz -C "$P/bin" flux
+                  chmod 755 "$P/bin/flux"
+                  rm -f /tmp/flux.tgz /tmp/flux.sums
+                fi
+                if [ ! -x "$P/bin/jq" ]; then
+                  JQ=1.7.1
+                  base="https://github.com/jqlang/jq/releases/download/jq-${JQ}"
+                  curl -fsSL -o "$P/bin/jq" "$base/jq-linux-amd64"
+                  curl -fsSL -o /tmp/jq.sums "$base/sha256sum.txt"
+                  ( cd "$P/bin" && awk '/jq-linux-amd64/{print $1"  jq"}' /tmp/jq.sums | sha256sum -c - )
+                  chmod 755 "$P/bin/jq"
+                  rm -f /tmp/jq.sums
+                fi
                 if [ ! -x "$P/bin/gh" ]; then
                   GH=2.101.0
                   curl -fsSL "https://github.com/cli/cli/releases/download/v${GH}/gh_${GH}_linux_amd64.tar.gz" | tar xz -C /tmp
@@ -183,6 +209,18 @@ spec:
             args:
               - gateway
               - run
+            # The agent's terminal runs `bash -l`, which resets PATH from
+            # /etc/profile; drop a profile.d entry (after the reset) so the
+            # brokered gh wrapper, .local/bin tools and mise shims all resolve.
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      printf '%s\n' 'export PATH=/opt/data/teletran/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/opt/data/.local/go/bin:/opt/data/.local/homebrew/bin:/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH' > /etc/profile.d/00-teletran-path.sh
+                      chmod 0644 /etc/profile.d/00-teletran-path.sh
             env:
               TZ: America/Chicago
               HERMES_HOME: /opt/data
@@ -225,6 +263,10 @@ spec:
               KUBECONFIG: /opt/data/.kube/config
               # No 👀/✅/❌ processing reactions on user messages.
               DISCORD_REACTIONS: "false"
+              # Default delivery target for cron / notifications (the bot's DM
+              # with rwaltr). Cron jobs must deliver=discord to reach a phone.
+              DISCORD_HOME_CHANNEL: "1553131461014462616"
+              DISCORD_HOME_CHANNEL_NAME: Teletran
               # Keep mise from refusing the repo's .mise.toml as untrusted; the
               # sidecar installs the pinned toolchain from it.
               MISE_TRUSTED_CONFIG_PATHS: /opt/data/workspace/home-ops
@@ -410,19 +452,31 @@ spec:
                 - file
                 - web
                 - homeassistant
+                - memory
+                - skills
+                - session_search
+                - cronjob
               cli:
                 - terminal
                 - file
                 - web
                 - homeassistant
-              # Phone-facing Discord DM channel (Teletran). Listed explicitly —
-              # a platform with no entry falls back to the full ~50-schema
-              # preset instead of this minimal CLI-style set.
+                - memory
+                - skills
+                - session_search
+                - cronjob
+              # Phone-facing Discord DM channel (Teletran). Explicit list (the
+              # `coding` preset moves between releases); an unlisted platform
+              # falls back to the full ~50-schema preset.
               discord:
                 - terminal
                 - file
                 - web
                 - homeassistant
+                - memory
+                - skills
+                - session_search
+                - cronjob
             web:
               search_backend: searxng
             tools:
@@ -565,9 +619,19 @@ spec:
                 return token["token"], installation.get("account", {}).get("login", ""), token.get("expires_at", "")
 
 
+            def _share(path, mode):
+                # The agent runs as uid 10000, not root: make brokered files
+                # group-readable and re-apply on every ~40 min refresh.
+                try:
+                    os.chmod(path, mode)
+                    os.chown(path, 0, 10000)
+                except OSError:
+                    pass
+
             def publish(token):
                 os.makedirs(GH_DIR, exist_ok=True)
-                with open(os.path.join(GH_DIR, "hosts.yml"), "w") as fh:
+                hosts = os.path.join(GH_DIR, "hosts.yml")
+                with open(hosts, "w") as fh:
                     fh.write(
                         "github.com:\n"
                         "    git_protocol: https\n"
@@ -576,9 +640,10 @@ spec:
                         "        teletraan-x[bot]:\n"
                         f"            oauth_token: {token}\n"
                     )
+                _share(hosts, 0o640)
                 with open(CREDS, "w") as fh:
                     fh.write(f"https://x-access-token:{token}@github.com\n")
-                os.chmod(CREDS, 0o600)
+                _share(CREDS, 0o640)
 
 
             def git(*args, check=False):
@@ -589,6 +654,7 @@ spec:
                 git("config", "--global", "credential.helper", f"store --file={CREDS}")
                 git("config", "--global", "user.name", "teletraan-x[bot]")
                 git("config", "--global", "user.email", "99223764+teletraan-x[bot]@users.noreply.github.com")
+                _share(os.environ.get("GIT_CONFIG_GLOBAL", "/opt/data/.gitconfig"), 0o644)
 
 
             def install_gh_wrapper():
@@ -634,3 +700,45 @@ spec:
 
             if __name__ == "__main__":
                 main()
+          home-ops-SKILL.md: |
+            ---
+            name: home-ops
+            description: Conventions and workflow for rwaltr/home-ops — the GitOps PR loop, mise tasks, manifest layout, Flatcar/Ignition gotchas, and docs. Load before infra work.
+            ---
+
+            # home-ops
+
+            GitOps monorepo for rwaltr's homelab: a single-node k0s + Cilium cluster
+            (host `mouse`, 10.10.0.10), Flatcar host config, reconciled by Flux. Read
+            `AGENTS.md` and `REFACTOR_PLANS.md` for depth; this is the fast map.
+
+            ## PR loop (never bypass)
+            - Branch `hermes/<slug>`; never commit or push to `master`.
+            - `mise run lint:all` before committing (fmt, yaml, markdown, shell, actions, security).
+            - Conventional commit, then `gh pr create`; stop for review.
+            - Flux reconciles `master` on merge. Confirm with `flux get ks -A`, `flux logs`, `flux trace`.
+
+            ## Layout
+            - `infra/k8s/kyz/apps/<group>/<app>/` — live cluster: `ks.yaml` (Flux Kustomization)
+              + `app/` (HelmRelease, ExternalSecret, OCIRepository, kustomization.yaml).
+            - `infra/k8s/bootstrap/` — out-of-band bootstrap (helmfile, CRDs).
+            - `infra/flatcar/butane/` — host config (`base.bu`, `hosts/*.bu`) -> Ignition.
+            - `infra/k0s/` — k0sctl cluster definitions.
+            - `.mise/tasks/` — task wrappers (`mise tasks`); helpers in `.mise/lib/common.sh`.
+            - `docs/`, `REFACTOR_PLANS.md` — decisions and lessons.
+
+            ## Conventions
+            - Every infra change carries a doc update (`REFACTOR_PLANS.md` and/or `docs/`).
+            - No secrets in Git and none handled by this agent (no SOPS/age). 1Password +
+              ExternalSecrets are rwaltr's; if a change needs a secret, stop and ask.
+            - `kubectl` is read-only observation; changes land through git, never imperative apply.
+            - Never touch the live host; Flatcar changes are VM-validated (host-side only —
+              this pod has no VM).
+
+            ## Gotchas
+            - Ignition runs only on first boot; `/etc/flatcar/update.conf` can't be
+              Ignition-written; sysext units can't be Ignition-enabled.
+            - Flux `postBuild.substitute` is string-level and blanks shell `${VAR}` in
+              HelmRelease values -> set `kustomize.toolkit.fluxcd.io/substitute: disabled`.
+            - A platform with no `platform_toolsets` entry falls back to the full preset.
+            - Hermes config is re-seeded from the ConfigMap each start; reloader rolls on change.
