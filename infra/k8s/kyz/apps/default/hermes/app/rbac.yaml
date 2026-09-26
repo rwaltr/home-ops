@@ -63,3 +63,57 @@ subjects:
   - kind: ServiceAccount
     name: hermes
     namespace: default
+---
+# Read-only CRD surfaces Teletran asked for: Cilium (kube-proxy replacement),
+# Gateway API (the ingress surface), storage (openebs/ZFS), and Leases.
+# Still no secrets, no pods/exec, no nodes/proxy, no write verbs anywhere.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hermes-crd-read
+rules:
+  - apiGroups: ["cilium.io"]
+    resources:
+      - ciliumnetworkpolicies
+      - ciliumclusterwidenetworkpolicies
+      - ciliumendpoints
+      - ciliumidentities
+      - ciliumnodes
+      - ciliumloadbalancerippools
+      - ciliuml2announcementpolicies
+      - ciliumbgpclustersconfigs
+      - ciliumbgppeeringpolicies
+      - ciliumbgpadvertisements
+      - ciliumbgpnodeconfigs
+      - ciliumbgpnodeconfigoverrides
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - gatewayclasses
+      - httproutes
+      - grpcroutes
+      - tcproutes
+      - tlsroutes
+      - referencegrants
+      - backendtlspolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers", "csinodes", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hermes-crd-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hermes-crd-read
+subjects:
+  - kind: ServiceAccount
+    name: hermes
+    namespace: default
