@@ -155,12 +155,13 @@ spec:
                 if [ ! -x "$P/bin/flux" ]; then
                   FLUX=2.9.5
                   base="https://github.com/fluxcd/flux2/releases/download/v${FLUX}"
-                  curl -fsSL -o /tmp/flux.tgz "$base/flux_${FLUX}_linux_amd64.tar.gz"
+                  tarball="/tmp/flux_${FLUX}_linux_amd64.tar.gz"
+                  curl -fsSL -o "$tarball" "$base/flux_${FLUX}_linux_amd64.tar.gz"
                   curl -fsSL -o /tmp/flux.sums "$base/flux_${FLUX}_checksums.txt"
                   ( cd /tmp && grep "flux_${FLUX}_linux_amd64.tar.gz" flux.sums | sha256sum -c - )
-                  tar -xzf /tmp/flux.tgz -C "$P/bin" flux
+                  tar -xzf "$tarball" -C "$P/bin" flux
                   chmod 755 "$P/bin/flux"
-                  rm -f /tmp/flux.tgz /tmp/flux.sums
+                  rm -f "$tarball" /tmp/flux.sums
                 fi
                 if [ ! -x "$P/bin/jq" ]; then
                   JQ=1.7.1
