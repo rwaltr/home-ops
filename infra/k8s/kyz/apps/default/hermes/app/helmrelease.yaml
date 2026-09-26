@@ -26,6 +26,8 @@ spec:
     controllers:
       hermes:
         strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
         initContainers:
           # Seed config.yaml + SOUL.md from the ConfigMap onto the data volume.
           # Hermes migrates/extends config on start, so it must be writable (a
