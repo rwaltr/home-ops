@@ -65,8 +65,9 @@ subjects:
     namespace: default
 ---
 # Read-only CRD surfaces Teletran asked for: Cilium (kube-proxy replacement),
-# Gateway API (the ingress surface), storage (openebs/ZFS), and Leases.
-# Still no secrets, no pods/exec, no nodes/proxy, no write verbs anywhere.
+# Gateway API (the ingress surface), storage (openebs/ZFS), Leases, and kopiur
+# (PVC backups). Still no secrets, no pods/exec, no nodes/proxy, no write verbs
+# anywhere.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -103,6 +104,23 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  # kopiur PVC backups. The Snapshot/SnapshotPolicy status is the only durable
+  # record of *why* a backup failed: the mover Jobs are short-lived and TTL'd
+  # away before the failure is investigated, so `pods/log` alone is not enough.
+  # ClusterRepository is cluster-scoped; the rest are namespaced. Read-only:
+  # get/list/watch on exactly these nine resources, nothing else in the group.
+  - apiGroups: ["kopiur.home-operations.com"]
+    resources:
+      - clusterrepositories
+      - maintenances
+      - repositories
+      - repositoryreplications
+      - restores
+      - snapshotpolicies
+      - snapshotreplications
+      - snapshots
+      - snapshotschedules
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
