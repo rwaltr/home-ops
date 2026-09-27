@@ -104,6 +104,28 @@ structural, not prompt-based.
   observation (get/logs/events) and debugging; changes land via PR → merge →
   Flux. If a scoped write role is ever added, it is explicit and reviewed.
 
+## Cluster RBAC (read-only)
+
+All grants live in `infra/k8s/kyz/apps/default/hermes/app/rbac.yaml` and use
+`get`/`list`/`watch` only — no verb outside the read set exists anywhere in the
+file.
+
+| Role                  | Covers                                                                            |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `view` (ClusterRole)  | stock namespaced reads                                                            |
+| `hermes-pod-logs`     | `pods/log` (the `view` role omits it; logs are the main debugging surface)        |
+| `hermes-cluster-read` | `nodes`, `persistentvolumes`, `namespaces`, `storageclasses`, `volumeattachments` |
+| `hermes-crd-read`     | Cilium, Gateway API, `storage.k8s.io`, `coordination.k8s.io/leases`, kopiur       |
+
+The kopiur rule is the newest addition. Backups are the one thing in this
+cluster where a silent failure costs data rather than uptime, and the failure
+evidence does not survive on its own: the mover Job and its pod are TTL'd away
+within minutes, so by the time a `KubeJobFailed` is triaged there is nothing left
+to read except the `Snapshot`/`SnapshotPolicy` status. The rule grants read on
+exactly nine resources in `kopiur.home-operations.com` — `clusterrepositories`
+(cluster-scoped) plus the eight namespaced kinds — and nothing else in the group.
+`pods/log` already covers the mover pod while it is alive.
+
 ## Phases
 
 ### Phase 1 — Discord channel (fast, reversible)
@@ -222,6 +244,9 @@ requests read-write (and Workflows write to touch `.github/workflows`).
   read-write (and Workflows write if it edits `.github/workflows`).
 - **In-cluster `kubectl` via SA** changes `automountServiceAccountToken`; review
   the RBAC diff before merge.
+- **RBAC stays read-only.** Every grant is `get`/`list`/`watch`; the cluster-scoped
+  roles are enumerated above so a bulk widening (e.g. adding a whole API group)
+  is visible in the diff rather than hidden behind a wildcard.
 - **Prompt budget** grows with every toolset; measure `hermes prompt-size`
   after each phase.
 - **Two write paths exist** (git and `kubectl`). The policy is git-only for
