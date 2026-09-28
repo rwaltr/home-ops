@@ -31,3 +31,20 @@ spec:
     jsonData:
       implementation: prometheus
     url: http://alertmanager-operated.o11y.svc.cluster.local:9093
+---
+# VictoriaLogs is not a Loki-protocol datasource — its own plugin is required
+# (GF_INSTALL_PLUGINS in instance/grafana.yaml). The URL is the chart's Service
+# with server.fullnameOverride pinned to `victoria-logs` in the HelmRelease.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: victoria-logs
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: victoriametrics-logs-datasource
+    name: victoria-logs
+    access: proxy
+    url: http://victoria-logs.o11y.svc.cluster.local:9428

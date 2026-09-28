@@ -28,6 +28,7 @@ the management VLAN but must directly serve a second VLAN.
 | Charts        | **bjw-s app-template via OCIRepository** for all apps                             | One values schema, digest-pinned images                                                                                                                                                                               |
 | Storage       | **OpenEBS localpv-provisioner hostpath** on OS NVMe (non-default class)           | ~~ZFS LocalPV~~ rejected: `poolname` must be a zpool (topology match), and tank stays outside the PVC lifecycle by design                                                                                             |
 | Backups       | kopiur-style snapshots → **RustFS** (S3)                                          | Our RustFS is the S3 backend, like onedr0p's expanse                                                                                                                                                                  |
+| Logs          | **VictoriaLogs single + Fluent Bit** (OCIRepository charts)                       | Slim by design: no Loki cache/compactor/index tiers and no separate index store, so it fits a node with no swap. 64Mi request / 256Mi limit; 14d + 8Gi retention caps. See `docs/logging.md`                        |
 | VLAN L2 needs | Multus + macvlan NAD **only** for discovery-dependent apps (home-assistant class) | BGP/routed VIPs cover everything else                                                                                                                                                                                 |
 
 ### Deferred
@@ -1117,6 +1118,80 @@ reports success while doing nothing.
 
 Measured before/after on a quiet rip: `I Love Lucy S05E18 [SDTV][MP3 2.0]` is
 **-18.5 LUFS** in, **-15.2 LUFS** out — a gentle correction, not a re-master.
+
+### 2026-09-26 (later) — log system: VictoriaLogs + Fluent Bit
+
+Driven by "review the last 24h of Home Assistant logs" and finding that the only
+tool available was `kubectl logs --since=24h`, which returned **five lines**
+because HA emits WARNING+ to stdout only — and which cannot see anything before
+the current pod (`home-assistant.log` and the recorder DB are on the HA PVC, and
+this agent deliberately has no `pods/exec`). Cluster-wide retention was the fix,
+not a HA-specific shim.
+
+**Chosen: VictoriaLogs single + Fluent Bit**, both as OCIRepository charts under
+`apps/o11y/`. Operating doc: **`docs/logging.md`**.
+
+- **Memory is the whole design constraint.** The node runs 31Gi with no disk
+  swap and ~6Gi `MemAvailable` after the 2026-09-24 audit, so the log store had
+  to fit in a fraction of what Loki needs. VictoriaLogs keeps its full-text
+  index in the same files as the data (no memcached, no boltdb-shipper cache,
+  no compactor tier, no separate index store); requests **64Mi**, capped at
+  **256Mi**. Fluent Bit replaces Vector Agent as the collector for the same
+  reason — ~30-50Mi versus ~150-250Mi for the same tail-and-ship pipeline.
+- **The VictoriaLogs chart ships Vector and enables it by default**
+  (`vector.enabled: true`, chart dependency, role Agent). Left on, it would tail
+  the same container logs Fluent Bit already ships and double both the collector
+  memory and every ingested byte. Explicitly disabled.
+- **`server.fullnameOverride: victoria-logs`** — without it the generated Service
+  is `victoria-logs-victoria-logs-single-server`, and that name has to appear in
+  two other files (the Grafana datasource URL, the Fluent Bit output host). One
+  pin, two short names.
+- **Retention is age *and* disk:** `14d` plus `retentionDiskSpaceUsage: 8Gi`, so
+  a log burst cannot fill the node's only OS disk. The chart's `vlogs.args`
+  template `fail`s outright if none of the three retention knobs is set.
+- **`Keep_Log On`** in the Fluent Bit `kubernetes` filter is load-bearing. The
+  chart default (`Off`) drops the `log` key for any record that parses as JSON,
+  which would leave `_msg_field=log` pointing at nothing — i.e. empty message
+  bodies for exactly the structured logs worth reading.
+- **Grafana needs the plugin installed.** VictoriaLogs is not a Loki-protocol
+  datasource, so `GF_INSTALL_PLUGINS: victoriametrics-logs-datasource 0.32.0`
+  was added to the Grafana CR (`>=10.4.0` per the plugin manifest; Grafana here
+  is 13.1.3). It installs into `/var/lib/grafana/plugins`, which is the
+  grafana-data PVC, so `readOnlyRootFilesystem: true` stays on. Pinned, not
+  `latest` — an unpinned plugin would change on the next Grafana restart with no
+  diff in Git.
+- **Buffering is memory-only** (`Mem_Buf_Limit 2MB`, `Retry_Limit 5`): the
+  trade is that a collector restart can drop the few lines in flight, versus
+  another hostPath and unbounded disk on the OS NVMe.
+
+**Not collected, deliberately:** host/kubelet journald (would need
+`/var/log/journal` from the host), and HA's own file log + recorder DB. Container
+stdout for every pod is.
+
+**Verified before commit:** both charts rendered with `helm template` using the
+values extracted verbatim from the committed HelmReleases (VL 0.12.3 → Service +
+StatefulSet + ServiceMonitor named `victoria-logs`; Fluent Bit 0.58.2 →
+SA/ConfigMap/ClusterRole/Binding/Service/DaemonSet named `fluent-bit`), and
+`kustomize build` clean on both app dirs, the o11y group and the Flux root.
+Not verified in-cluster — the PR is the review point.
+
+**konflate review on PR #870** raised two cautions; both are handled in the same
+branch, and the second is the one worth remembering.
+
+- *New cluster-wide ClusterRoleBinding* — it is the chart's own ServiceAccount
+  role: `get`/`list`/`watch` on `pods` and `namespaces` only, no secrets, no
+  `nodes`/`nodes/proxy` (`rbac.nodeAccess`/`eventsAccess` stay off). Cluster-wide
+  is required — the `kubernetes` filter enriches records from every namespace.
+  Now stated in the HelmRelease comment and `docs/logging.md`.
+- *`flush`/`logLevel` set as values no chart template consumes* — correct, and
+  subtle. Both keys exist in the chart's `values.yaml`, but **no template reads
+  them**: only the chart's *default* `config.service` string references them.
+  Because we override that string, the override renders correctly (`flush: 7` →
+  `Flush 7`, verified) while depending on templating inside an overridden value —
+  a shape that would break silently on a chart refactor. Both are now literals in
+  the string; `metricsPort` stays a value because the pod template really does
+  read it. **Lesson: a value that renders is not proof the chart defines it —
+  check the chart's templates, not the rendered output.**
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
