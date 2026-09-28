@@ -37,8 +37,8 @@ subjects:
     name: hermes
     namespace: default
 ---
-# `view` is namespaced-only; cluster-scoped reads (node health, storage) are
-# useful for a homelab ops agent and are not covered by it.
+# `view` is namespaced-only; cluster-scoped reads (node health, storage,
+# priority classes) are useful for a homelab ops agent and are not covered by it.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -49,6 +49,13 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  # PriorityClasses are cluster-scoped and names are only provable from the pod
+  # spec that names them — which is not enough when the question is whether the
+  # *class* is right (value, preemptionPolicy, globalDefault). Read-only, this
+  # one resource in the group.
+  - apiGroups: ["scheduling.k8s.io"]
+    resources: ["priorityclasses"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

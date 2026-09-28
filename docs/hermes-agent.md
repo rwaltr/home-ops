@@ -110,14 +110,22 @@ All grants live in `infra/k8s/kyz/apps/default/hermes/app/rbac.yaml` and use
 `get`/`list`/`watch` only — no verb outside the read set exists anywhere in the
 file.
 
-| Role                  | Covers                                                                            |
-| --------------------- | --------------------------------------------------------------------------------- |
-| `view` (ClusterRole)  | stock namespaced reads                                                            |
-| `hermes-pod-logs`     | `pods/log` (the `view` role omits it; logs are the main debugging surface)        |
-| `hermes-cluster-read` | `nodes`, `persistentvolumes`, `namespaces`, `storageclasses`, `volumeattachments` |
-| `hermes-crd-read`     | Cilium, Gateway API, `storage.k8s.io`, `coordination.k8s.io/leases`, kopiur       |
+| Role                  | Covers                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `view` (ClusterRole)  | stock namespaced reads                                                                                                 |
+| `hermes-pod-logs`     | `pods/log` (the `view` role omits it; logs are the main debugging surface)                                             |
+| `hermes-cluster-read` | `nodes`, `persistentvolumes`, `namespaces`, `storageclasses`, `volumeattachments`, `scheduling.k8s.io/priorityclasses` |
+| `hermes-crd-read`     | Cilium, Gateway API, `storage.k8s.io`, `coordination.k8s.io/leases`, kopiur                                            |
 
-The kopiur rule is the newest addition. Backups are the one thing in this
+The `priorityclasses` rule is the newest addition. A pod spec proves only that
+a `PriorityClass` _name_ resolved at admission; it cannot prove that the class
+carries the intended `value`, `preemptionPolicy` or `globalDefault`. Reading
+the object is the only way to check that after the fact, which matters for the
+`unmanic-background` class (`value: -100`, `preemptionPolicy: Never`). One
+cluster-scoped resource in `scheduling.k8s.io`, read-only.
+
+The kopiur rule follows the same principle — it exists to reach evidence that
+does not survive elsewhere. Backups are the one thing in this
 cluster where a silent failure costs data rather than uptime, and the failure
 evidence does not survive on its own: the mover Job and its pod are TTL'd away
 within minutes, so by the time a `KubeJobFailed` is triaged there is nothing left
