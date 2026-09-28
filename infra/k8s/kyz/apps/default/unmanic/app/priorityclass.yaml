@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/scheduling.k8s.io/priorityclass_v1.json
+# Background class for the Unmanic transcoder.
+#
+# Unmanic is a CPU-saturating batch job: whenever it has work, it runs the CPU
+# at its 4-core limit by design. The negative value puts it *below* every pod
+# that does not set a priorityClass (those are implicitly 0), so Kubernetes
+# treats it as background work: it is scheduled last, it never preempts
+# anything (preemptionPolicy: Never) and node-pressure eviction picks it before
+# any default-priority workload. A killed transcode is lost work, not a lost
+# service — Unmanic re-queues it.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: unmanic-background
+value: -100
+globalDefault: false
+preemptionPolicy: Never
+description: >-
+  Intentional CPU-saturating background transcoder (Unmanic). Below-default
+  priority, never preempts; work is re-queueable.

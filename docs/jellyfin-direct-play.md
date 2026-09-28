@@ -157,6 +157,19 @@ offline.
   excluded from the kopia SnapshotPolicy.
 - `NUMBER_OF_WORKERS=2`, CPU limit 4 cores — a long re-encode cannot starve
   Jellyfin.
+- **Background priority**: `priorityClassName: unmanic-background` — a
+  `PriorityClass` with `value: -100`, `preemptionPolicy: Never`. Every other pod
+  in this cluster carries the implicit priority 0, so Unmanic schedules behind
+  all of them, never preempts, and is the first pod node-pressure eviction
+  takes. Its 250m CPU request keeps the cgroup CPU weight low for the same
+  reason: it only gets CPU nobody else wants, and a killed transcode is
+  re-queued rather than lost.
+- **Its CPU alerts do not page**: at its 4-core limit with work queued,
+  `CPUThrottlingHigh` (severity `info`) fires continuously. That is the design,
+  not a fault. A route in
+  `infra/k8s/kyz/apps/o11y/kube-prometheus-stack/app/alertmanagerconfig.yaml`
+  sends CPU alerts for `pod =~ "unmanic-.*"` to the `blackhole` receiver — they
+  stay visible in the Alertmanager UI, they just do not page.
 - Libraries: **TV** `/media/tv` and **Movies** `/media/movies`,
   scanner + inotify enabled, scan every 60 min.
 

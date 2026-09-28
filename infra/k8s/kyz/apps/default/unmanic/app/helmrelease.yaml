@@ -10,6 +10,18 @@
 # online the whole time. CPU is capped so a long transcode cannot starve
 # Jellyfin.
 #
+# BACKGROUND WORK ON PURPOSE. `priorityClassName: unmanic-background` (see
+# priorityclass.yaml) is a below-default, non-preempting class: Unmanic is
+# scheduled after everything else and is the first pod node-pressure eviction
+# takes, so it can never displace Jellyfin or anything else. A killed transcode
+# is re-queued, not lost. The 250m CPU request keeps its cgroup CPU weight low
+# for the same reason — it only gets CPU nobody else wants.
+#
+# Consequently "this pod is at its CPU limit and throttled" is the expected
+# steady state while it has work. CPU alerts for this pod are routed to the
+# blackhole receiver in o11y/kube-prometheus-stack/alertmanagerconfig.yaml —
+# visible in Alertmanager, never paged.
+#
 # NOTE: libraries, plugin repo and the plugin flow are runtime config on the
 # config PVC (like Sonarr/Radarr), not declared here. See
 # docs/jellyfin-direct-play.md for the flow to reproduce.
@@ -73,6 +85,8 @@ spec:
                 cpu: "4"
                 memory: 4Gi
     defaultPodOptions:
+      # Below-default, non-preempting background class (see priorityclass.yaml).
+      priorityClassName: unmanic-background
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
