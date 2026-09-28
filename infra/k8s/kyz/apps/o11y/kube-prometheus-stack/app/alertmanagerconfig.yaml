@@ -22,6 +22,20 @@ spec:
           - name: alertname
             value: Watchdog
             matchType: =
+      # Unmanic is a deliberately CPU-saturating background transcoder
+      # (priorityClass unmanic-background), so CPU alerts about that pod are
+      # expected steady state, not signal. Blackholed, not silenced: they stay
+      # visible in the Alertmanager UI and in Prometheus, they just do not page.
+      # Matches the pod name prefix, so it covers any CPU alert now or later
+      # (CPUThrottlingHigh today) for the pod, whatever its hash suffix.
+      - receiver: blackhole
+        matchers:
+          - name: pod
+            value: unmanic-.*
+            matchType: =~
+          - name: alertname
+            value: .*CPU.*
+            matchType: =~
       - receiver: pushover
         matchers:
           - name: severity
