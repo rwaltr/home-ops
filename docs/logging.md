@@ -10,7 +10,7 @@ Defined in `infra/k8s/kyz/apps/o11y/victoria-logs/` and
 | Query API     | `http://victoria-logs.o11y.svc.cluster.local:9428`                                     |
 | Collector     | Fluent Bit DaemonSet, chart `fluent-bit` 0.58.2                                        |
 | Grafana       | datasource `victoria-logs` (plugin `victoriametrics-logs-datasource` 0.32.0)           |
-| Retention     | 14d, with an 8Gi disk ceiling                                                          |
+| Retention     | 14d, with an 8GiB disk ceiling                                                         |
 | Memory budget | VL 64Mi request / 256Mi limit · Fluent Bit 32Mi request / 96Mi limit                   |
 | Disk          | 10Gi PVC `openebs-hostpath`                                                            |
 
@@ -96,6 +96,12 @@ Change retention in `victoria-logs/app/helmrelease.yaml`
 (`server.retentionPeriod`, `server.retentionDiskSpaceUsage`) and let Flux
 reconcile. Raising `persistentVolume.size` needs the PVC replaced by hand —
 `openebs-hostpath` cannot expand a bound volume.
+
+`retentionDiskSpaceUsage` is passed straight to
+`-retention.maxDiskSpaceUsageBytes`, and that flag takes a size with a specific
+suffix: `8GiB`, **not** `8Gi`. VictoriaLogs exits at flag parse on an unknown
+suffix, so a wrong unit is a CrashLoopBackOff rather than a warning, and
+`helm template` cannot catch it — the value renders; only the binary judges it.
 
 ## Known limits
 
