@@ -29,6 +29,7 @@ the management VLAN but must directly serve a second VLAN.
 | Storage       | **OpenEBS localpv-provisioner hostpath** on OS NVMe (non-default class)           | ~~ZFS LocalPV~~ rejected: `poolname` must be a zpool (topology match), and tank stays outside the PVC lifecycle by design                                                                                             |
 | Backups       | kopiur-style snapshots → **RustFS** (S3)                                          | Our RustFS is the S3 backend, like onedr0p's expanse                                                                                                                                                                  |
 | Logs          | **VictoriaLogs single + Fluent Bit** (OCIRepository charts)                       | Slim by design: no Loki cache/compactor/index tiers and no separate index store, so it fits a node with no swap. 64Mi request / 256Mi limit; 14d + 8Gi retention caps. See `docs/logging.md`                        |
+| Calendar      | **Radicale 3.8.1 + CalDAV** (shared calendar, Remind as a read-only feed)         | The only protocol iOS Calendar, Android (DAVx⁵) and HA's CalDAV integration all speak natively. mTLS rejected — see `docs/calendar.md`. Collections pre-seeded by an init container, sharing by `map` (a rights file breaks client discovery) |
 | VLAN L2 needs | Multus + macvlan NAD **only** for discovery-dependent apps (home-assistant class) | BGP/routed VIPs cover everything else                                                                                                                                                                                 |
 
 ### Deferred
@@ -1206,6 +1207,66 @@ Fixed to `8GiB` in the same files.
 program on the other end accepts it.** Unit strings are the sharp edge — K8s
 quantities (`8Gi`) and VictoriaMetrics byte sizes (`8GiB`) look interchangeable
 and are not, and a bad one is a crash loop rather than a validation error.
+
+### 2026-09-29 — shared family calendar: Radicale + CalDAV, Remind as a read-only feed
+
+Driver: two phones on two platforms (iPhone + Android), the calendar visible in
+Home Assistant, and the `remind` CLI's reminders visible inside it. Operating doc:
+**`docs/calendar.md`**.
+
+**Chosen: Radicale 3.8.1 in the cluster**, one shared `Family` calendar, one
+private calendar per person, and a read-only `Remind` feed. CalDAV is the only
+protocol all three consumers speak natively — iOS Calendar needs no app, Android
+needs one (DAVx⁵), and HA's core `caldav` integration exposes a calendar entity
+with `CREATE_EVENT`, so automations can add events too.
+
+- **mTLS was researched and rejected, not skipped.** Cloudflare *can* do it
+  (edge mTLS on any plan with a Cloudflare-managed CA, and `Client-Cert`
+  RFC 9440 forwarding to the origin via Transform Rules) and DAVx⁵ supports
+  client certificates. iOS Calendar.app does not: Apple's CalDAV payload has
+  exactly seven fields and no certificate field, and there is no cert picker in
+  the account UI. The only Radicale-side bridge is `http_x_remote_user`, which
+  disables Radicale's own auth and trusts a header — with a second (in-cluster)
+  route to the same pod, that is unauthenticated calendar for anything on the LAN.
+  Public hostname + per-account bcrypt passwords was accepted instead.
+- **Sharing is by `map`, not by a rights file.** Upstream's own docs: any rights
+  backend other than `owner_only` means collections outside `/USERNAME/` are never
+  auto-discovered, and every phone discovers calendars by PROPFIND on its own
+  principal. The shared calendar is therefore `rwaltr/family` presented inside
+  `sam`'s and `home-assistant`'s principals.
+- **The init container is what makes it declarative.** Radicale's storage is
+  plain files: `bootstrap.sh` writes the four collections' `.Radicale.props` and
+  seeds `collection-db/sharing.csv`, fill-gaps-only, so the shares resolve before
+  any client has connected and nothing a phone writes is ever clobbered. The
+  seeded JSON and CSV are byte-for-byte what `MKCOL` and
+  `POST /.sharing/v1/map/create` produce — hand-write either and a wrong byte
+  doesn't crash, the share just never appears.
+- **One VEVENT per resource.** rem2ics emits a single multi-event `.ics`, and
+  Radicale (RFC 4791 §4.1) rejects it: HTTP 400, "Multiple VEVENT components with
+  different UIDs in object". Hence `scripts/remind-to-caldav.py` — split per UID,
+  VTIMEZONE copied into each resource, stale resources deleted. It also had to
+  percent-encode UIDs in paths: rem2ics UIDs are `<hash>@<hostname>`, Radicale
+  encodes the `@` in hrefs, and comparing the raw href against the wanted UID made
+  every run delete the whole feed.
+- **app-template PVC naming, again.** A lone `persistentVolumeClaim` renders as
+  plain `<fullname>`; the `<fullname>-<key>` form only appears once a second PVC
+  exists. `forceRename: radicale-collections` pins it, because an unpinned name
+  would orphan the calendar data on a chart refactor — and the kopiur policy
+  references the PVC by name.
+- **app-template probes are silently ignored unless `custom: true`.** A
+  `spec.httpGet` under liveness rendered as a plain `tcpSocket` probe; ditto
+  startup. Set `custom: true` or the spec block is decoration.
+- Remind stays the source of truth and the `.reminders` file stays off Git on the
+  workstation; only rendered events are uploaded, by an account that can write to
+  nothing else. Conversion is lossy by design (evaluated form; `OMIT`/`TRIGGER`/
+  `BEFORE`/`SKIP` flattened; the `%"summary%description"` MSG form is passed
+  through as literal text).
+
+**Owner step before this works:** the htpasswd file in 1Password (item
+`radicale-secret`, field `htpasswd`, one bcrypt line per account: `rwaltr`, `sam`,
+`home-assistant`, `remind-export`). The pod does not start without it. The HA
+integration itself is a UI step — HA config entries live in `/config/.storage`, and
+the `config/` directory in this repo is a mirror, not a mounted source.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 

@@ -1,0 +1,47 @@
+# Radicale configuration (mounted read-only from the `radicale-config`
+# ConfigMap at /etc/radicale/config; the container is started with
+# `--config /etc/radicale/config`). Rationale and the client-side setup live in
+# docs/calendar.md — keep the two in sync.
+#
+# Deliberately NOT configured:
+#   [rights] from_file / any backend other than owner_only — upstream states
+#   that granting access outside /USERNAME/ breaks client auto-discovery, which
+#   is exactly what the shared "Family" calendar needs. Cross-user access goes
+#   through the sharing database instead (see bootstrap.sh).
+#   [server] ssl — TLS terminates at the envoy Gateway (cert-manager wildcard).
+
+[server]
+# Single listener, plain HTTP: the only ingress path is the in-cluster envoy
+# Service. The pod is not exposed directly.
+hosts = 0.0.0.0:5232
+
+[auth]
+type = htpasswd
+# Provisioned from 1Password (item `radicale-secret`, field `htpasswd`) via the
+# ExternalSecret in this directory. One entry per client credential — see
+# docs/calendar.md for the account list and the `htpasswd -B` invocation.
+htpasswd_filename = /etc/radicale-users/users
+htpasswd_encryption = bcrypt
+
+[storage]
+type = multifilesystem
+filesystem_folder = /var/lib/radicale/collections
+
+[sharing]
+# Sharing-by-map is how the shared "Family" calendar and the read-only Remind
+# feed appear inside each user's own principal (so phones discover them).
+# The database is seeded once by the bootstrap.sh init container and left alone
+# afterwards; permit_create_map stays on so shares can also be changed from the
+# WebUI without a config edit.
+type = csv
+collection_by_map = true
+permit_create_map = true
+
+[rights]
+type = owner_only
+
+[web]
+type = internal
+
+[logging]
+level = info

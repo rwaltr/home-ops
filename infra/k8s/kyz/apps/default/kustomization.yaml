@@ -33,3 +33,4 @@ resources:
   - ./degoog/ks.yaml
   - ./hermes/ks.yaml
   - ./litellm/ks.yaml
+  - ./radicale/ks.yaml
