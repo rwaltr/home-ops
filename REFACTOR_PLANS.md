@@ -1193,6 +1193,20 @@ branch, and the second is the one worth remembering.
   read it. **Lesson: a value that renders is not proof the chart defines it —
   check the chart's templates, not the rendered output.**
 
+**Bug caught in production on merge (2026-09-28).** The first reconcile of the
+merged PR crashlooped: `invalid value "8Gi" for flag
+-retention.maxDiskSpaceUsageBytes: strconv.ParseFloat: parsing "8Gi": invalid
+syntax`. `retentionDiskSpaceUsage` is passed verbatim to that flag, and
+VictoriaMetrics size flags take `GiB`, not Kubernetes' `Gi` — so the pod exited
+at flag parse, the StatefulSet went `Failed`, the HelmRelease stalled five
+minutes, and Fluent Bit (declared `dependsOn` the store) never installed.
+Fixed to `8GiB` in the same files.
+
+**Lesson: `helm template` proves a value reaches a template, never that the
+program on the other end accepts it.** Unit strings are the sharp edge — K8s
+quantities (`8Gi`) and VictoriaMetrics byte sizes (`8GiB`) look interchangeable
+and are not, and a bad one is a crash loop rather than a validation error.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

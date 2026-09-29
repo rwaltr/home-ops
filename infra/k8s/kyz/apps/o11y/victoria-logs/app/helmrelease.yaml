@@ -9,7 +9,7 @@
 # and no separate index store to size. The smallest sane Loki single-binary
 # deployment asks for 500Mi+; this asks for 64Mi and is capped at 256Mi.
 #
-# Retention is deliberately belt-and-braces: 14d by age AND an 8Gi ceiling, so
+# Retention is deliberately belt-and-braces: 14d by age AND an 8GiB ceiling, so
 # a log burst can never fill the node's only OS disk.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -32,8 +32,11 @@ spec:
         size: 10Gi
         storageClassName: openebs-hostpath
       # Age-based retention plus the disk ceiling that protects the node.
+      # The byte flag wants a plain size with a known suffix — `8Gi` is not one
+      # (`GiB` is). A wrong suffix here is a crash loop, not a warning: the
+      # binary exits at flag parse.
       retentionPeriod: 14d
-      retentionDiskSpaceUsage: 8Gi
+      retentionDiskSpaceUsage: 8GiB
       resources:
         requests:
           cpu: 20m
