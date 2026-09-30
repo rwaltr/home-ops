@@ -24,22 +24,26 @@ phone means deleting one htpasswd line rather than rotating a shared password.
 
 | Account          | Used by                       | Collections                        |
 | ---------------- | ----------------------------- | ---------------------------------- |
-| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (read-only to `sam`) |
-| `sam`            | her iPhone                    | `sam/calendar` (read-only to `rwaltr`) |
-| `home-assistant` | the HA CalDAV integration     | `home-assistant/*` (shares)        |
+| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (read-only to `sam` and HA) |
+| `sam`            | her iPhone                    | `sam/calendar` (read-only to `rwaltr` and HA) |
+| `home-assistant` | the HA CalDAV integration     | `home-assistant/*` (Family `rw`, everything else `r`) |
 | `remind-export`  | `scripts/remind-to-caldav.py` | `remind-export/remind` (writable)  |
 
 Collection layout:
 
 - **`rwaltr/calendar`** — yours, and yours to write. Presented read-only (`r`) into
-  `sam`'s principal as `/sam/rwaltr/`, so she sees it but every write from her side
-  is a 403. Nothing else can see it.
-- **`sam/calendar`** — hers, mirrored the other way: read-only into your principal
-  as `/rwaltr/sam/`.
+  `sam`'s principal as `/sam/rwaltr/` and HA's as `/home-assistant/rwaltr/`, so
+  both see it and every write from their side is a 403.
+- **`sam/calendar`** — hers, mirrored the same way: read-only into your principal
+  as `/rwaltr/sam/` and HA's as `/home-assistant/sam/`.
 - **`rwaltr/family`** — the shared calendar, owned by `rwaltr` and presented inside
   `sam`'s and `home-assistant`'s principals via `map` shares with `rw`.
 - **`remind-export/remind`** — the Remind feed. Owned by `remind-export`; shared
   read-only (`r`) to `rwaltr`, `sam` and `home-assistant`.
+
+Only Family is writable by more than its owner: every other cross-collection share
+is `r`, which is why `home-assistant` can read the personal calendars and
+`calendar.create_event` against them fails with 403.
 
 **Why shares and not a rights file.** Upstream is explicit: any rights backend
 other than `owner_only` means collections _outside_ `/USERNAME/` are never
@@ -47,8 +51,9 @@ auto-discovered by clients. Since every phone discovers calendars by PROPFIND on
 its own principal, a cross-user collection must appear as a child of that
 principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), so
 `bootstrap.sh` seeds the sharing database instead of a rights file — the same
-mechanism carries the Family calendar, the Remind feed and the two personal
-cross-shares.
+mechanism carries the Family calendar, the Remind feed and the four personal
+cross-shares (each person's calendar read-only into the other person's principal
+and into HA's).
 
 The rows are seeded rather than created through `POST /.sharing/v1/map/create`
 because the API always writes `EnabledByUser=False, HiddenByUser=True` for a share
@@ -71,7 +76,7 @@ talked to this server discover the shares on its first PROPFIND.
   cert-manager `*.waltr.tech` wildcard; basic auth over TLS is the only gate.
 - The **init container** (`bootstrap.sh`) is what makes this declarative: it
   builds the htpasswd file from the 1Password fields (above), pre-creates the four
-  collections and seeds the sharing database (Family, the two personal
+  collections and seeds the sharing database (Family, the four personal
   cross-shares, the Remind feed), so the shares resolve before any phone has ever
   connected. It only ever fills gaps — an existing `.Radicale.props` or
   `sharing.csv` is left untouched, so state written by a phone or the WebUI
@@ -127,7 +132,9 @@ Settings → Manage Accounts (DAVx⁵'s own FAQ).
 **Home Assistant.** Settings → Devices & services → Add integration → **CalDAV**:
 URL `https://calendar.waltr.tech`, username `home-assistant`. It creates a
 calendar entity per collection with `CREATE_EVENT` support, so automations can
-both trigger on events and add them (`calendar.create_event`).
+both trigger on events and add them (`calendar.create_event`). It discovers four:
+`Family` (writable), `Rwaltr`, `Sam` and `Remind (read-only)` — `create_event`
+works on `Family` only, the other three are read-only shares.
 
 Config entries live in `/config/.storage` on the HA PVC — the `config/` directory
 in this repo is a mirror, not a mounted source — so this is a UI step, not a Git
@@ -238,14 +245,15 @@ real 1Password item — covering what the local run could not:
 - discovery by PROPFIND `Depth: 1` matches the collections table for every
   principal — `rwaltr` → `Rwaltr`/`Sam`/`Family`/`Remind (read-only)`, `sam` →
   `Sam`/`Rwaltr`/`Family`/`Remind (read-only)`, `home-assistant` →
-  `Family`/`Remind (read-only)` (HA is deliberately not given the personal
-  calendars);
-- the personal cross-shares are read-only both ways: `rwaltr` PUT into
+  `Family`/`Rwaltr`/`Sam`/`Remind (read-only)`;
+- the personal cross-shares are read-only everywhere: `rwaltr` PUT into
   `/rwaltr/calendar` → 201 and `sam` GET `/sam/rwaltr/…` → 200, but `sam`
-  PUT/DELETE under `/sam/rwaltr/` → 403, and the mirror image for `/rwaltr/sam/`.
-  PROPFIND on the real path `/sam/calendar/` as `rwaltr` is still 403 — only the
-  mapped path is exposed, and `home-assistant` gets 404 for
-  `/home-assistant/rwaltr/`;
+  PUT/DELETE under `/sam/rwaltr/` → 403, `rwaltr` PUT into `/rwaltr/sam/` → 403,
+  and `home-assistant` reads both (`/home-assistant/rwaltr/…` → 200) while every
+  PUT there → 403. PROPFIND on the real path `/sam/calendar/` as `rwaltr` is still
+  403 — only the mapped paths are exposed;
+- HA keeps write access to its own collection: PUT `/home-assistant/family/` →
+  201, PUT `/home-assistant/remind/` → 403;
 - `sam` PUT into `Family` → 201, `rwaltr` GET through his own path → 200 with the
   body intact, `home-assistant` → 200; `sam` PROPFIND on `rwaltr/calendar` → 403;
 - read-only feed: `rwaltr` PUT → 403, `remind-export` PUT → 201, `sam` GET → 200;

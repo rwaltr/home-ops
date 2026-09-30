@@ -1234,8 +1234,9 @@ automations can add events too.
   backend other than `owner_only` means collections outside `/USERNAME/` are never
   auto-discovered, and every phone discovers calendars by PROPFIND on its own
   principal. `rwaltr/family` is therefore presented inside `sam`'s and
-  `home-assistant`'s principals, and the two personal calendars mirror each other
-  read-only (`r`) the same way. Seed the rows, do not create them through
+  `home-assistant`'s principals, and both personal calendars are mirrored
+  read-only (`r`) into the other person's principal *and* into HA's — only Family
+  is writable by a non-owner. Seed the rows, do not create them through
   `/.sharing/v1/map/create`: the API hard-codes `EnabledByUser=False,
   HiddenByUser=True` for a share to another user, so the recipient has to accept
   it in the WebUI before it appears — seeded rows skip that and a brand-new client

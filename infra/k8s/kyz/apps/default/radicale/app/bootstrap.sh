@@ -88,6 +88,8 @@ if [ ! -e "$DB" ]; then
     'map;/home-assistant/family/;/rwaltr/family/;none;rwaltr;home-assistant;rw;True;True;False;False;1790688234;1790688234;;' \
     'map;/sam/rwaltr/;/rwaltr/calendar/;none;rwaltr;sam;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/rwaltr/sam/;/sam/calendar/;none;sam;rwaltr;r;True;True;False;False;1790688234;1790688234;;' \
+    'map;/home-assistant/rwaltr/;/rwaltr/calendar/;none;rwaltr;home-assistant;r;True;True;False;False;1790688234;1790688234;;' \
+    'map;/home-assistant/sam/;/sam/calendar/;none;sam;home-assistant;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/rwaltr/remind/;/remind-export/remind/;none;remind-export;rwaltr;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/sam/remind/;/remind-export/remind/;none;remind-export;sam;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/home-assistant/remind/;/remind-export/remind/;none;remind-export;home-assistant;r;True;True;False;False;1790688234;1790688234;;' \
