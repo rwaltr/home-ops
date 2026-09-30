@@ -1215,10 +1215,11 @@ Home Assistant, and the `remind` CLI's reminders visible inside it. Operating do
 **`docs/calendar.md`**.
 
 **Chosen: Radicale 3.8.1 in the cluster**, one shared `Family` calendar, one
-private calendar per person, and a read-only `Remind` feed. CalDAV is the only
-protocol all three consumers speak natively — iOS Calendar needs no app, Android
-needs one (DAVx⁵), and HA's core `caldav` integration exposes a calendar entity
-with `CREATE_EVENT`, so automations can add events too.
+personal calendar per person (each mirrored into the other's principal read-only),
+and a read-only `Remind` feed. CalDAV is the only protocol all three consumers
+speak natively — iOS Calendar needs no app, Android needs one (DAVx⁵), and HA's
+core `caldav` integration exposes a calendar entity with `CREATE_EVENT`, so
+automations can add events too.
 
 - **mTLS was researched and rejected, not skipped.** Cloudflare *can* do it
   (edge mTLS on any plan with a Cloudflare-managed CA, and `Client-Cert`
@@ -1232,8 +1233,13 @@ with `CREATE_EVENT`, so automations can add events too.
 - **Sharing is by `map`, not by a rights file.** Upstream's own docs: any rights
   backend other than `owner_only` means collections outside `/USERNAME/` are never
   auto-discovered, and every phone discovers calendars by PROPFIND on its own
-  principal. The shared calendar is therefore `rwaltr/family` presented inside
-  `sam`'s and `home-assistant`'s principals.
+  principal. `rwaltr/family` is therefore presented inside `sam`'s and
+  `home-assistant`'s principals, and the two personal calendars mirror each other
+  read-only (`r`) the same way. Seed the rows, do not create them through
+  `/.sharing/v1/map/create`: the API hard-codes `EnabledByUser=False,
+  HiddenByUser=True` for a share to another user, so the recipient has to accept
+  it in the WebUI before it appears — seeded rows skip that and a brand-new client
+  discovers everything on its first PROPFIND.
 - **The init container is what makes it declarative.** Radicale's storage is
   plain files: `bootstrap.sh` writes the four collections' `.Radicale.props` and
   seeds `collection-db/sharing.csv`, fill-gaps-only, so the shares resolve before

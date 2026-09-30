@@ -13,10 +13,16 @@
 # left untouched, so state a phone or the WebUI wrote (a new event, a share
 # toggled off) survives every pod restart and every Recreate.
 #
-# Verified against radicale 3.8.1: the .Radicale.props JSON and the csv rows
-# below are byte-for-byte what `MKCOL` and `POST /.sharing/v1/map/create`
-# produce. The csv column order and the `True/False` spelling are Radicale's,
-# not ours — re-verify both before bumping the image tag.
+# Verified against radicale 3.8.1: the .Radicale.props JSON and the csv column
+# order / True-False spelling are Radicale's, not ours — re-verify both before
+# bumping the image tag.
+#
+# The rows are seeded rather than created with `POST /.sharing/v1/map/create`
+# because that API always writes EnabledByUser=False, HiddenByUser=True for a
+# share handed to *another* user (the recipient has to accept it in the WebUI
+# first — see the `EnabledByUser: bool = False` default in sharing/__init__.py).
+# Every row below is seeded already accepted and visible (True;True;False;False)
+# so a client that has never talked to this server still discovers the shares.
 set -eu
 
 ROOT=/var/lib/radicale/collections
@@ -80,11 +86,13 @@ if [ ! -e "$DB" ]; then
     'ShareType;PathOrToken;PathMapped;Conversion;Owner;User;Permissions;EnabledByOwner;EnabledByUser;HiddenByOwner;HiddenByUser;TimestampCreated;TimestampUpdated;Properties;Actions' \
     'map;/sam/family/;/rwaltr/family/;none;rwaltr;sam;rw;True;True;False;False;1790688234;1790688234;;' \
     'map;/home-assistant/family/;/rwaltr/family/;none;rwaltr;home-assistant;rw;True;True;False;False;1790688234;1790688234;;' \
+    'map;/sam/rwaltr/;/rwaltr/calendar/;none;rwaltr;sam;r;True;True;False;False;1790688234;1790688234;;' \
+    'map;/rwaltr/sam/;/sam/calendar/;none;sam;rwaltr;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/rwaltr/remind/;/remind-export/remind/;none;remind-export;rwaltr;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/sam/remind/;/remind-export/remind/;none;remind-export;sam;r;True;True;False;False;1790688234;1790688234;;' \
     'map;/home-assistant/remind/;/remind-export/remind/;none;remind-export;home-assistant;r;True;True;False;False;1790688234;1790688234;;' \
     > "$DB"
-  echo "radicale-bootstrap: seeded sharing database (3 collections + Remind feed)"
+  echo "radicale-bootstrap: seeded sharing database (Family, personal cross-shares, Remind feed)"
 else
   echo "radicale-bootstrap: sharing database present, left as-is"
 fi

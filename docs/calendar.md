@@ -1,7 +1,8 @@
 # Calendar (Radicale / CalDAV)
 
-One shared calendar for two phones on two different platforms, plus Home Assistant,
-plus a read-only feed of the `remind` CLI's reminders.
+One shared calendar for two phones on two different platforms, the two personal
+calendars mirroring each other read-only, plus Home Assistant, plus a read-only
+feed of the `remind` CLI's reminders.
 
 Radicale is the only new workload. Nothing else was added: iOS Calendar is a
 native CalDAV client, Home Assistant has a core CalDAV integration, and Android
@@ -21,17 +22,20 @@ needs one app (DAVx⁵).
 Four accounts, four collections. Each account is one client credential, so a lost
 phone means deleting one htpasswd line rather than rotating a shared password.
 
-| Account          | Used by                       | Collections                       |
-| ---------------- | ----------------------------- | --------------------------------- |
-| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (private)       |
-| `sam`            | her iPhone                    | `sam/calendar` (private)          |
-| `home-assistant` | the HA CalDAV integration     | `home-assistant/*` (shares)       |
-| `remind-export`  | `scripts/remind-to-caldav.py` | `remind-export/remind` (writable) |
+| Account          | Used by                       | Collections                        |
+| ---------------- | ----------------------------- | ---------------------------------- |
+| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (read-only to `sam`) |
+| `sam`            | her iPhone                    | `sam/calendar` (read-only to `rwaltr`) |
+| `home-assistant` | the HA CalDAV integration     | `home-assistant/*` (shares)        |
+| `remind-export`  | `scripts/remind-to-caldav.py` | `remind-export/remind` (writable)  |
 
 Collection layout:
 
-- **`rwaltr/calendar`** — yours alone (`owner_only` rights; nobody else can see it).
-- **`sam/calendar`** — hers alone.
+- **`rwaltr/calendar`** — yours, and yours to write. Presented read-only (`r`) into
+  `sam`'s principal as `/sam/rwaltr/`, so she sees it but every write from her side
+  is a 403. Nothing else can see it.
+- **`sam/calendar`** — hers, mirrored the other way: read-only into your principal
+  as `/rwaltr/sam/`.
 - **`rwaltr/family`** — the shared calendar, owned by `rwaltr` and presented inside
   `sam`'s and `home-assistant`'s principals via `map` shares with `rw`.
 - **`remind-export/remind`** — the Remind feed. Owned by `remind-export`; shared
@@ -42,7 +46,15 @@ other than `owner_only` means collections _outside_ `/USERNAME/` are never
 auto-discovered by clients. Since every phone discovers calendars by PROPFIND on
 its own principal, a cross-user collection must appear as a child of that
 principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), so
-`bootstrap.sh` seeds the sharing database instead of a rights file.
+`bootstrap.sh` seeds the sharing database instead of a rights file — the same
+mechanism carries the Family calendar, the Remind feed and the two personal
+cross-shares.
+
+The rows are seeded rather than created through `POST /.sharing/v1/map/create`
+because the API always writes `EnabledByUser=False, HiddenByUser=True` for a share
+handed to another user, which makes the recipient accept it in the WebUI first.
+Seeding them already accepted and visible is what lets a phone that has never
+talked to this server discover the shares on its first PROPFIND.
 
 ## Cluster side
 
@@ -59,9 +71,10 @@ principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), s
   cert-manager `*.waltr.tech` wildcard; basic auth over TLS is the only gate.
 - The **init container** (`bootstrap.sh`) is what makes this declarative: it
   builds the htpasswd file from the 1Password fields (above), pre-creates the four
-  collections and seeds the sharing database, so the shares resolve before any
-  phone has ever connected. It only ever fills gaps — an existing `.Radicale.props`
-  or `sharing.csv` is left untouched, so state written by a phone or the WebUI
+  collections and seeds the sharing database (Family, the two personal
+  cross-shares, the Remind feed), so the shares resolve before any phone has ever
+  connected. It only ever fills gaps — an existing `.Radicale.props` or
+  `sharing.csv` is left untouched, so state written by a phone or the WebUI
   survives every restart. The plaintext `radicale-users` Secret is mounted
   **only** into this container; the app container gets the generated hashes from
   an emptyDir, read-only.
@@ -223,9 +236,16 @@ real 1Password item — covering what the local run could not:
   `/etc/radicale-passwords` at all: the plaintext Secret never reaches it;
 - all four accounts authenticate (`PROPFIND` → 207, wrong password → 401);
 - discovery by PROPFIND `Depth: 1` matches the collections table for every
-  principal — `rwaltr` → `Rwaltr`/`Family`/`Remind (read-only)`, `sam` →
-  `Sam`/`Family`/`Remind (read-only)`, `home-assistant` →
-  `Family`/`Remind (read-only)`;
+  principal — `rwaltr` → `Rwaltr`/`Sam`/`Family`/`Remind (read-only)`, `sam` →
+  `Sam`/`Rwaltr`/`Family`/`Remind (read-only)`, `home-assistant` →
+  `Family`/`Remind (read-only)` (HA is deliberately not given the personal
+  calendars);
+- the personal cross-shares are read-only both ways: `rwaltr` PUT into
+  `/rwaltr/calendar` → 201 and `sam` GET `/sam/rwaltr/…` → 200, but `sam`
+  PUT/DELETE under `/sam/rwaltr/` → 403, and the mirror image for `/rwaltr/sam/`.
+  PROPFIND on the real path `/sam/calendar/` as `rwaltr` is still 403 — only the
+  mapped path is exposed, and `home-assistant` gets 404 for
+  `/home-assistant/rwaltr/`;
 - `sam` PUT into `Family` → 201, `rwaltr` GET through his own path → 200 with the
   body intact, `home-assistant` → 200; `sam` PROPFIND on `rwaltr/calendar` → 403;
 - read-only feed: `rwaltr` PUT → 403, `remind-export` PUT → 201, `sam` GET → 200;
