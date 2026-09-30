@@ -17,9 +17,9 @@ hosts = 0.0.0.0:5232
 
 [auth]
 type = htpasswd
-# Provisioned from 1Password (item `radicale-secret`, field `htpasswd`) via the
-# ExternalSecret in this directory. One entry per client credential — see
-# docs/calendar.md for the account list and the `htpasswd -B` invocation.
+# Provisioned from 1Password (item `radicale-secret`; the file is the Secure
+# Note's body) via the ExternalSecret in this directory. One entry per client
+# credential — see docs/calendar.md for the account list and `htpasswd -B`.
 htpasswd_filename = /etc/radicale-users/users
 htpasswd_encryption = bcrypt
 

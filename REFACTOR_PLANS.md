@@ -1263,8 +1263,11 @@ with `CREATE_EVENT`, so automations can add events too.
   through as literal text).
 
 **Owner step before this works:** the htpasswd file in 1Password (item
-`radicale-secret`, field `htpasswd`, one bcrypt line per account: `rwaltr`, `sam`,
-`home-assistant`, `remind-export`). The pod does not start without it. The HA
+`radicale-secret` — a Secure Note whose *body* is the file, one bcrypt line per
+account: `rwaltr`, `sam`, `home-assistant`, `remind-export`; the per-account
+plaintext passwords live in the same item as single-line fields). The
+ExternalSecret reads the note body because 1Password fields are single-line. The
+pod does not start without it. The HA
 integration itself is a UI step — HA config entries live in `/config/.storage`, and
 the `config/` directory in this repo is a mirror, not a mounted source.
 

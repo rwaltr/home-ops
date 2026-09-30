@@ -65,18 +65,25 @@ principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), s
 
 ### Provisioning the credentials (owner step — the pod does not start without it)
 
-1Password item **`radicale-secret`**, field **`htpasswd`**, containing one bcrypt
-line per account:
+1Password item **`radicale-secret`**, a Secure Note whose **body** is the
+htpasswd file, one bcrypt line per account:
 
 ```bash
 # for each account: rwaltr, sam, home-assistant, remind-export
 htpasswd -nB user                        # -B = bcrypt, matches [auth] htpasswd_encryption
 ```
 
-Paste the lines into the item (the ExternalSecret templates them to the
-`radicale-users` Secret). Generating a _long random password per account_ and
-storing each in the same 1Password item is the point — these are the only thing
-between the internet and the calendar.
+Paste the four lines into the item's **notes**, not into a named field: 1Password
+fields are single-line, so the ExternalSecret reads the note body (`notesPlain`)
+and templates it to the `radicale-users` Secret. The same item also carries one
+single-line concealed field per account (`rwaltr`, `sam`, `ha`, `remind-export`)
+with the plaintext password — that is what `op://home-ops/radicale-secret/...`
+reads and what gets typed into the phones and Home Assistant. Generating a _long
+random password per account_ and storing both forms in the same 1Password item is
+the point — these are the only thing between the internet and the calendar.
+
+Keep prose out of that note: it is machine-read as the htpasswd file, so a stray
+line either fails the parse or becomes a bogus account entry.
 
 ## Client setup
 
