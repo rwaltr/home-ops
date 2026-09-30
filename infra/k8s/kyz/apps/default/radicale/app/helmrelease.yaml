@@ -1,0 +1,168 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Radicale — CalDAV/CardDAV server for the shared family calendar.
+#
+# Replaces nothing: an iPhone (Calendar.app, native CalDAV), an Android
+# (DAVx⁵ + a calendar app) and Home Assistant (core CalDAV integration) all
+# speak CalDAV, so this is the one middle ground between the two phone
+# platforms. Public via the cloudflare tunnel (phones need it off-LAN);
+# credentials are the only gate — basic auth over TLS.
+#
+# Config, collections, sharing rows and the client-side steps: docs/calendar.md.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: radicale
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: radicale
+  values:
+    fullnameOverride: radicale
+    controllers:
+      radicale:
+        # The collections PVC is ReadWriteOnce on openebs-hostpath (no CSI
+        # snapshots, no shared writers); Recreate avoids a Multi-Attach stall
+        # when the bootstrap init container re-runs on a config change.
+        strategy: Recreate
+        annotations:
+          # Config and bootstrap.sh live in a ConfigMap; re-seeding on change
+          # must roll the pod (the init container is what applies new rows).
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          bootstrap:
+            image:
+              repository: ghcr.io/kozea/radicale
+              tag: 3.8.1@sha256:f5b936519c0041c17ea79eb85444e86d7fc55bdcc271b74d722f62537323eb84
+            command:
+              - /bin/sh
+              - /etc/radicale/bootstrap.sh
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+            resources:
+              requests:
+                cpu: 5m
+                memory: 16Mi
+              limits:
+                memory: 64Mi
+        containers:
+          app:
+            image:
+              repository: ghcr.io/kozea/radicale
+              tag: 3.8.1@sha256:f5b936519c0041c17ea79eb85444e86d7fc55bdcc271b74d722f62537323eb84
+            # Entrypoint is `/app/bin/python /app/bin/radicale`; these args
+            # replace the image CMD (which would otherwise add a [::] listener).
+            args:
+              - --config
+              - /etc/radicale/config
+            env:
+              TZ: America/Chicago
+              # readOnlyRootFilesystem: the venv is compiled at image build
+              # time, but a stray import would still try to drop .pyc files.
+              PYTHONDONTWRITEBYTECODE: "1"
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /.web/
+                    port: &port 5232
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  # `/` 302s to the principal; `/.web/` is the login page and
+                  # answers 200 unauthenticated once the server is up.
+                  httpGet:
+                    path: /.web/
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /.web/
+                    port: *port
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+            resources:
+              requests:
+                cpu: 5m
+                memory: 48Mi
+              limits:
+                memory: 192Mi
+    defaultPodOptions:
+      securityContext:
+        # Matches the image's `radicale` user (uid 1000).
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: radicale
+        ports:
+          http:
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - calendar.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+          - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
+            namespace: network
+    persistence:
+      # /var/lib/radicale/collections is the storage folder; the sharing csv
+      # lives in /var/lib/radicale/collections/collection-db/. Backed up by
+      # kopiur (components/kopiur/backup in ../ks.yaml).
+      collections:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        # Pinned deliberately: app-template names a *lone* PVC plainly
+        # `<fullname>` (`radicale`) and only suffixes the key once a second PVC
+        # exists (`radicale-<key>`) — a chart bump that changes that rule would
+        # silently orphan the calendar data in a fresh empty PVC. forceRename
+        # also keeps the name in ../ks.yaml's kopiur snapshot policy honest.
+        forceRename: radicale-collections
+        globalMounts:
+          - path: /var/lib/radicale
+      config:
+        type: configMap
+        name: radicale-config
+        globalMounts:
+          - path: /etc/radicale
+            readOnly: true
+      users:
+        type: secret
+        name: radicale-users
+        globalMounts:
+          - path: /etc/radicale-users
+            readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
