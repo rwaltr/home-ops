@@ -1262,12 +1262,13 @@ with `CREATE_EVENT`, so automations can add events too.
   `BEFORE`/`SKIP` flattened; the `%"summary%description"` MSG form is passed
   through as literal text).
 
-**Owner step before this works:** the htpasswd file in 1Password (item
-`radicale-secret` — a Secure Note whose *body* is the file, one bcrypt line per
-account: `rwaltr`, `sam`, `home-assistant`, `remind-export`; the per-account
-plaintext passwords live in the same item as single-line fields). The
-ExternalSecret reads the note body because 1Password fields are single-line. The
-pod does not start without it. The HA
+**Owner step before this works:** one 1Password field per account in item
+`radicale-secret` (`rwaltr`, `sam`, `ha` → `home-assistant`, `remind-export`)
+holding a long random password. Those are the credentials clients type in; the
+init container bcrypts them into the htpasswd file at every start, so there is no
+hand-maintained hash blob to drift — the first version of this app kept one in
+the item's notes, it disagreed with these fields, and every client got a 401.
+The pod does not start without the item. The HA
 integration itself is a UI step — HA config entries live in `/config/.storage`, and
 the `config/` directory in this repo is a mirror, not a mounted source.
 

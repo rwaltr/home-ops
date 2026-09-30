@@ -1,10 +1,11 @@
 #!/bin/sh
 # Seed the Radicale storage tree before the server starts.
 #
-# Two jobs:
-#   1. pre-create the four calendar collections, so the shares below resolve
+# Three jobs:
+#   1. build the htpasswd file from the per-account passwords in 1Password;
+#   2. pre-create the four calendar collections, so the shares below resolve
 #      before anyone's phone has ever connected;
-#   2. seed the sharing database (csv) — this is what puts the shared "Family"
+#   3. seed the sharing database (csv) — this is what puts the shared "Family"
 #      calendar and the read-only "Remind" feed inside each user's principal,
 #      which is the only place CalDAV clients discover collections.
 #
@@ -20,6 +21,39 @@ set -eu
 
 ROOT=/var/lib/radicale/collections
 DB="$ROOT/collection-db/sharing.csv"
+
+seed_users() {
+  # /etc/radicale-passwords is the ExternalSecret projected as files, one per
+  # account (`rwaltr`, `sam`, `home-assistant`, `remind-export`); the name of the
+  # file *is* the htpasswd user. Regenerated every start because it lands in an
+  # emptyDir shared with the app container, which mounts it read-only.
+  #
+  # bcrypt cost 10: Radicale re-hashes on every request (htpasswd_cache defaults
+  # to False), so this is per-request latency, not just init time.
+  PASS_DIR=/etc/radicale-passwords
+  USERS_FILE=/etc/radicale-users/users
+  [ -d "$PASS_DIR" ] || { echo "radicale-bootstrap: no $PASS_DIR (ExternalSecret did not project)" >&2; exit 1; }
+  /app/bin/python - "$PASS_DIR" "$USERS_FILE" <<'PY'
+import bcrypt, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+expected = {"rwaltr", "sam", "home-assistant", "remind-export"}
+names = sorted(n for n in os.listdir(src) if os.path.isfile(os.path.join(src, n)))
+if set(names) != expected:
+    raise SystemExit("radicale-bootstrap: unexpected accounts %r (want %r)" % (names, sorted(expected)))
+lines = []
+for name in names:
+    with open(os.path.join(src, name), "rb") as fh:
+        password = fh.read().rstrip(b"\n")
+    if not password:
+        raise SystemExit("radicale-bootstrap: empty password for %r" % name)
+    lines.append("%s:%s" % (name, bcrypt.hashpw(password, bcrypt.gensalt(rounds=10)).decode()))
+with open(dst, "w") as fh:
+    fh.write("\n".join(lines) + "\n")
+print("radicale-bootstrap: generated %d htpasswd entries: %s" % (len(lines), ", ".join(names)))
+PY
+}
+
+seed_users
 
 seed_collection() {
   # seed_collection <path under collection-root> <display name> <colour>

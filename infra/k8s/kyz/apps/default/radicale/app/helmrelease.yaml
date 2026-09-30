@@ -156,12 +156,29 @@ spec:
         globalMounts:
           - path: /etc/radicale
             readOnly: true
+      # The htpasswd file is generated, never stored: bootstrap.sh reads the
+      # per-account passwords from 1Password (mounted below) and bcrypts them in
+      # here on every start, so a password rotation is a 1Password edit plus a
+      # rollout and there is no hand-maintained hash blob to drift out of sync.
       users:
+        type: emptyDir
+        advancedMounts:
+          radicale:
+            bootstrap:
+              - path: /etc/radicale-users
+            app:
+              - path: /etc/radicale-users
+                readOnly: true
+      # Plaintext passwords, projected by the ExternalSecret. Init container
+      # only — the app container sees just the hashes generated above.
+      passwords:
         type: secret
         name: radicale-users
-        globalMounts:
-          - path: /etc/radicale-users
-            readOnly: true
+        advancedMounts:
+          radicale:
+            bootstrap:
+              - path: /etc/radicale-passwords
+                readOnly: true
       tmp:
         type: emptyDir
         globalMounts:

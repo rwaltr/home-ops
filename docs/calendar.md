@@ -65,25 +65,33 @@ principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), s
 
 ### Provisioning the credentials (owner step — the pod does not start without it)
 
-1Password item **`radicale-secret`**, a Secure Note whose **body** is the
-htpasswd file, one bcrypt line per account:
+1Password item **`radicale-secret`**: one **concealed field per account** holding a
+_long random password_, named after the account.
 
-```bash
-# for each account: rwaltr, sam, home-assistant, remind-export
-htpasswd -nB user                        # -B = bcrypt, matches [auth] htpasswd_encryption
-```
+| Item field      | htpasswd user     | Used by                        |
+| --------------- | ----------------- | ------------------------------ |
+| `rwaltr`        | `rwaltr`          | your phone, your desktop       |
+| `sam`           | `sam`             | her iPhone                     |
+| `ha`            | `home-assistant`  | the HA CalDAV integration      |
+| `remind-export` | `remind-export`   | `scripts/remind-to-caldav.py`  |
 
-Paste the four lines into the item's **notes**, not into a named field: 1Password
-fields are single-line, so the ExternalSecret reads the note body (`notesPlain`)
-and templates it to the `radicale-users` Secret. The same item also carries one
-single-line concealed field per account (`rwaltr`, `sam`, `ha`, `remind-export`)
-with the plaintext password — that is what `op://home-ops/radicale-secret/...`
-reads and what gets typed into the phones and Home Assistant. Generating a _long
-random password per account_ and storing both forms in the same 1Password item is
-the point — these are the only thing between the internet and the calendar.
+Those four values are the only credentials in the system, and they are what
+`op://home-ops/radicale-secret/<name>` returns. **There is no htpasswd file to
+generate.** The `bootstrap.sh` init container bcrypts each field into
+`/etc/radicale-users/users` at every pod start, so rotating a password is one
+1Password edit: the ExternalSecret picks it up within `refreshInterval` (1h),
+reloader rolls the pod, the hash is rebuilt. Nothing is kept in sync by hand.
 
-Keep prose out of that note: it is machine-read as the htpasswd file, so a stray
-line either fails the parse or becomes a bogus account entry.
+That last point is the whole design: the first version of this app stored a
+hand-made bcrypt blob in the item's **notes** and read it with `{{ .notesPlain }}`.
+The blob drifted from these fields, and every client got a 401 with no obvious
+cause. If you ever do want the hash parked in 1Password instead, it has to be
+regenerated from *these* fields (`htpasswd -nB`) whenever one changes — so don't.
+
+The plaintext passwords do land in the `radicale-users` Secret, but it is mounted
+**only into the init container**; the app container mounts just the generated
+hashes. That is the price of not hand-maintaining a hash blob, and it is the same
+Secret-read trust boundary as the 1Password Connect token already in the cluster.
 
 ## Client setup
 
