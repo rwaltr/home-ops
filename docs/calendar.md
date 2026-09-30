@@ -58,10 +58,13 @@ principal. That is what `[sharing] collection_by_map` does (Radicale ≥ 3.7), s
   (public through the cloudflare tunnel — CGNAT, no port forwards). TLS is the
   cert-manager `*.waltr.tech` wildcard; basic auth over TLS is the only gate.
 - The **init container** (`bootstrap.sh`) is what makes this declarative: it
-  pre-creates the four collections and seeds the sharing database, so the shares
-  resolve before any phone has ever connected. It only ever fills gaps — an
-  existing `.Radicale.props` or `sharing.csv` is left untouched, so state written
-  by a phone or the WebUI survives every restart.
+  builds the htpasswd file from the 1Password fields (above), pre-creates the four
+  collections and seeds the sharing database, so the shares resolve before any
+  phone has ever connected. It only ever fills gaps — an existing `.Radicale.props`
+  or `sharing.csv` is left untouched, so state written by a phone or the WebUI
+  survives every restart. The plaintext `radicale-users` Secret is mounted
+  **only** into this container; the app container gets the generated hashes from
+  an emptyDir, read-only.
 
 ### Provisioning the credentials (owner step — the pod does not start without it)
 
@@ -207,8 +210,32 @@ and `bootstrap.sh` locally, seeded exactly as the init container seeds it:
 - `helm template` renders the Deployment/Service/HTTPRoute/PVC from the committed
   values and the probes resolve to `/.web/` (200 unauthenticated; `/` is a 302).
 
-Not tested: the real cloudflare tunnel path with a phone, and the HA CalDAV
-config flow (both need the environment, not the manifests).
+Not tested: a real phone client over the tunnel, and the HA CalDAV config flow
+(both need the environment, not the manifests).
+
+### Verified live in the cluster (2026-09-30)
+
+Deployed end to end on `mouse` — the pinned digest, the committed values and the
+real 1Password item — covering what the local run could not:
+
+- init container logged `generated 4 htpasswd entries: home-assistant,
+  remind-export, rwaltr, sam`, and the app container has no
+  `/etc/radicale-passwords` at all: the plaintext Secret never reaches it;
+- all four accounts authenticate (`PROPFIND` → 207, wrong password → 401);
+- discovery by PROPFIND `Depth: 1` matches the collections table for every
+  principal — `rwaltr` → `Rwaltr`/`Family`/`Remind (read-only)`, `sam` →
+  `Sam`/`Family`/`Remind (read-only)`, `home-assistant` →
+  `Family`/`Remind (read-only)`;
+- `sam` PUT into `Family` → 201, `rwaltr` GET through his own path → 200 with the
+  body intact, `home-assistant` → 200; `sam` PROPFIND on `rwaltr/calendar` → 403;
+- read-only feed: `rwaltr` PUT → 403, `remind-export` PUT → 201, `sam` GET → 200;
+- through `envoy-internal` over TLS: `/.web/` → 200, authenticated `/` → 302,
+  PROPFIND `/sam/` → 207; the public `https://calendar.waltr.tech/.web/` → 200
+  through the cloudflare tunnel.
+
+This deploy is also what exposed the credential drift: the item's note held a
+bcrypt blob that matched none of its four password fields, so every client got a
+401. That failure is the reason the file is generated rather than stored.
 
 ## Cautions for whoever touches this next
 
@@ -216,6 +243,10 @@ config flow (both need the environment, not the manifests).
   Radicale's own storage formats (`.Radicale.props`, `sharing.csv` column order and
   `True`/`False` spelling). A wrong byte here does not crash — the share silently
   never appears.
+- **The four passwords live in the `radicale-users` Secret in cleartext.** That is
+  the price of generating the htpasswd instead of hand-maintaining it. Mount it
+  nowhere but the init container (the `advancedMounts` in `helmrelease.yaml`), and
+  never copy one into a manifest — `git grep` for the passwords should stay empty.
 - **The PVC name is pinned with `forceRename` on purpose.** app-template names a
   _lone_ PVC plainly `<fullname>` and only suffixes the key once a second PVC
   exists; without the pin, a chart refactor could rename it and orphan the data.
