@@ -63,5 +63,15 @@ spec:
         globalMounts:
           - path: /mosquitto/config/mosquitto.conf
             subPath: mosquitto.conf
+      # Retained messages (HA discovery + availability topics) survive a broker
+      # restart only if they are on disk. fsGroup 1000 owns the volume, which is
+      # what the container runs as.
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /mosquitto/data
       tmp:
         type: emptyDir
