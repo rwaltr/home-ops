@@ -24,7 +24,7 @@ spec:
           app:
             image:
               repository: docker.io/alexxit/go2rtc
-              tag: 1.9.9@sha256:7d31dcb73633310e80497c431f4534c81ed55ec0708db3262bc56918e654bba5
+              tag: 1.9.14@sha256:675c318b23c06fd862a61d262240c9a63436b4050d177ffc68a32710d9e05bae
             env:
               TZ: America/Chicago
             probes:
