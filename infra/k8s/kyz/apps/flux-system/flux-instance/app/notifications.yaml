@@ -36,4 +36,10 @@ spec:
     - dial.*tcp.*timeout
     - dial.*tcp.*unreachable
     - waiting.*socket
+    # ghcr blob fetches intermittently fail with "context deadline exceeded" and
+    # recover unaided, but the dial-timeout patterns above miss that phrasing, so
+    # every occurrence paged. Scoped to artifact layer extraction on purpose: a
+    # bare `context deadline exceeded` would also swallow a genuine
+    # GitRepository/HelmRepository fetch timeout, which is worth a page.
+    - extracting layer from artifact.*context deadline exceeded
   suspend: false
