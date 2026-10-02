@@ -22,12 +22,12 @@ needs one app (DAVx⁵).
 Four accounts, four collections. Each account is one client credential, so a lost
 phone means deleting one htpasswd line rather than rotating a shared password.
 
-| Account          | Used by                       | Collections                        |
-| ---------------- | ----------------------------- | ---------------------------------- |
-| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (read-only to `sam` and HA) |
-| `sam`            | her iPhone                    | `sam/calendar` (read-only to `rwaltr` and HA) |
+| Account          | Used by                       | Collections                                           |
+| ---------------- | ----------------------------- | ----------------------------------------------------- |
+| `rwaltr`         | your phone, your desktop      | `rwaltr/calendar` (read-only to `sam` and HA)         |
+| `sam`            | her iPhone                    | `sam/calendar` (read-only to `rwaltr` and HA)         |
 | `home-assistant` | the HA CalDAV integration     | `home-assistant/*` (Family `rw`, everything else `r`) |
-| `remind-export`  | `scripts/remind-to-caldav.py` | `remind-export/remind` (writable)  |
+| `remind-export`  | `scripts/remind-to-caldav.py` | `remind-export/remind` (writable)                     |
 
 Collection layout:
 
@@ -89,12 +89,12 @@ talked to this server discover the shares on its first PROPFIND.
 1Password item **`radicale-secret`**: one **concealed field per account** holding a
 _long random password_, named after the account.
 
-| Item field      | htpasswd user     | Used by                        |
-| --------------- | ----------------- | ------------------------------ |
-| `rwaltr`        | `rwaltr`          | your phone, your desktop       |
-| `sam`           | `sam`             | her iPhone                     |
-| `ha`            | `home-assistant`  | the HA CalDAV integration      |
-| `remind-export` | `remind-export`   | `scripts/remind-to-caldav.py`  |
+| Item field      | htpasswd user    | Used by                       |
+| --------------- | ---------------- | ----------------------------- |
+| `rwaltr`        | `rwaltr`         | your phone, your desktop      |
+| `sam`           | `sam`            | her iPhone                    |
+| `ha`            | `home-assistant` | the HA CalDAV integration     |
+| `remind-export` | `remind-export`  | `scripts/remind-to-caldav.py` |
 
 Those four values are the only credentials in the system, and they are what
 `op://home-ops/radicale-secret/<name>` returns. **There is no htpasswd file to
@@ -107,7 +107,7 @@ That last point is the whole design: the first version of this app stored a
 hand-made bcrypt blob in the item's **notes** and read it with `{{ .notesPlain }}`.
 The blob drifted from these fields, and every client got a 401 with no obvious
 cause. If you ever do want the hash parked in 1Password instead, it has to be
-regenerated from *these* fields (`htpasswd -nB`) whenever one changes — so don't.
+regenerated from _these_ fields (`htpasswd -nB`) whenever one changes — so don't.
 
 The plaintext passwords do land in the `radicale-users` Secret, but it is mounted
 **only into the init container**; the app container mounts just the generated
@@ -239,7 +239,7 @@ Deployed end to end on `mouse` — the pinned digest, the committed values and t
 real 1Password item — covering what the local run could not:
 
 - init container logged `generated 4 htpasswd entries: home-assistant,
-  remind-export, rwaltr, sam`, and the app container has no
+remind-export, rwaltr, sam`, and the app container has no
   `/etc/radicale-passwords` at all: the plaintext Secret never reaches it;
 - all four accounts authenticate (`PROPFIND` → 207, wrong password → 401);
 - discovery by PROPFIND `Depth: 1` matches the collections table for every
@@ -262,8 +262,7 @@ real 1Password item — covering what the local run could not:
   through the cloudflare tunnel.
 
 This deploy is also what exposed the credential drift: the item's note held a
-bcrypt blob that matched none of its four password fields, so every client got a
-401. That failure is the reason the file is generated rather than stored.
+bcrypt blob that matched none of its four password fields, so every client got a 401. That failure is the reason the file is generated rather than stored.
 
 ## Cautions for whoever touches this next
 
