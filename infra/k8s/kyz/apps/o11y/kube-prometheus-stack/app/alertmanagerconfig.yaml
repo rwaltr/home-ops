@@ -59,6 +59,25 @@ spec:
         - name: severity
           value: warning
           matchType: =
+    # One node-memory event raises two warnings on the same node:
+    # NodeMemoryMajorPagesFaults (the node is actively paging) and
+    # NodeMemoryHighUtilization (the pressure behind it). The rule above cannot
+    # collapse them -- it requires an equal alertname and both are
+    # severity=warning -- so a single event cost two pages against a budget of
+    # three paging alerts per day. Keyed on the shared `instance` instead, so the
+    # operational symptom still pages and its softer companion is suppressed.
+    # Directed on purpose: the pair must not inhibit each other in both
+    # directions, which would be circular and resolve arbitrarily.
+    - equal:
+        - instance
+      sourceMatch:
+        - name: alertname
+          value: NodeMemoryMajorPagesFaults
+          matchType: =
+      targetMatch:
+        - name: alertname
+          value: NodeMemoryHighUtilization
+          matchType: =
 
   receivers:
     - name: blackhole
