@@ -478,6 +478,12 @@ spec:
                 - skills
                 - session_search
                 - cronjob
+                # In-process subagents. `delegate_task` runs the child inside
+                # this pod -- it does NOT shell out to the `hermes` CLI, which
+                # would deadlock on the session lease this turn holds. Used to
+                # work independent items (one branch + PR each) in parallel
+                # instead of serially.
+                - delegation
             web:
               search_backend: searxng
             tools:
