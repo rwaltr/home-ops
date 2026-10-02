@@ -87,17 +87,28 @@ spec:
 # are what external-dns publishes publicly; anything else stays internal-only.
 # Under CGNAT this gateway receives traffic via the cloudflare-tunnel (future)
 # and the external VIPs from Tailscale (operator, future).
+#
+# The `target` annotation must use the external-dns.kubernetes.io/ prefix:
+# external-dns v0.22.0 (chart 1.22.0) changed the default --annotation-prefix
+# from external-dns.alpha.kubernetes.io/. With the old prefix the target is
+# ignored, routes fall back to this Gateway's status.addresses (the private
+# LB VIPs), and Cloudflare rejects the resulting proxied A/AAAA records
+# ("Target 10.10.100.12 is not allowed for a proxied record") — so no public
+# record is published at all.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: envoy-external
   annotations:
-    external-dns.alpha.kubernetes.io/target: &hostname external.waltr.tech
+    external-dns.kubernetes.io/target: &hostname external.waltr.tech
 spec:
   gatewayClassName: envoy
   infrastructure:
     annotations:
-      external-dns.alpha.kubernetes.io/hostname: *hostname
+      # Applied to the generated envoy Service by Envoy Gateway, not read by
+      # the gateway-httproute source — `external.waltr.tech` itself is
+      # published by the cloudflare-tunnel DNSEndpoint (crd source).
+      external-dns.kubernetes.io/hostname: *hostname
       lbipam.cilium.io/ips: 10.10.100.12,fdad:207a:f1ab:100::12
   listeners:
     - name: http

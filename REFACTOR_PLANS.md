@@ -1279,6 +1279,39 @@ The pod does not start without the item. The HA
 integration itself is a UI step — HA config entries live in `/config/.storage`, and
 the `config/` directory in this repo is a mirror, not a mounted source.
 
+### 2026-10-02 — external-dns v0.22.0 annotation-prefix change: public records vanished
+
+Silent, high impact. Jellyfin, Home Assistant, Immich, Radicale, Tesla key,
+konflate and flux-receiver all lost their public Cloudflare records — the
+hostnames stopped resolving from outside the LAN. Everything behind the gateway
+was healthy the whole time (`curl --resolve <host>:443:10.10.100.12` returned
+200/302 on every one).
+
+Cause: the automated chart bump external-dns 1.21.1 → 1.22.0 (PR #825), which
+ships external-dns v0.22.0. That release changed the default
+`--annotation-prefix` from `external-dns.alpha.kubernetes.io/` to
+`external-dns.kubernetes.io/` (upstream #6703). The `envoy-external` Gateway
+carried `external-dns.alpha.kubernetes.io/target: external.waltr.tech`; v0.22.0
+ignored it, so the `gateway-httproute` source fell back to the Gateway's
+`status.addresses` — the private dual-stack LB VIPs (10.10.100.12 /
+fdad:207a:f1ab:100::12). Cloudflare rejects a *proxied* record pointing at a
+private IP (`9003: Target 10.10.100.12 is not allowed for a proxied record`),
+the whole DNS batch fails, and `--policy=sync` had already deleted the
+previously correct CNAMEs, so nothing was left to resolve.
+
+Fix: use the new prefix on the Gateway `target` annotation. The
+`spec.infrastructure.annotations` hostname annotation is not read by the
+`gateway-httproute` source at all (Envoy Gateway copies it onto the generated
+envoy Service); `external.waltr.tech` itself is published by the
+cloudflare-tunnel DNSEndpoint (crd source). Upstream ships
+`--enable-legacy-annotation-prefix` as a migration stopgap, but these two
+annotations were the only external-dns annotations in the repo, so re-prefixing
+is the durable fix.
+
+Lesson: a chart bump can carry a behavioural breaking change, not just a
+version. Anything consuming external-dns annotations is coupled to that default
+prefix.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
