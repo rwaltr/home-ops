@@ -35,7 +35,7 @@ spec:
           config:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
             command:
               - /bin/bash
               - -c
@@ -94,7 +94,7 @@ spec:
           repo:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
             command:
               - /bin/bash
               - -c
@@ -126,7 +126,7 @@ spec:
           tools:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
             command:
               - /bin/bash
               - -c
@@ -206,7 +206,7 @@ spec:
           app:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
             args:
               - gateway
               - run
@@ -336,7 +336,7 @@ spec:
           gitcreds:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.14@sha256:1f983df4d778d46b3c3892d7598c9d57291430a6e35936ebc371ae1e5766699a
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
             command:
               - /bin/bash
               - -c
