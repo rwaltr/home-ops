@@ -28,6 +28,12 @@ spec:
         alertmanagerConfiguration:
           name: alertmanager
         externalUrl: https://alertmanager.waltr.tech
+        # Chart default was request 200Mi with no limit; 30d p99 working set 52Mi.
+        resources:
+          requests:
+            memory: 96Mi
+          limits:
+            memory: 256Mi
         storage:
           volumeClaimTemplate:
             spec:
@@ -68,6 +74,10 @@ spec:
         resources:
           requests:
             cpu: 100m
+            # 30d p99 working set 1034Mi (max 1212Mi; the pod cgroup, which also
+            # carries the WAL/head chunks, hit 1393Mi). 2Gi keeps Prometheus from
+            # being the pod that argues for space, without pinning it to its limit.
+            memory: 2Gi
           limits:
             memory: 4Gi
         storageSpec:
@@ -79,6 +89,12 @@ spec:
                   storage: 50Gi
     prometheus-node-exporter:
       fullnameOverride: node-exporter
+      # Was BestEffort; 30d p99 working set 35Mi.
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 128Mi
       # Textfile collector for host facts node_exporter cannot gather itself —
       # currently the ZFS vdev states written by o11y/zfs-vdev-exporter.
       #
@@ -99,6 +115,19 @@ spec:
           mountPath: /textfile
     kube-state-metrics:
       fullnameOverride: kube-state-metrics
+      # Was BestEffort; 30d p99 92Mi but max 183Mi — sized to the burst.
+      resources:
+        requests:
+          memory: 192Mi
+        limits:
+          memory: 512Mi
+    prometheusOperator:
+      # Was BestEffort; 30d p99 working set 43Mi.
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     grafana:
       enabled: false
       forceDeployDashboards: true

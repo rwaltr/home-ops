@@ -39,6 +39,12 @@ spec:
       - --cloudflare-proxied
     policy: sync
     registry: txt
+    # Was BestEffort; 30d p99 working set 35Mi.
+    resources:
+      requests:
+        memory: 64Mi
+      limits:
+        memory: 256Mi
     txtOwnerId: kyz
     domainFilters:
       - waltr.tech # ops zone — records come only from envoy-external routes + DNSEndpoints

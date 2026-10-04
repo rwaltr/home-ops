@@ -15,5 +15,23 @@ spec:
       enabled: true
     grafanaDashboard:
       enabled: true
+    # Memory requests from the 30d working-set audit (docs/memory-requests.md).
+    # Controller, cert-controller and webhook were all BestEffort before this.
+    resources:
+      requests:
+        memory: 96Mi
+      limits:
+        memory: 256Mi
+    certController:
+      resources:
+        requests:
+          memory: 96Mi
+        limits:
+          memory: 256Mi
     webhook:
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 256Mi
       replicaCount: 2

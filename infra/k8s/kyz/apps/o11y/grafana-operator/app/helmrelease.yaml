@@ -10,6 +10,12 @@ spec:
     name: grafana-operator
   interval: 1h
   values:
+    # Was BestEffort at 30d p99 86Mi (7 restarts in the window).
+    resources:
+      requests:
+        memory: 128Mi
+      limits:
+        memory: 512Mi
     dashboard:
       enabled: true
     serviceMonitor:

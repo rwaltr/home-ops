@@ -64,6 +64,8 @@ spec:
             resources:
               requests:
                 cpu: 10m
+                # 30d p99 working set 686Mi (docs/memory-requests.md)
+                memory: 1Gi
               limits:
                 memory: 2Gi
     defaultPodOptions:

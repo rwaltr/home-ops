@@ -12,6 +12,13 @@ spec:
   values:
     global:
       imageRegistry: mirror.gcr.io
+    # Control-plane memory request: 30d p99 working set 143Mi, so stop holding
+    # the chart's 256Mi (docs/memory-requests.md). Limit stays at the default 1Gi.
+    deployment:
+      envoyGateway:
+        resources:
+          requests:
+            memory: 192Mi
     config:
       envoyGateway:
         provider:

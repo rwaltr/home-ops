@@ -91,7 +91,8 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                # 30d p99 working set 1360Mi (docs/memory-requests.md)
+                memory: 1792Mi
               limits:
                 memory: 4Gi # CPU transcoding headroom
       valkey:
@@ -176,7 +177,7 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                memory: 448Mi
               limits:
                 memory: 2Gi
     service:

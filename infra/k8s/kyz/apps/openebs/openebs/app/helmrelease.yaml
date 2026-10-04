@@ -25,7 +25,13 @@ spec:
     # as a StorageClass; the zfs CSI is disabled until a dedicated local
     # pool exists.
     localpv-provisioner:
+      # Was BestEffort; 30d p99 working set 48Mi for the provisioner.
       localpv:
+        resources:
+          requests:
+            memory: 96Mi
+          limits:
+            memory: 256Mi
         image:
           registry: quay.io/
       hostpathClass:

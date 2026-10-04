@@ -37,5 +37,8 @@ spec:
     resources:
       requests:
         cpu: 50m
-      limits:
+        # 30d p99 working set 810Mi against a 1Gi limit. Request/limit raised:
+        # a PR-review bot that has to render the whole tree wants headroom.
         memory: 1Gi
+      limits:
+        memory: 2Gi

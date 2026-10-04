@@ -10,6 +10,12 @@ spec:
     name: flux-operator
   interval: 1h
   values:
+    # Operator process: 30d p99 working set 164Mi, so the chart's 64Mi default
+    # request was ~40% of measured. Limit stays at the chart's 1Gi.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
     serviceMonitor:
       create: true
     # web:

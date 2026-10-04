@@ -53,7 +53,11 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 250Mi
+                # 30d p90 2.4GiB / p95 3.45GiB / p99 4.42GiB: unpack+repair is a
+                # spiky working set (steady is ~1.4GiB), so the request covers the
+                # bulk of the distribution and the 8Gi limit is the ceiling for a
+                # large multi-part unpack.
+                memory: 3Gi
               limits:
                 memory: 8Gi
     defaultPodOptions:

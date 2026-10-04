@@ -89,7 +89,12 @@ spec:
               # 20 cores committed. Throttling is the cost; the request is the guard.
               requests:
                 cpu: 250m
-                memory: 1Gi
+                # 30d p90 1633Mi / p99 4620Mi. This pod is a deliberately
+                # yielding background transcoder (priorityClass unmanic-background,
+                # non-preempting), so the request covers the normal working set and
+                # the re-encode spike stays inside the 6Gi limit rather than being
+                # reserved permanently for the whole node's scheduler.
+                memory: 2Gi
               limits:
                 # Memory keeps its cap: memory is not reclaimed fairly, and this node
                 # has no swap. Budget is ~1 GiB idle floor + ~1.4 GiB per worker at

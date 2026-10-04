@@ -149,9 +149,11 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 256Mi
+                # 30d p99 working set 496Mi — it sat at 97% of its old 512Mi
+                # limit, so raise the limit too, and keep request under 75% of it.
+                memory: 640Mi
               limits:
-                memory: 512Mi
+                memory: 1Gi
           ollama:
             image:
               repository: docker.io/ollama/ollama
@@ -192,7 +194,11 @@ spec:
             resources:
               requests:
                 cpu: 500m
-                memory: 2500Mi
+                # No model load in the 25d window: pegged at 17Mi the whole time,
+                # so 2500Mi was reserving for a load that never happened. The 4Gi
+                # limit is unchanged, so a load still bursts; raise this request
+                # again if local inference comes back.
+                memory: 512Mi
               limits:
                 # Largest resident local model is qwen3-1.7b (1.4GB) + 8k KV
                 # cache + runtime. 4Gi leaves room for a 4B-class swap later.
@@ -239,7 +245,7 @@ spec:
             resources:
               requests:
                 cpu: 500m
-                memory: 1Gi
+                memory: 256Mi
               limits:
                 # whisper small-int8 ~500Mi + piper voice ~150Mi + runtime.
                 memory: 2Gi

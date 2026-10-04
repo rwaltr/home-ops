@@ -98,7 +98,8 @@ spec:
             resources:
               requests:
                 cpu: 50m
-                memory: 512Mi
+                # 30d p99 working set 1578Mi (whisper model resident)
+                memory: 2Gi
               limits:
                 memory: 3Gi
     defaultPodOptions:
