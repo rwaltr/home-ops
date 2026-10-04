@@ -48,9 +48,12 @@ spec:
               TZ: America/Chicago
               PUID: "1000"
               PGID: "1000"
-              # CPU workers. Each worker runs one ffmpeg at a time. Raised 2 -> 3
-              # alongside dropping the CPU cap: the node has 20 cores and ~15 idle
-              # while the backlog sits near 1,900 files. Costs ~1.4 GiB more at peak.
+              # INERT. Unmanic imports env into settings by matching the lowercase
+              # setting key (`if setting in os.environ` in unmanic/config.py), so
+              # `NUMBER_OF_WORKERS` never maps to `number_of_workers`. Verified: the
+              # pod ran with this set to 2 and then 3 and the worker count never
+              # moved. It is kept only as a hint of intent — the live control is the
+              # worker group, set via the API (see docs/jellyfin-direct-play.md).
               NUMBER_OF_WORKERS: "3"
               # Periodic full library scan (inotify handles new files too).
               SCHEDULE_FULL_SCAN_MINUTES: "60"
