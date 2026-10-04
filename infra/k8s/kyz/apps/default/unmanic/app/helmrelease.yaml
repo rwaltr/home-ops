@@ -77,12 +77,17 @@ spec:
               readOnlyRootFilesystem: false
               capabilities: { drop: ["ALL"] }
             resources:
+              # CPU request, no CPU limit, on purpose. CPU shares are derived from
+              # requests, so the 250m request is the lever that makes this pod yield
+              # under contention — not a quota. The 4-core limit only ever throttled
+              # it (~95% of CFS periods) against a node sitting ~75% idle with 4.3 of
+              # 20 cores committed. Throttling is the cost; the request is the guard.
               requests:
                 cpu: 250m
                 memory: 512Mi
               limits:
-                # Cap so a long re-encode cannot starve Jellyfin.
-                cpu: "4"
+                # Memory keeps its cap: memory is not reclaimed fairly, and this node
+                # has no swap.
                 memory: 4Gi
     defaultPodOptions:
       # Below-default, non-preempting background class (see priorityclass.yaml).
