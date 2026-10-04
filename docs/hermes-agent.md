@@ -54,7 +54,9 @@ PRs, o11y dashboards, Flatcar/Butane work validated in a VM.
    material, and does not use SOPS/age. 1Password and ExternalSecrets remain
    rwaltr's to manage; if a change needs a secret, it stops and asks.
 5. **Cluster access: direct is allowed**, but the PR loop must stay tight
-   (see below). Start read-only; add scoped writes only if it earns them.
+   (see below). Read-only by default; scoped writes only if earned. One has been
+   earned: `delete` on pods (2026-10-04) so a restart does not need a human. See
+   the RBAC note below — the grant is a restart lever, not a configuration path.
 6. **Autonomy: approve destructive commands.** Reads and builds run freely;
    destructive/irreversible ops require an explicit in-chat approval.
 7. **Exposure: Tailscale is the intended answer but not yet established.**
@@ -252,13 +254,22 @@ requests read-write (and Workflows write to touch `.github/workflows`).
   read-write (and Workflows write if it edits `.github/workflows`).
 - **In-cluster `kubectl` via SA** changes `automountServiceAccountToken`; review
   the RBAC diff before merge.
-- **RBAC stays read-only.** Every grant is `get`/`list`/`watch`; the cluster-scoped
-  roles are enumerated above so a bulk widening (e.g. adding a whole API group)
-  is visible in the diff rather than hidden behind a wildcard.
+- **RBAC is read-only except for one operational verb.** Every grant is
+  `get`/`list`/`watch` except `delete` on `pods` (`hermes-pod-restart`,
+  2026-10-04). That grant exists so Teletran can restart a workload itself rather
+  than asking rwaltr to type `kubectl` for something mechanical. A restart is not
+  a configuration change — the owning controller recreates the pod, PVCs and
+  Secrets are untouched, and desired state is unchanged. It is deliberately
+  pods-only: it does not extend to workload objects, replica counts,
+  `deletecollection`, or `pods/exec`. Cluster-scoped roles are enumerated above
+  so a bulk widening (e.g. adding a whole API group) is visible in the diff
+  rather than hidden behind a wildcard.
 - **Prompt budget** grows with every toolset; measure `hermes prompt-size`
   after each phase.
 - **Two write paths exist** (git and `kubectl`). The policy is git-only for
   changes; keep it explicit so the agent does not drift into imperative fixes.
+  Deleting a pod is the one exception, and only because it changes no desired
+  state — it is a restart, not an edit.
 
 ## Gotchas captured while planning
 
@@ -271,5 +282,8 @@ requests read-write (and Workflows write to touch `.github/workflows`).
   `${GO}` init-container shell).
 - `automountServiceAccountToken: false` today — any cluster access is a
   conscious change.
+- RBAC grants apply immediately to a running pod: the API server authorises every
+  request against the live ClusterRole/Binding, so no restart or token re-issue
+  is needed after Flux applies a new grant.
 - Repo `.mise.toml` is the toolchain source of truth; `mise install` beats
   hand-pinned binaries.
