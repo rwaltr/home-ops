@@ -1353,6 +1353,15 @@ Tracking issue #896. Full method, per-container table and exceptions:
   chart change. They stay BestEffort.
 - **`konnectivity-agent` is k0s-managed.** It is the one BestEffort pod on the
   node that cannot be fixed by a Git change.
+- **A `metadata.namespace` in an app's `ks.yaml` is silently overwritten by the
+  parent kustomization's `namespace:` transformer.** `network/cloudflare-tunnel`
+  carried `namespace: flux-system` in its metadata while the parent
+  `network/kustomization.yaml` set `namespace: network`; kustomize rewrote it, so
+  the object has always been applied to `network` and the file was lying. It also
+  made the `- name: external-dns` entry ambiguous to anything reading the file
+  literally (konflate looked for `flux-system/external-dns` and reported the
+  dependency missing). The stray line is gone and the `dependsOn` entry now names
+  `network` explicitly: same object, no inference required.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
