@@ -162,6 +162,14 @@ offline.
   reclaimed fairly and the node has no swap. Budget is ~1 GiB idle floor plus
   ~1.4 GiB per worker at peak — the pod measured 3.8 GiB with two workers, so 6Gi
   covers three with headroom.
+- **Worker count is app state, not env.** `NUMBER_OF_WORKERS` only seeds Unmanic's
+  config on first run; on an install that already has a config PVC it does
+  nothing — it is documentation, not a control. The live value is
+  `settings.number_of_workers` (`3` as of 2026-10-04), written through
+  `POST /unmanic/api/v2/settings/write`. Workers are spawned at process start, so
+  a change needs a pod restart — and `clear_pending_tasks_on_restart` is `true`,
+  so a restart wipes the pending queue, which the hourly full scan then rebuilds.
+  Restart when the queue is empty rather than mid-backlog.
 - **Background priority**: `priorityClassName: unmanic-background` — a
   `PriorityClass` with `value: -100`, `preemptionPolicy: Never`. Every other pod
   in this cluster carries the implicit priority 0, so Unmanic schedules behind
