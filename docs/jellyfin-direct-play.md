@@ -155,21 +155,49 @@ offline.
 - Image: `ghcr.io/unmanic/unmanic:0.4.1` (the app repo's own registry), pinned
   by digest. `unmanic-config` 5Gi + `unmanic-cache` 50Gi PVCs; the cache is
   excluded from the kopia SnapshotPolicy.
-- `NUMBER_OF_WORKERS=3`, 250m CPU request and **no CPU limit**. Kubernetes derives
-  CPU shares from requests, so the request is what stops a long re-encode starving
-  Jellyfin — the old 4-core limit only added throttling on a node with 20 cores
-  and ~4.3 cores of requests committed. Memory is capped at 6Gi: memory is not
-  reclaimed fairly and the node has no swap. Budget is ~1 GiB idle floor plus
-  ~1.4 GiB per worker at peak — the pod measured 3.8 GiB with two workers, so 6Gi
-  covers three with headroom.
-- **Worker count is app state, not env.** `NUMBER_OF_WORKERS` only seeds Unmanic's
-  config on first run; on an install that already has a config PVC it does
-  nothing — it is documentation, not a control. The live value is
-  `settings.number_of_workers` (`3` as of 2026-10-04), written through
-  `POST /unmanic/api/v2/settings/write`. Workers are spawned at process start, so
-  a change needs a pod restart — and `clear_pending_tasks_on_restart` is `true`,
-  so a restart wipes the pending queue, which the hourly full scan then rebuilds.
-  Restart when the queue is empty rather than mid-backlog.
+- 250m CPU request and **no CPU limit**. Kubernetes derives CPU shares from
+  requests, so the request is what stops a long re-encode starving Jellyfin — the
+  old 4-core limit only added throttling on a node with 20 cores and ~4.3 cores
+  of requests committed. Memory is capped at 6Gi: memory is not reclaimed fairly
+  and the node has no swap. Budget is ~1 GiB idle floor plus ~1.4 GiB per worker
+  at peak — the pod measured 3.8 GiB with two workers, so 6Gi covers three with
+  headroom. (The HelmRelease also sets `NUMBER_OF_WORKERS`, which does nothing —
+  see the worker-count bullet below.)
+- **Worker count lives in the worker group — the env var is inert.** Neither the
+  env var nor `settings.number_of_workers` is the control:
+  - `NUMBER_OF_WORKERS` does **nothing**. Unmanic imports env into settings by
+    matching the lowercase setting key (`if setting in os.environ`, in
+    `unmanic/config.py`), and the variable is upper-case, so it never maps.
+    Verified 2026-10-04: the pod ran with it set to 2, then to 3, and the worker
+    count never moved.
+  - `settings.number_of_workers` only _seeds_ the default worker group on first
+    run; `unmanic/libs/worker_group.py` then resets it to `null` and reads the
+    count from the `worker_groups` table. Writing it on an established install is
+    a no-op — confirmed by setting it to 3 and watching nothing happen.
+  - The live control is the group, via
+    `POST /unmanic/api/v2/settings/worker_group/write`. The schema requires every
+    field, so send the whole object back:
+
+    ```json
+    {
+      "id": 1,
+      "locked": false,
+      "name": "Hamedi",
+      "number_of_workers": 3,
+      "worker_event_schedules": [],
+      "tags": []
+    }
+    ```
+
+    Read it with `GET /unmanic/api/v2/settings/worker_groups`.
+
+  - The foreman reconciles on each tick, so a change lands within about a minute
+    and **no restart is needed**. It only adds or removes _idle_ workers — a
+    running transcode is never interrupted. Current count: **3**.
+- **Restarts keep the pending queue.** `clear_pending_tasks_on_restart` is set to
+  `false` (default `true`). With `true`, every restart wipes the pending list,
+  which then has to be rebuilt by a full library scan — measured at roughly 70
+  minutes of idle workers for a ~1,900-file backlog.
 - **Background priority**: `priorityClassName: unmanic-background` — a
   `PriorityClass` with `value: -100`, `preemptionPolicy: Never`. Every other pod
   in this cluster carries the implicit priority 0, so Unmanic schedules behind
