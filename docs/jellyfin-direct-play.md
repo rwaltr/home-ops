@@ -155,8 +155,13 @@ offline.
 - Image: `ghcr.io/unmanic/unmanic:0.4.1` (the app repo's own registry), pinned
   by digest. `unmanic-config` 5Gi + `unmanic-cache` 50Gi PVCs; the cache is
   excluded from the kopia SnapshotPolicy.
-- `NUMBER_OF_WORKERS=2`, CPU limit 4 cores — a long re-encode cannot starve
-  Jellyfin.
+- `NUMBER_OF_WORKERS=3`, 250m CPU request and **no CPU limit**. Kubernetes derives
+  CPU shares from requests, so the request is what stops a long re-encode starving
+  Jellyfin — the old 4-core limit only added throttling on a node with 20 cores
+  and ~4.3 cores of requests committed. Memory is capped at 6Gi: memory is not
+  reclaimed fairly and the node has no swap. Budget is ~1 GiB idle floor plus
+  ~1.4 GiB per worker at peak — the pod measured 3.8 GiB with two workers, so 6Gi
+  covers three with headroom.
 - **Background priority**: `priorityClassName: unmanic-background` — a
   `PriorityClass` with `value: -100`, `preemptionPolicy: Never`. Every other pod
   in this cluster carries the implicit priority 0, so Unmanic schedules behind
@@ -164,12 +169,13 @@ offline.
   takes. Its 250m CPU request keeps the cgroup CPU weight low for the same
   reason: it only gets CPU nobody else wants, and a killed transcode is
   re-queued rather than lost.
-- **Its CPU alerts do not page**: at its 4-core limit with work queued,
-  `CPUThrottlingHigh` (severity `info`) fires continuously. That is the design,
-  not a fault. A route in
+- **Its CPU alerts do not page**: the blackhole route is now a guard, not a
+  standing condition. With no CPU quota there is no CFS throttling, so
+  `CPUThrottlingHigh` (severity `info`) should stop firing entirely — it was
+  firing around the clock solely because of the removed 4-core cap. A route in
   `infra/k8s/kyz/apps/o11y/kube-prometheus-stack/app/alertmanagerconfig.yaml`
-  sends CPU alerts for `pod =~ "unmanic-.*"` to the `blackhole` receiver — they
-  stay visible in the Alertmanager UI, they just do not page.
+  still sends CPU alerts for `pod =~ "unmanic-.*"` to the `blackhole` receiver,
+  so a re-introduced cap stays visible in the Alertmanager UI without paging.
 - Libraries: **TV** `/media/tv` and **Movies** `/media/movies`,
   scanner + inotify enabled, scan every 60 min.
 
