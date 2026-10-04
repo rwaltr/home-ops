@@ -142,3 +142,34 @@ subjects:
   - kind: ServiceAccount
     name: hermes
     namespace: default
+---
+# Operational lever, not a configuration path: restart a workload by deleting its
+# pod. The owning controller recreates it, so nothing about desired state changes
+# — which is why this does not violate the git-only rule for changes.
+#
+# Deliberately narrow: pods, delete, nothing else. No deletecollection, no
+# pods/exec, no writes to workload objects (Deployments, StatefulSets,
+# HelmReleases). A pod delete cannot destroy data — PVCs, Secrets and workload
+# specs are untouched — and anything controller-managed returns on its own. The
+# failure mode is a brief restart, which is the point.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hermes-pod-restart
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hermes-pod-restart
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hermes-pod-restart
+subjects:
+  - kind: ServiceAccount
+    name: hermes
+    namespace: default
