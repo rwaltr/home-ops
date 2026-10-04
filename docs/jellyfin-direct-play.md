@@ -155,11 +155,13 @@ offline.
 - Image: `ghcr.io/unmanic/unmanic:0.4.1` (the app repo's own registry), pinned
   by digest. `unmanic-config` 5Gi + `unmanic-cache` 50Gi PVCs; the cache is
   excluded from the kopia SnapshotPolicy.
-- `NUMBER_OF_WORKERS=2`, 250m CPU request and **no CPU limit**. Kubernetes derives
+- `NUMBER_OF_WORKERS=3`, 250m CPU request and **no CPU limit**. Kubernetes derives
   CPU shares from requests, so the request is what stops a long re-encode starving
   Jellyfin — the old 4-core limit only added throttling on a node with 20 cores
-  and ~4.3 cores of requests committed. Memory stays capped at 4Gi: memory is not
-  reclaimed fairly and the node has no swap.
+  and ~4.3 cores of requests committed. Memory is capped at 6Gi: memory is not
+  reclaimed fairly and the node has no swap. Budget is ~1 GiB idle floor plus
+  ~1.4 GiB per worker at peak — the pod measured 3.8 GiB with two workers, so 6Gi
+  covers three with headroom.
 - **Background priority**: `priorityClassName: unmanic-background` — a
   `PriorityClass` with `value: -100`, `preemptionPolicy: Never`. Every other pod
   in this cluster carries the implicit priority 0, so Unmanic schedules behind

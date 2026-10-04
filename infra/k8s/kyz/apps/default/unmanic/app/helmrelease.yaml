@@ -48,8 +48,10 @@ spec:
               TZ: America/Chicago
               PUID: "1000"
               PGID: "1000"
-              # CPU workers. Each worker runs one ffmpeg at a time.
-              NUMBER_OF_WORKERS: "2"
+              # CPU workers. Each worker runs one ffmpeg at a time. Raised 2 -> 3
+              # alongside dropping the CPU cap: the node has 20 cores and ~15 idle
+              # while the backlog sits near 1,900 files. Costs ~1.4 GiB more at peak.
+              NUMBER_OF_WORKERS: "3"
               # Periodic full library scan (inotify handles new files too).
               SCHEDULE_FULL_SCAN_MINUTES: "60"
               RUN_FULL_SCAN_ON_START: "false"
@@ -84,11 +86,13 @@ spec:
               # 20 cores committed. Throttling is the cost; the request is the guard.
               requests:
                 cpu: 250m
-                memory: 512Mi
+                memory: 1Gi
               limits:
                 # Memory keeps its cap: memory is not reclaimed fairly, and this node
-                # has no swap.
-                memory: 4Gi
+                # has no swap. Budget is ~1 GiB idle floor + ~1.4 GiB per worker at
+                # peak; the pod hit 3.8 GiB with two workers, so 6Gi covers three with
+                # headroom. Do not raise the worker count without re-measuring.
+                memory: 6Gi
     defaultPodOptions:
       # Below-default, non-preempting background class (see priorityclass.yaml).
       priorityClassName: unmanic-background
