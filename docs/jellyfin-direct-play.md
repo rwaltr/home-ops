@@ -320,6 +320,63 @@ Validated on `Beast Wars S02E05 [SDTV][MP3 2.0][XviD].avi` (216 MB) →
 `[SDTV][AAC 2.0][x264].mkv` (151 MB, H.264 + AAC 2.0), with `notify_sonarr`
 queueing a rescan and rename.
 
+### The size gate rejects audio-only remuxes (2026-10-05)
+
+`reject_files_larger_than_original` is the flow's safety net, and its
+`size_threshold_percent` sat at `0` from 2026-09-26 to 2026-10-05. That pairing
+quietly created an infinite loop on every file the flow rewrites **audio-only**:
+
+- `audio_transcoder` copies the video and re-encodes DTS/TrueHD to AAC at the
+  plugin's Basic-mode smart target. The resulting track is about the same size as
+  the DTS core it replaces, so the remuxed file lands **1.3-2.9% larger** than
+  the source.
+- At a threshold of `0`, that is a rejection. The plugin resets the task to the
+  original file:
+
+  ```
+  Resetting task file back to original source as current cache file is larger
+  than the original file
+  ```
+
+- **The task still reports success.** Nothing surfaces in the UI, in task
+  history, or through the notification path.
+- The source file is unchanged, so the gate still matches it (`dts` is in the
+  gate's `allowed_values`) and the next hourly scan re-queues it. Forever.
+
+Measured cost over those 8 days: 806 completions, 179 distinct files, **644 of
+them — 80% of all work this worker had ever done — were re-work of 17 files**.
+Zootopia alone ran 147 times, starting 2026-09-26 21:22Z.
+
+`size_threshold_percent: 5` permits the small increase while still rejecting a
+runaway output. The plugin's own description covers this case verbatim: _"Set a
+positive value to permit a small increase, for tasks that only rewrite the
+container and can add a few bytes without re-encoding."_
+
+> **The setting is per-library, and that is a second trap.** Writing
+> `size_threshold_percent` on the global scope (library_id 0) does **nothing**
+> for a library that carries its own copy of the plugin's settings. On this
+> install the Movies library kept `0` while global and TV read `5`, so the loop
+> continued untouched after the "fix" was applied, and the only visible clue was
+> that one library logged the new threshold text and the other logged the old.
+> Read and write it per library:
+>
+> ```
+> POST /unmanic/api/v2/plugins/info
+>   {"plugin_id": "reject_files_larger_than_original", "library_id": 3}
+> ```
+>
+> Library ids here: `1` = TV (/media/tv), `3` = Movies (/media/movies). Set it on
+> **every** library the flow is enabled in.
+>
+> **Do not set `size_threshold_percent` back to `0`.** Any audio-only remux whose
+> AAC track is not smaller than the source will loop silently, and the history
+> will report it as a success.
+>
+> **Diagnosing a suspected loop:** a filename appearing repeatedly in
+> `POST /unmanic/api/v2/history/tasks` is the signal. Confirm with
+> `POST /history/task/log` (`{"task_id": N}`) and search for `larger than the
+original`. `task_success: true` does not mean the file was replaced.
+
 ### Reproducing the configuration
 
 Unmanic's libraries/plugins/flows are runtime state on the config PVC (like
