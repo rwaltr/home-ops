@@ -374,8 +374,43 @@ container and can add a few bytes without re-encoding."_
 >
 > **Diagnosing a suspected loop:** a filename appearing repeatedly in
 > `POST /unmanic/api/v2/history/tasks` is the signal. Confirm with
-> `POST /history/task/log` (`{"task_id": N}`) and search for `larger than the
-original`. `task_success: true` does not mean the file was replaced.
+> `POST /history/task/log` (`{"task_id": N}`). **Read the rejection text — the
+> percentage is the discriminator, not the wording.** At a threshold of `0` it
+> logs `...as current cache file is larger than the original file`; at a positive
+> threshold it logs `...is more than 5.0% larger than the original file`. Both
+> contain `larger than the original`, so a grep for that phrase reports a working
+> setting as broken. No reset line at all is the only outcome that proves the file
+> was replaced. `task_success: true` does not mean it was.
+
+**The threshold alone does not close the loop — it moves it.** Any fixed
+percentage leaves a residual class: a file whose output grows _past_ the
+threshold is rejected exactly as before. Measured here, one TV episode grew past
+5% and kept looping after the threshold was raised.
+
+`if_end_result_file_is_still_larger_mark_as_ignore: true` is the hard bound. The
+file is attempted once, and if the result is still larger it is ignored on future
+scans instead of re-queued — so no file can loop indefinitely. The trade-off is
+real: such a file keeps its source codec and is never converted, which is the
+opposite of why the transcode exists. It shows up in the ignore list rather than
+the queue.
+
+Both keys are enabled on all three scopes (global, TV, Movies) as of 2026-10-05.
+Set them together: the threshold covers the ordinary case, and the ignore flag
+covers the files the threshold cannot help.
+
+**Standing decision: files that still exceed the threshold are left alone.**
+Re-encoding them at a lower CRF would shrink them and let them through, but it
+costs real output quality on already-compressed sources, and that trade was
+declined. The ignore flag is the accepted handling: one attempt, then the file is
+retired from the pipeline and keeps its source codec. Treat the retired set as
+permanent and expected, not as a backlog of work. Measured in the first ten hours
+after the flags went live: 161 files completed, 101 converted, 60 retired,
+**zero repeats**.
+
+The retired ones are SDTV episodes (XviD/MPEG-4 with AC3) that grow 5.7-17% under
+the CRF 20 profile — a high-quality encode of already-compressed SD content is
+larger than the source, which no percentage threshold can accommodate. They will
+be transcoded on demand by Jellyfin instead of direct-playing.
 
 ### Reproducing the configuration
 
