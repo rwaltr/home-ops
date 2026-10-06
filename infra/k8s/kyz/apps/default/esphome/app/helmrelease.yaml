@@ -63,7 +63,7 @@ spec:
             resources:
               requests:
                 cpu: 10m
-                memory: 256Mi
+                memory: 128Mi
               limits:
                 memory: 3Gi # PlatformIO/ESP-IDF compile + link is memory-hungry
     defaultPodOptions:

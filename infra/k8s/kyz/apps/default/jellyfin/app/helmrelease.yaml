@@ -60,6 +60,10 @@ spec:
                 - name: gpu
               requests:
                 cpu: 100m
+                # Request is deliberately well under the limit: request == limit
+                # forces Guaranteed QoS (oom_score_adj -997), which makes this the
+                # last pod killed under pressure. 30d p99 working set 1136Mi.
+                memory: 1536Mi
               limits:
                 # Headroom for transcoding
                 memory: 4Gi

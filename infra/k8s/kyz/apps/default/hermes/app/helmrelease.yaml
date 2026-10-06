@@ -312,7 +312,8 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                # 30d p99 working set 1139Mi (docs/memory-requests.md)
+                memory: 1536Mi
               limits:
                 memory: 4Gi
             # The image's s6-overlay entrypoint starts as root and drops
@@ -355,6 +356,12 @@ spec:
                     name: hermes-secret
                     key: GITHUB_APP_PRIVATE_KEY
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
+            # Was BestEffort with no request or limit (30d p99 working set 39Mi).
+            resources:
+              requests:
+                memory: 64Mi
+              limits:
+                memory: 256Mi
             securityContext:
               runAsNonRoot: false
               runAsUser: 0

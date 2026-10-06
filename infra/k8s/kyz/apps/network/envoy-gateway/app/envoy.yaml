@@ -20,6 +20,10 @@ spec:
           resources:
             requests:
               cpu: 100m
+              # 30d p99 working set 70Mi. Set explicitly so the request stops
+              # defaulting to the 512Mi limit (which pins it at the ceiling and
+              # leaves no burst room for connection churn).
+              memory: 128Mi
             limits:
               memory: 512Mi
       envoyService:

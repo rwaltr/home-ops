@@ -18,7 +18,25 @@ spec:
       enabled: true
       servicemonitor:
         enabled: true
+    # Memory requests from the 30d working-set audit (docs/memory-requests.md).
+    # All three were BestEffort (no request, no limit) before this.
+    resources:
+      requests:
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    cainjector:
+      resources:
+        requests:
+          memory: 128Mi
+        limits:
+          memory: 256Mi
     webhook:
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 256Mi
       replicaCount: 2
       podDisruptionBudget:
         enabled: true

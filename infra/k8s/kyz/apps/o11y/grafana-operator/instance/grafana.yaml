@@ -37,6 +37,13 @@ spec:
         spec:
           containers:
             - name: grafana
+              # Grafana's own resources are not set anywhere else (the operator
+              # would otherwise default the request); 30d p99 working set 491Mi.
+              resources:
+                requests:
+                  memory: 640Mi
+                limits:
+                  memory: 1Gi
               env:
                 - name: GF_SECURITY_ADMIN_PASSWORD
                   valueFrom:

@@ -47,7 +47,10 @@ spec:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        # 30d p99 working set 599Mi on the capped deployment (925Mi peak before
+        # the 2026-09-24 limit landed). 1Gi keeps the steady-state footprint
+        # reserved without asking the scheduler for the whole 1.5Gi limit.
+        memory: 1Gi
       limits:
         # Uncapped it sat at ~860Mi steady / 925Mi peak (audit 2026-09-24).
         # 1.5Gi leaves headroom over the observed peak without letting it

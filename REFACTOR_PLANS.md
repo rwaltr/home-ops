@@ -1312,6 +1312,57 @@ Lesson: a chart bump can carry a behavioural breaking change, not just a
 version. Anything consuming external-dns annotations is coupled to that default
 prefix.
 
+### 2026-10-04 — right-sizing container memory requests across node `mouse`
+
+Tracking issue #896. Full method, per-container table and exceptions:
+**[`docs/memory-requests.md`](docs/memory-requests.md)**. 55 containers across
+39 manifests changed. What the audit found:
+
+- **The 92%-committed figure was not an accounting error, and fixing it does not
+  buy the room the issue expected.** Requests were indeed inflated per pod — 20
+  pods held 13.48 GiB they never touched — but 35 pods (15 of them BestEffort)
+  were under-provisioned by almost the same amount (+13.19 GiB). Net 28.58 →
+  28.28 GiB. The value is that the distribution now matches reality: the pods
+  that were first in the OOM queue with a near-zero CPU weight have real
+  requests, and the inert `litellm` reservation is gone.
+- **`request == limit` is the trap, and Kubernetes creates it silently.** A
+  container that declares only a `limits.memory` gets a *request equal to the
+  limit* by defaulting — which forces Guaranteed QoS (`oom_score_adj: -997`) and
+  removes its ability to burst. `jellyfin`, `home-assistant`, `music-assistant`,
+  `prometheus`, `multus`, `cloudflare-tunnel`, `envoy`, `matter-server`,
+  `mosquitto`, `otbr`, `prowlarr`, `zigbee2mqtt`, `zwave-js-ui` and `tesla-key`
+  were all in that state. Fixing it meant adding a request *below* the limit,
+  not raising one.
+- **Sizing bursty batch workloads from p99 is wrong.** `sabnzbd` (p90 2.4 GiB,
+  p99 4.4 GiB) and `unmanic` (p90 1.6 GiB, p99 4.6 GiB) would have added ~3 GiB
+  of permanent commitment each. For those the request covers the bulk of the
+  distribution and the limit stays the ceiling — the same shape the repo already
+  uses for `unmanic`'s CPU (low request, no quota).
+- **A 30d `[30d]` range is the whole Prometheus lifetime here** (retention is
+  30d, node age ~25d), so percentile-over-30d and percentile-over-lifetime are
+  the same query today. Re-check the window before trusting it after the node
+  has been up longer.
+- **Pod-level and container-level memory are different series.** Container
+  working set excludes `emptyDir: {medium: Memory}` tmpfs, which the pod cgroup
+  *does* carry — `kustomize-controller`'s in-memory builds are ~250 MiB at the
+  pod level against ~128 MiB of container p99. Size from the container for the
+  container's request, but do not read the pod's ceiling off it.
+- **The pinned prometheus-operator CRDs have no `configReloaderResources`**
+  (`kubectl explain alertmanager.spec.configReloaderResources` → does not
+  exist), so the config-reloader sidecars cannot be given a request without a
+  chart change. They stay BestEffort.
+- **`konnectivity-agent` is k0s-managed.** It is the one BestEffort pod on the
+  node that cannot be fixed by a Git change.
+- **A `metadata.namespace` in an app's `ks.yaml` is silently overwritten by the
+  parent kustomization's `namespace:` transformer.** `network/cloudflare-tunnel`
+  carried `namespace: flux-system` in its metadata while the parent
+  `network/kustomization.yaml` set `namespace: network`; kustomize rewrote it, so
+  the object has always been applied to `network` and the file was lying. It also
+  made the `- name: external-dns` entry ambiguous to anything reading the file
+  literally (konflate looked for `flux-system/external-dns` and reported the
+  dependency missing). The stray line is gone and the `dependsOn` entry now names
+  `network` explicitly: same object, no inference required.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

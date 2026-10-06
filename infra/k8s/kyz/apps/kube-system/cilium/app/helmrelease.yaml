@@ -60,6 +60,12 @@ spec:
     localRedirectPolicies:
       enabled: true
     operator:
+      # Was BestEffort (no request, no limit) at 30d p99 114Mi / max 139Mi.
+      resources:
+        requests:
+          memory: 192Mi
+        limits:
+          memory: 512Mi
       dashboards:
         enabled: true
       prometheus:
@@ -80,7 +86,9 @@ spec:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        # 30d p99 working set 357Mi on the capped agent (uncapped it reached
+        # ~430Mi, audit 2026-09-24). Request now reflects that; limit unchanged.
+        memory: 448Mi
       limits:
         memory: 1Gi
     rollOutCiliumPods: true

@@ -46,10 +46,12 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 32Mi
+            # 30d p99 63Mi against the old 64Mi limit: it lives at the ceiling
+            # with no headroom, so both request and limit move up.
+            memory: 96Mi
           limits:
             # Bounded like every other system component here — the node has no
             # disk swap (see the 2026-09-24 memory audit in REFACTOR_PLANS.md).
-            memory: 64Mi
+            memory: 128Mi
       podMonitor:
         enabled: true
