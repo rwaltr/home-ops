@@ -1312,6 +1312,27 @@ Lesson: a chart bump can carry a behavioural breaking change, not just a
 version. Anything consuming external-dns annotations is coupled to that default
 prefix.
 
+### 2026-10-08 — Hermes: managed scope, so git pins config without receding
+
+The agent's config was re-seeded from the `hermes-config` ConfigMap onto
+`/opt/data/config.yaml` on every pod start. Because that file is also Hermes'
+own mutable state, each restart discarded runtime accumulation —
+`_config_version`, `command_allowlist`, `onboarding.seen` — so approvals had to
+be re-taught after every roll.
+
+Fix: use Hermes' built-in **managed scope** instead of a boot-time copy. The
+ConfigMap is mounted read-only at `/etc/hermes-policy` and named by
+`HERMES_MANAGED_DIR`; Hermes deep-merges it on top of the PVC config per leaf,
+so pinned keys are resolved from git on every load while runtime state survives.
+This step is additive — the boot-time seed is still in place and comes out
+separately, one variable per roll.
+
+Not `/etc/hermes`: that path holds the image-baked `image-provenance.json`, and
+mounting over it would flip the runtime out of image-managed mode. Managed scope
+is fail-open on a missing or malformed file, which is what makes it safe to roll
+onto the live agent; the cutover was additionally A/B-verified as a no-op across
+all 933 resolved keys first. Full notes in `docs/hermes-agent.md`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

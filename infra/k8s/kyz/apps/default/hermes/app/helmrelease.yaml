@@ -225,6 +225,16 @@ spec:
             env:
               TZ: America/Chicago
               HERMES_HOME: /opt/data
+              # Admin-owned, read-only policy layer (Hermes "managed scope").
+              # The hermes-config ConfigMap is mounted below at this path and
+              # deep-merges ON TOP of the writable $HERMES_HOME/config.yaml on
+              # every load, so the keys it pins win and everything else stays
+              # agent-controlled (docs/user-guide/managed-scope).
+              #
+              # Deliberately NOT /etc/hermes: that directory holds the image's
+              # image-provenance.json, and mounting over it would flip the
+              # runtime out of image-managed mode.
+              HERMES_MANAGED_DIR: /etc/hermes-policy
               # Toolchain installed by the `tools` init container (persisted on the PVC).
               PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/teletran/bin:/opt/data/.local/bin:/opt/data/.local/share/mise/shims:/opt/data/.local/go/bin:/opt/data/.local/homebrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
               MISE_DATA_DIR: /opt/data/.local/share/mise
@@ -419,6 +429,14 @@ spec:
               - path: /scripts
             gitcreds:
               - path: /scripts
+            # Read-only managed-scope layer for the running agent. Same
+            # ConfigMap the init container seeds from; the extra keys (SOUL.md,
+            # git-broker.py, the skill) land in the directory but managed scope
+            # only ever reads config.yaml and .env. ConfigMap volumes are
+            # read-only by default; readOnly makes the intent explicit.
+            app:
+              - path: /etc/hermes-policy
+                readOnly: true
       tmp:
         type: emptyDir
         globalMounts:
