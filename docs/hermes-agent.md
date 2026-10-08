@@ -15,9 +15,10 @@ from a phone, instead of having to be at the computer.
 - Toolsets: `terminal, file, web` for `cli` and `api_server` **only**.
 - `tools` init container installs `mise`, `uv`, `gh`, `go`, `homebrew` into
   `/opt/data/.local` (persisted, guarded).
-- Config is re-seeded from the `hermes-config` ConfigMap on every pod start;
-  `stakater/reloader` rolls the pod when the ConfigMap or `hermes-secret`
-  changes.
+- Config is seeded from the `hermes-config` ConfigMap on every pod start, and
+  is _also_ mounted read-only at `/etc/hermes-policy` as Hermes' **managed
+  scope** (2026-10-08) — see below. `stakater/reloader` rolls the pod when the
+  ConfigMap or `hermes-secret` changes.
 - No messaging platform is configured; the gateway currently serves only the
   dashboard/API.
 
@@ -36,6 +37,41 @@ PRs, o11y dashboards, Flatcar/Butane work validated in a VM.
 | Secret material (SOPS/1P)           | 🚫 out of scope — rwaltr manages  |
 | Phone channel                       | ❌ none configured                |
 | Secrets to decrypt SOPS / 1Password | ❌                                |
+
+## Managed scope: policy pinned by git (2026-10-08)
+
+The `hermes-config` ConfigMap is mounted **read-only** into the `app` container
+at `/etc/hermes-policy`, and `HERMES_MANAGED_DIR` names it. Hermes deep-merges
+that layer on top of `$HERMES_HOME/config.yaml` on every config load, leaf by
+leaf: keys the ConfigMap sets win, everything else stays agent-owned.
+Reference: <https://hermes-agent.nousresearch.com/docs/user-guide/managed-scope>.
+
+**Why.** The `config` init container `install`ed the ConfigMap over
+`/opt/data/config.yaml` on every start. That file is also the agent's own
+mutable state, so each restart discarded what the agent had accumulated —
+`_config_version`, `command_allowlist`, `onboarding.seen`. Command approvals
+had to be re-taught after every pod roll. Under managed scope the pinned keys
+come from git on every load, and the PVC copy is no longer overwritten for
+them.
+
+**Design notes.**
+
+- **Path is not `/etc/hermes`.** That directory holds the image-baked
+  `image-provenance.json`; mounting a volume there would hide it and flip the
+  runtime out of image-managed mode. A dedicated directory keeps both.
+- **Failure mode is fail-open.** A missing directory, a missing file, or
+  malformed YAML resolves to "no managed scope" and the agent starts on
+  `$HERMES_HOME/config.yaml` exactly as before. That is what makes this safe to
+  roll onto a running agent.
+- **Verified as a no-op before merge.** Resolving the config with and without
+  the live ConfigMap as a managed layer produced identical values across all
+  933 resolved keys.
+- **Managed keys are immutable at runtime.** `hermes config set` refuses them
+  and names the source. Pin policy only (model, toolsets, terminal, display,
+  web) and leave tunables unpinned.
+- **This is not `HERMES_MANAGED`.** That is a separate, coarser
+  package-manager lock that blocks all config mutation; setting it would break
+  the agent.
 
 ## Decisions (2026-09-25)
 
