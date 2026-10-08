@@ -1333,6 +1333,28 @@ is fail-open on a missing or malformed file, which is what makes it safe to roll
 onto the live agent; the cutover was additionally A/B-verified as a no-op across
 all 933 resolved keys first. Full notes in `docs/hermes-agent.md`.
 
+### 2026-10-08 (later) — restricted Hermes host: tiering instead of a pod per agent
+
+One Hermes identity held repo write access, cluster read access, and device
+control including locks and power. The first attempt was a purpose-built
+household pod; rwaltr pushed back on cost, correctly. A Hermes process is
+~1.8GB resident and the node is at ~92% of allocatable memory requests, so pods
+per agent is the wrong shape.
+
+The unit of cost is the trust tier. `hermes-restricted` is one pod hosting
+profiles as tenants (`gateway.multiplex_profiles` is on by default: per-profile
+secrets, sessions, memory, skills, cron, adapters), with no gitcreds sidecar,
+no repo, no `gh`, no kubeconfig, and no RBAC. The household agent is tenant #1.
+A browsing agent stays off this host — multiplexing's isolation is in-process,
+and its failure mode must not reach the locks (#908).
+
+Two mechanisms carry the security. Per-tenant `platform_toolsets` is re-asserted
+on every start by `policy-apply.py`, because Hermes rewrites its own config at
+runtime and an unlisted platform silently gains every tool. Capability
+credentials live in each tenant's `.env` (Secret mounted init-only), where the
+per-profile scope resolves them fail-closed — verified in `agent/secret_scope.py`
+and `config.py::get_env_value`, so no tenant can read another's token.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

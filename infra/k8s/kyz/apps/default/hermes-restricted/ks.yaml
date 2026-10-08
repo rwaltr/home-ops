@@ -1,0 +1,30 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+# The restricted Hermes host: one pod, profiles as tenants. Serves agents that
+# need no repo checkout and no cluster credentials. The household agent is
+# tenant #1. Tiering and rationale: docs/hermes-agent.md.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hermes-restricted
+spec:
+  components:
+    - ../../../../components/kopiur/backup
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/hermes-restricted/app
+  postBuild:
+    substitute:
+      APP: hermes-restricted
+      PVC: hermes-restricted-data
+      KOPIUR_CRON: "H 4 * * *"
+      KOPIUR_RUNAS: "10000"
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  dependsOn:
+    - name: openebs # PVCs on the openebs-hostpath storage class
+      namespace: openebs
+  wait: false
