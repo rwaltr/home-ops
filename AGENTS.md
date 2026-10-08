@@ -225,6 +225,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **Cluster logging (VictoriaLogs + Fluent Bit)**: `docs/logging.md`
 - **MQTT broker (Mosquitto) + HA discovery**: `docs/mosquitto.md`
 - **Shared family calendar (Radicale + CalDAV, read-only Remind feed)**: `docs/calendar.md`
+- **RSS/feed reader (FreshRSS, Google Reader + Fever APIs)**: `docs/freshrss.md`
 - **TODOs**: `git grep "TODO:"`
 
 ## ⚠️ Important Considerations

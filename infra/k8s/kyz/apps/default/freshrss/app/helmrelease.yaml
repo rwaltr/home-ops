@@ -1,0 +1,151 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# FreshRSS — self-hosted feed aggregator (Google Reader / Fever APIs). Public at
+# https://feeds.waltr.tech via the cloudflare tunnel (CGNAT — no port forwards).
+#
+# Install is NOT declared here, on purpose. The image's headless install hooks
+# (FRESHRSS_INSTALL / FRESHRSS_USER) do install the instance but create no
+# account, and self-registration is off by default — so the only way in would be
+# `kubectl exec cli/create-user.php`. Instead the first boot serves the web
+# installer at /i/, which creates the SQLite config AND the first admin account
+# in one pass. Result: no secret in git, nothing for rwaltr to provision in
+# 1Password. See docs/freshrss.md for the first-run steps.
+#
+# Runs as root with a writable root filesystem, unlike the rest of the apps here.
+# The upstream entrypoint rewrites /etc/localtime + /etc/timezone, php.ini and
+# the Apache vhost in place, chowns data/ + extensions/ to www-data, then execs
+# Apache on :80 with an in-container cron. readOnlyRootFilesystem: true
+# crashloops before Apache ever starts, so it stays false (same call as degoog,
+# whose entrypoint also self-modifies). Capabilities are narrowed to exactly the
+# set the entrypoint needs to drop from root to www-data.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: freshrss
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: freshrss
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: freshrss
+    controllers:
+      freshrss:
+        # RWO PVCs: never run two pods against data/ at once.
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/freshrss/freshrss
+              tag: 1.30.1@sha256:48b63b9bc3d042a1301c32971b01af8841c7f059b452589c5bf77f475ba44c61
+            env:
+              TZ: America/Chicago
+              # Built-in cron: refreshes feeds every 30 min without anyone
+              # opening the UI (mobile clients rely on the server having pulled).
+              # Empty/omitted = refresh only on page load.
+              CRON_MIN: "11,41"
+            # /i/ is the FreshRSS front controller: the web installer before
+            # install, the login form after. Both render inline (Minz forward,
+            # not a redirect), so an anonymous GET is a 200 in either state.
+            probes:
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /i/
+                    port: &port 80
+                  periodSeconds: 10
+                  timeoutSeconds: 3
+                  failureThreshold: 3
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /i/
+                    port: *port
+                  periodSeconds: 5
+                  timeoutSeconds: 3
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN # entrypoint chowns data/ + extensions/ to www-data
+                  - SETGID
+                  - SETUID # Apache's www-data children
+                  - DAC_OVERRIDE
+                  - FOWNER
+            resources:
+              requests:
+                cpu: 10m
+                memory: 128Mi
+              limits:
+                # No CPU limit: PHP+Apache is bursty per request and a limit
+                # throttles below 100% usage. Memory is bounded (no swap here).
+                memory: 1Gi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: freshrss
+        ports:
+          http:
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - feeds.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+          - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
+            namespace: network
+    persistence:
+      # Article DB (SQLite), config.php, caches. DATA_PATH resolves to this path
+      # by default (constants.php), so no DATA_PATH env is needed.
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC exists,
+        # and the kopiur policy refers to this exact name.
+        forceRename: freshrss-data
+        globalMounts:
+          - path: /var/www/FreshRSS/data
+      # User-installed extensions (THIRDPARTY_EXTENSIONS_PATH). Without this
+      # they land on the container FS and vanish on every pod roll.
+      extensions:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        forceRename: freshrss-extensions
+        globalMounts:
+          - path: /var/www/FreshRSS/extensions
