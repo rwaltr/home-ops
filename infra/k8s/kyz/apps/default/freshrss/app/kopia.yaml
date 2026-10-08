@@ -1,0 +1,57 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+# DELIBERATELY NOT using components/kopiur/backup: FreshRSS keeps state in TWO
+# PVCs (data + extensions) and the component templates a single ${PVC}. Flux
+# postBuild substitution is string-level, so a variable-length sources list
+# cannot be expressed as a component variable (same exception as HA's kopia.yaml).
+#
+# copyMethod: Direct is mandatory on openebs-hostpath (no CSI snapshots) — the
+# mover reads the live PVC, so snapshots are crash-consistent. FreshRSS keeps
+# its articles in SQLite (data/db.sqlite); a snapshot taken mid-write is the
+# accepted tradeoff, same as HA's recorder DB.
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: freshrss
+  namespace: default
+spec:
+  repository:
+    kind: ClusterRepository
+    name: cluster-kopia
+  sources:
+    - pvc:
+        name: freshrss-data
+      sourcePathStrategy: PvcName
+    - pvc:
+        name: freshrss-extensions
+      sourcePathStrategy: PvcName
+  copyMethod: Direct
+  # The mover must READ the PVCs. FreshRSS runs its Apache/PHP children as
+  # www-data (uid/gid 33) and its entrypoint chgrps data/ + extensions/ to
+  # www-data before exec, so a default-UID mover gets EACCES on data/users/<u>/
+  # (mode 0700, owned by 33).
+  mover:
+    securityContext:
+      runAsUser: 33
+      runAsGroup: 33
+    podSecurityContext:
+      fsGroup: 33
+  retention:
+    keepLatest: 7
+    keepDaily: 14
+    keepWeekly: 4
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: freshrss-nightly
+  namespace: default
+spec:
+  policyRef:
+    name: freshrss
+  schedule:
+    # H is a deterministic offset; 5am is clear of the other movers.
+    cron: "H 5 * * *"
+    jitter: 30m
+    runOnCreate: false

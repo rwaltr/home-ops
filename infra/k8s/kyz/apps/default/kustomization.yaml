@@ -34,3 +34,4 @@ resources:
   - ./hermes/ks.yaml
   - ./litellm/ks.yaml
   - ./radicale/ks.yaml
+  - ./freshrss/ks.yaml

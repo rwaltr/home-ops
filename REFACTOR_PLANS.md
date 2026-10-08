@@ -1333,6 +1333,44 @@ is fail-open on a missing or malformed file, which is what makes it safe to roll
 onto the live agent; the cutover was additionally A/B-verified as a no-op across
 all 933 resolved keys first. Full notes in `docs/hermes-agent.md`.
 
+### 2026-10-08 — FreshRSS deployed (feeds.waltr.tech, public)
+
+New feed aggregator in `apps/default/freshrss/`. Picked over Miniflux and
+CommaFeed for one reason that decides it on a single-node cluster: SQLite is the
+default backend, so the app is one container plus two PVCs and adds no database
+service to keep, back up and reconcile. Miniflux requires PostgreSQL (upstream
+refuses a second backend); CommaFeed's Google Reader UI is closer to the original
+but its client ecosystem is thinner. All three are actively maintained — FreshRSS
+1.30.1 (2026-10-05), Miniflux 2.3.3, CommaFeed 7.3.2.
+
+Two decisions worth recording:
+
+- **Install is a browser step, not a manifest.** The image's headless hooks
+  (`FRESHRSS_INSTALL` / `FRESHRSS_USER`) do install the instance but create no
+  account, and FreshRSS ships `max_registrations` disabled — so a headless
+  install would leave an instance reachable only through an in-pod
+  `cli/create-user.php` (and `pods/exec` is deliberately not in this agent's
+  RBAC). The first boot instead serves the web installer at `/i/`, which writes
+  the SQLite config **and** the first admin account in one pass. Nothing to
+  provision in 1Password, nothing secret in git.
+- **The API is off after that install.** The web wizard never touches
+  `api_enabled`, and `config.default.php` ships it `false`, so mobile clients
+  (Reeder, NetNewsWire, FeedMe) will fail until *Allow API access* is ticked in
+  the admin UI and a per-user API password is set. Not a bug — just not
+  discoverable from the wizard.
+
+Operational shape: root + writable root filesystem, because the entrypoint
+rewrites `/etc/localtime`, php.ini and the Apache vhost in place and chowns
+`data/`+`extensions/` to www-data before exec'ing Apache on :80 with an
+in-container cron (`CRON_MIN: "11,41"`). Same call as degoog. The two PVCs mean
+the kopiur component can't be used (string-level substitution over a
+variable-length `sources` list) — hand-written policy, as with HA, with the mover
+pinned to uid/gid 33 because `data/users/<user>/` is mode 0700 owned by www-data.
+Probes hit `/i/`, which is the front controller in both states — installer before,
+login form after — and renders inline rather than redirecting, so an anonymous
+GET is a 200 either way. Public exposure via `envoy-external`; see
+`docs/freshrss.md`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
