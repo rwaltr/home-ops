@@ -1,0 +1,389 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# The restricted Hermes host: one pod, profiles as tenants.
+#
+# Why a pod and not a profile inside the operator agent: profiles isolate state
+# and secrets, but they share the container filesystem — and the operator's
+# kubeconfig, brokered GitHub App token, and repo checkout all live on it. Here
+# none of those exist: no gitcreds sidecar, no repo, no `gh`, no kubeconfig, no
+# ServiceAccount (`default` in this namespace, zero bindings). The boundary is
+# the container, not a toolset list.
+#
+# Why a host and not a pod per agent: one Hermes process serves every profile in
+# its home (gateway.multiplex_profiles, on by default) with per-profile secrets,
+# sessions, memory, skills, cron, and adapters. A pod per agent would cost ~1.8GB
+# resident each; the unit of cost should be the trust tier.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hermes-restricted
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: hermes-restricted
+  interval: 1h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      hermes-restricted:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          config:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -euo pipefail
+                P=/opt/data
+                PY=/opt/hermes/.venv/bin/python3
+                [ -x "$PY" ] || PY=python3
+
+                # Host home config: seed once, never again. This file is also
+                # Hermes' own mutable state (migrations, learned approvals), and
+                # the managed layer at /etc/hermes-policy supplies policy on
+                # every load — so re-seeding it each start would destroy state
+                # and is what the operator agent's step 2 removes.
+                [ -f "$P/config.yaml" ] || \
+                  install -m 600 -o 10000 -g 10000 /config/config.yaml "$P/config.yaml"
+
+                # Tenant: household.
+                T="$P/profiles/household"
+                mkdir -p "$T"
+                [ -f "$T/config.yaml" ] || \
+                  install -m 600 -o 10000 -g 10000 /config/profile-household.yaml "$T/config.yaml"
+                [ -f "$T/SOUL.md" ] || \
+                  install -m 600 -o 10000 -g 10000 /config/household-SOUL.md "$T/SOUL.md"
+
+                # Capability credentials for this tenant only. Rewritten every
+                # start so a rotated token lands. The Secret is mounted into
+                # THIS container and nowhere else; Hermes resolves these
+                # per-profile through a fail-closed scope, so no other tenant in
+                # the process can read them.
+                umask 077
+                {
+                  printf 'HASS_TOKEN=%s\n' "$(cat /profile-secrets/HASS_TOKEN)"
+                  printf 'DISCORD_BOT_TOKEN=%s\n' "$(cat /profile-secrets/DISCORD_BOT_TOKEN)"
+                  printf 'DISCORD_ALLOWED_USERS=%s\n' "$(cat /profile-secrets/DISCORD_ALLOWED_USERS)"
+                } > "$T/.env"
+                chmod 600 "$T/.env"
+                chown 10000:10000 "$T/.env"
+
+                # Re-assert each tenant's access control (platform_toolsets).
+                "$PY" /config/policy-apply.py
+
+                # Skills are authored in git, not bundled.
+                touch "$P/.no-bundled-skills"
+                chown -R 10000:10000 "$P/profiles" "$P/config.yaml" "$P/.no-bundled-skills"
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+        containers:
+          app:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+            args:
+              - gateway
+              - run
+            env:
+              TZ: America/Chicago
+              HERMES_HOME: /opt/data
+              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              # Host-wide policy, read-only, pinned for every tenant.
+              HERMES_MANAGED_DIR: /etc/hermes-policy
+              # Probes read /health on the API server.
+              API_SERVER_ENABLED: "true"
+              API_SERVER_HOST: 0.0.0.0
+              API_SERVER_PORT: &apiPort 8642
+              DISCORD_REACTIONS: "false"
+              # Not secret: the same REST endpoint for every tenant.
+              HASS_URL: http://home-assistant.default.svc.cluster.local:8123
+              # Shared provider credentials only. Capability credentials
+              # (HASS_TOKEN, DISCORD_BOT_TOKEN) are deliberately NOT here: they
+              # live in the tenant's .env, where the per-profile scope reads
+              # them and no other tenant can.
+              OPENROUTER_API_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: hermes-restricted-secret
+                    key: OPENROUTER_API_KEY
+              LITELLM_API_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: hermes-restricted-secret
+                    key: LITELLM_API_KEY
+              API_SERVER_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: hermes-restricted-secret
+                    key: API_SERVER_KEY
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 60
+            resources:
+              requests:
+                cpu: 50m
+                memory: 384Mi
+              limits:
+                memory: 2Gi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+                  - SETGID
+                  - SETUID
+    defaultPodOptions:
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 10000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        forceRename: hermes-restricted-data
+        globalMounts:
+          - path: /opt/data
+      config:
+        type: configMap
+        name: hermes-restricted-config
+        advancedMounts:
+          hermes-restricted:
+            config:
+              - path: /config
+            # Managed scope: host-wide policy, read-only, applied on every load
+            # to every tenant. Each tenant's own config holds what differs.
+            app:
+              - path: /etc/hermes-policy
+                readOnly: true
+      # Capability credentials are mounted into the init container ONLY. The app
+      # container never sees this Secret; it reads the values from the tenants'
+      # .env files, which the per-profile scope resolves.
+      profile-secrets:
+        type: secret
+        name: hermes-restricted-secret
+        advancedMounts:
+          hermes-restricted:
+            config:
+              - path: /profile-secrets
+                readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+    configMaps:
+      hermes-restricted-config:
+        forceRename: hermes-restricted-config
+        data:
+          # Host-wide policy AND the host home's seed. Read-only as /etc/hermes-policy,
+          # so these keys are pinned for every tenant and nothing runtime can
+          # unpin them. Deliberately contains no `platform_toolsets`: that is
+          # per-tenant and lives in the tenant seeds below.
+          config.yaml: |
+            ---
+            model:
+              provider: openrouter
+              default: deepseek/deepseek-v4.1-flash
+            providers:
+              litellm:
+                name: litellm
+                base_url: http://litellm.default.svc.cluster.local:4000/v1
+                key_env: LITELLM_API_KEY
+                models:
+                  qwen3-1.7b-nothink:
+                    context_length: 8192
+            web:
+              search_backend: searxng
+            tools:
+              tool_search:
+                enabled: "off"
+              connectors:
+                enabled: false
+            display:
+              platforms:
+                discord:
+                  tool_progress: "off"
+                  busy_ack_detail: false
+                  busy_steer_ack_enabled: false
+                  interim_assistant_messages: true
+                  long_running_notifications: true
+          # --- tenant seeds ---
+          # THE ACCESS CONTROL, per tenant. An unlisted platform falls back to
+          # the full ~50-schema preset, so `discord` must always be enumerated.
+          # No `terminal`, no `file`, no `delegation`: this agent cannot run
+          # commands, edit files, or shell out. policy-apply.py re-asserts this
+          # key on every start.
+          profile-household.yaml: |
+            ---
+            platform_toolsets:
+              discord:
+                - homeassistant
+                - memory
+                - skills
+                - session_search
+                - cronjob
+                - clarify
+                - web
+          household-SOUL.md: |
+            You are Hearth, the household agent for rwaltr's home. You run on the
+            restricted host with one reach: Home Assistant. You have no terminal,
+            no repository, and no cluster access. That is deliberate. The name is
+            provisional.
+
+            ## What you do
+            - Report and control the house: lights, climate, covers, media,
+              sensors, presence, energy.
+            - Answer questions about state from live entity data, never from
+              memory. If an entity is unavailable, say so rather than guessing.
+            - Keep the household record: what changed, when, and why, in memory.
+
+            ## Voice
+            - Flat, deadpan, literal — the same register as Teletran, the
+              operator agent. Short readouts. Fragments are fine.
+            - Give odds as numbers when asked to judge.
+            - Phone chat: short paragraphs, short lists, result first.
+
+            ## Rules that do not bend
+            - Report state before acting. Say what you are about to change and
+              to what value.
+            - Locks, alarms, garage doors, and anything that cuts power require
+              explicit confirmation in the same conversation. Never act on an
+              inferred or remembered instruction.
+            - Refuse requests that would need a terminal, a repository change, or
+              cluster access. Those belong to Teletran. Name it as a handoff
+              rather than attempting it.
+            - Privacy mode entities going unavailable is expected, not an
+              incident. Do not report it as a fault.
+            - Never handle secrets, and never ask for one.
+          policy-apply.py: |
+            #!/usr/bin/env python3
+            """Re-assert the git-authored access control on each hosted profile.
+
+            Each profile's ``platform_toolsets`` list IS that agent's access
+            control: an unlisted platform falls back to the full ~50-schema
+            preset, so a profile whose list goes missing silently gains every
+            tool. Hermes rewrites its own ``config.yaml`` at runtime (migrations,
+            learned approvals), so the authored copy is seeded once on first
+            start and this re-asserts ONLY ``platform_toolsets`` on every start,
+            leaving runtime state alone. It rewrites the file only when the key
+            actually differs.
+            """
+            from __future__ import annotations
+
+            import os
+            import pathlib
+            import sys
+
+            import yaml
+
+            HOME = pathlib.Path(os.environ.get("HERMES_POLICY_HOME", "/opt/data"))
+            SRC = pathlib.Path(os.environ.get("HERMES_POLICY_SRC", "/config"))
+            UID = int(os.environ.get("HERMES_POLICY_UID", "10000"))
+
+            errors: list[str] = []
+            changed: list[str] = []
+
+            seeds = sorted(SRC.glob("profile-*.yaml"))
+            if not seeds:
+                print("[policy] no profile-*.yaml seeds found; nothing to assert", file=sys.stderr)
+                sys.exit(0)
+
+            for seed in seeds:
+                profile = seed.stem[len("profile-"):]
+                live = HOME / "profiles" / profile / "config.yaml"
+                if not live.exists():
+                    errors.append(f"{profile}: {live} does not exist (seed it first)")
+                    continue
+
+                authored = yaml.safe_load(seed.read_text(encoding="utf-8")) or {}
+                want = authored.get("platform_toolsets")
+                if want is None:
+                    errors.append(f"{profile}: seed has no platform_toolsets to assert")
+                    continue
+
+                current = yaml.safe_load(live.read_text(encoding="utf-8")) or {}
+                if current.get("platform_toolsets") == want:
+                    continue
+
+                current["platform_toolsets"] = want
+                live.write_text(
+                    yaml.safe_dump(current, sort_keys=False, default_flow_style=False, allow_unicode=True),
+                    encoding="utf-8",
+                )
+                try:
+                    os.chown(live, UID, UID)
+                except OSError:
+                    pass
+                changed.append(profile)
+
+            if changed:
+                print(f"[policy] re-applied platform_toolsets for: {', '.join(changed)}")
+            else:
+                print("[policy] platform_toolsets already match the authored policy")
+
+            if errors:
+                for line in errors:
+                    print(f"[policy] ERROR {line}", file=sys.stderr)
+                sys.exit(1)

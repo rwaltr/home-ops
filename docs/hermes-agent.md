@@ -73,6 +73,69 @@ them.
   package-manager lock that blocks all config mutation; setting it would break
   the agent.
 
+## The restricted host (`hermes-restricted`) — 2026-10-08
+
+A second Hermes instance, and the tenant for every agent that needs no repo
+checkout and no cluster credentials. It exists because of blast radius, not
+tidiness: one identity previously held repo write access, cluster read access,
+and device control — including locks, alarms, and power.
+
+**Tiers, not agents.** The unit of cost is the trust tier, because one Hermes
+process serves every profile in its home (`gateway.multiplex_profiles`, on by
+default) with per-profile secrets, sessions, memory, skills, cron, and
+adapters. A Hermes process is ~1.8GB resident, so a pod per agent is the wrong
+shape; a pod per tier is not.
+
+- **Tier 1 — operator** (`hermes`): repo write, cluster read.
+- **Tier 2 — restricted host** (`hermes-restricted`): no untrusted input, no
+  container credentials. Tenant #1 is the household agent.
+- **Tier 3 — untrusted input**: a browsing agent, in its own pod or a
+  sandboxed runtime. Not on this host: multiplexing's isolation is in-process,
+  and the browsing agent's failure mode is the one that must not reach the
+  locks. Tracked as #908.
+
+**What the host deliberately lacks.** No `gitcreds` sidecar, no git-broker, no
+repo checkout, no `gh`, no kubeconfig, no RBAC — the pod runs under the
+namespace `default` ServiceAccount, which has zero bindings. No tenant has
+`terminal`, `file`, or `delegation`, so no tenant can run a command or edit a
+file even though they share a container.
+
+**The toolset list is the access control, and it is enforced every start.** An
+unlisted platform falls back to the full ~50-schema preset, so
+`platform_toolsets.discord` is enumerated per tenant and `policy-apply.py`
+re-asserts that one key on every start — Hermes rewrites its own `config.yaml`
+at runtime, so the seed alone would not hold. Host-wide policy (model, web,
+tools, display) is pinned separately by managed scope, read-only and global to
+the home.
+
+**Secrets are split by role.** Shared provider credentials (OpenRouter,
+LiteLLM, the API server key) go in the process env. Capability credentials
+(`HASS_TOKEN`, `DISCORD_BOT_TOKEN`) go in the tenant's own
+`profiles/<name>/.env`, written by the init container from a Secret mounted
+into that container only. Hermes resolves them through a context-local,
+fail-closed scope, so a miss returns nothing rather than falling through to
+`os.environ` — one tenant cannot read another's token. Verified against
+`agent/secret_scope.py` and `hermes_cli/config.py::get_env_value`.
+
+**Ordering matters.** The operator agent keeps the `homeassistant` toolset
+until the household tenant is live and answering. Dropping it first would
+remove device control before its replacement exists. Step 2, after this lands
+and the bot replies, is removing `homeassistant` from `hermes`'s toolset list.
+
+**Owner step before it can start.** A second Discord application, because two
+gateway profiles cannot share one bot token. Create the application, add the
+bot to the server, and store the token in 1Password as item
+`discordbot-household` with field `token` (the user allowlist is reused from
+the existing `discordbot` item). Until that item exists the ExternalSecret
+reports `SecretSyncedError`, the pod sits in `Init`, and nothing else is wrong
+— kubelet retries the mount in place, so the pod starts on its own once the
+item appears. No reconcile or restart is needed.
+
+**Persona.** The tenant's `SOUL.md` names it Hearth, provisionally — one line
+to change. Its hard rules mirror the operator agent's: report state before
+acting, confirm before locks/alarms/power, and refuse anything needing a
+terminal or repo access as a handoff to Teletran.
+
 ## Decisions (2026-09-25)
 
 1. **Phone channel: Discord.** rwaltr already uses Discord; the adapter uses
