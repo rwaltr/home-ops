@@ -32,5 +32,6 @@ resources:
   - ./unmanic/ks.yaml
   - ./degoog/ks.yaml
   - ./hermes/ks.yaml
+  - ./hermes-ha/ks.yaml
   - ./litellm/ks.yaml
   - ./radicale/ks.yaml

@@ -73,6 +73,40 @@ them.
   package-manager lock that blocks all config mutation; setting it would break
   the agent.
 
+## Second agent: the household (`hermes-ha`) — 2026-10-08
+
+A separate Hermes instance whose only reach is Home Assistant. It exists
+because of blast radius, not tidiness: before this, one identity held repo
+write access, cluster read access, and device control — including locks,
+alarms, and power. A single misread message or injected instruction could
+reach any of them. `hermes-ha` holds device control and nothing else.
+
+**What it deliberately lacks.** No `gitcreds` sidecar, no git-broker, no repo
+checkout, no `gh`, no kubeconfig, no ServiceAccount, no RBAC, no toolchain init
+container. Its container cannot run commands at all — `terminal`, `file`, and
+`delegation` are absent from its toolset list, and that list is the access
+control: an unlisted platform falls back to the full ~50-schema preset, so
+`platform_toolsets.discord` is always enumerated and is pinned read-only by
+managed scope.
+
+**Ordering matters.** The operator agent keeps the `homeassistant` toolset
+until `hermes-ha` is live and answering. Dropping it first would remove device
+control before its replacement exists. Step 2, after this lands and the bot
+replies, is removing `homeassistant` from `hermes`'s toolset list.
+
+**Owner step before it can start.** A second Discord application, because two
+gateway processes cannot share one bot token. Create the application, add the
+bot to the server, and store the token in 1Password as item `discordbot-ha`
+with fields `token` and `rwaltruserid`. Until that item exists the
+`hermes-ha` ExternalSecret reports `SecretSyncedError`, the pod sits in `Init`,
+and nothing else is wrong — kubelet retries the mount in place, so the pod
+starts on its own once the item appears. No reconcile or restart is needed.
+
+**Persona.** `SOUL.md` names it Hearth, provisionally — one line to change. Its
+hard rules mirror the operator agent's: report state before acting, confirm
+before locks/alarms/power, and refuse anything needing a terminal or repo
+access as a handoff to Teletran.
+
 ## Decisions (2026-09-25)
 
 1. **Phone channel: Discord.** rwaltr already uses Discord; the adapter uses

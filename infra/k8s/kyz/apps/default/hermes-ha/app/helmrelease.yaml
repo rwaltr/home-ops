@@ -1,0 +1,256 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# The household agent: a second Hermes instance whose only reach is Home
+# Assistant. Deliberately stripped relative to `hermes`:
+#   - no `gitcreds` sidecar, no git-broker, no repo checkout, no `gh`
+#   - no kubeconfig, no ServiceAccount, no RBAC (see the app's kustomization)
+#   - no toolchain init container: the app container needs no `mise`/`go`
+# Its toolset list is the access control, so it lives in the managed config
+# below and is pinned read-only (docs/hermes-agent.md).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hermes-ha
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: hermes-ha
+  interval: 1h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      hermes-ha:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          # Seed config.yaml + SOUL.md onto the data volume on first start.
+          # Hermes migrates/extends config on start, so it must be writable (a
+          # read-only mount at /opt/data/config.yaml would break it).
+          config:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -euo pipefail
+                install -m 600 -o 10000 -g 10000 /config/config.yaml /opt/data/config.yaml
+                install -m 600 -o 10000 -g 10000 /config/SOUL.md /opt/data/SOUL.md
+                chown 10000:10000 /opt/data
+                # Skills are authored in git, not bundled: skip the bundled seed.
+                touch /opt/data/.no-bundled-skills
+                chown 10000:10000 /opt/data/.no-bundled-skills
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+        containers:
+          app:
+            image:
+              repository: nousresearch/hermes-agent
+              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+            args:
+              - gateway
+              - run
+            env:
+              TZ: America/Chicago
+              HERMES_HOME: /opt/data
+              PATH: /opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              # Admin-owned, read-only policy layer. Same mechanism as the
+              # operator agent; the toolset list below is the access control.
+              HERMES_MANAGED_DIR: /etc/hermes-policy
+              # Expose the OpenAI-compatible API server on the pod network —
+              # the probes use its /health endpoint.
+              API_SERVER_ENABLED: "true"
+              API_SERVER_HOST: 0.0.0.0
+              API_SERVER_PORT: &apiPort 8642
+              # No dashboard: nothing to administer here, and it would need
+              # its own auth secret.
+              DISCORD_REACTIONS: "false"
+              # Home Assistant REST API (in-cluster). HASS_TOKEN comes from
+              # hermes-ha-secret.
+              HASS_URL: http://home-assistant.default.svc.cluster.local:8123
+            envFrom:
+              - secretRef:
+                  name: hermes-ha-secret
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *apiPort
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 60
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                memory: 2Gi
+            # The image's s6-overlay entrypoint starts as root and drops
+            # privileges; it needs these caps for its own cont-init and for the
+            # supervised services to touch /run.
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - DAC_OVERRIDE
+                  - FOWNER
+                  - SETGID
+                  - SETUID
+    defaultPodOptions:
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 10000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        forceRename: hermes-ha-data
+        globalMounts:
+          - path: /opt/data
+      config:
+        type: configMap
+        name: hermes-ha-config
+        advancedMounts:
+          hermes-ha:
+            config:
+              - path: /config
+            # Read-only managed-scope layer for the running agent. The ConfigMap
+            # also carries SOUL.md; managed scope only reads config.yaml/.env,
+            # so the extra key is inert.
+            app:
+              - path: /etc/hermes-policy
+                readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+    configMaps:
+      hermes-ha-config:
+        forceRename: hermes-ha-config
+        data:
+          config.yaml: |
+            ---
+            model:
+              provider: openrouter
+              default: deepseek/deepseek-v4.1-flash
+            providers:
+              litellm:
+                name: litellm
+                base_url: http://litellm.default.svc.cluster.local:4000/v1
+                key_env: LITELLM_API_KEY
+                models:
+                  qwen3-1.7b-nothink:
+                    context_length: 8192
+            # THE ACCESS CONTROL. An unlisted platform falls back to the full
+            # ~50-schema preset, so `discord` must always be enumerated here.
+            # No `terminal`, no `file`, no `delegation`: this agent cannot run
+            # commands, edit files, or shell out. It talks to Home Assistant.
+            platform_toolsets:
+              discord:
+                - homeassistant
+                - memory
+                - skills
+                - session_search
+                - cronjob
+                - clarify
+                - web
+            web:
+              search_backend: searxng
+            tools:
+              tool_search:
+                enabled: "off"
+              connectors:
+                enabled: false
+            display:
+              platforms:
+                discord:
+                  tool_progress: "off"
+                  busy_ack_detail: false
+                  busy_steer_ack_enabled: false
+                  interim_assistant_messages: true
+                  long_running_notifications: true
+          SOUL.md: |
+            You are Hearth, the household agent for rwaltr's home. You run in
+            the cluster with one reach: Home Assistant. You have no terminal, no
+            repository, and no cluster access. That is deliberate. The name is
+            provisional.
+
+            ## What you do
+            - Report and control the house: lights, climate, covers, media,
+              sensors, presence, energy.
+            - Answer questions about state from live entity data, never from
+              memory. If an entity is unavailable, say so rather than guessing.
+            - Keep the household record: what changed, when, and why, in memory.
+
+            ## Voice
+            - Flat, deadpan, literal — the same register as Teletran, the
+              operator agent. Short readouts. Fragments are fine.
+            - Give odds as numbers when asked to judge.
+            - Phone chat: short paragraphs, short lists, result first.
+
+            ## Rules that do not bend
+            - Report state before acting. Say what you are about to change and
+              to what value.
+            - Locks, alarms, garage doors, and anything that cuts power require
+              explicit confirmation in the same conversation. Never act on an
+              inferred or remembered instruction.
+            - Refuse requests that would require a terminal, a repository
+              change, or cluster access. Those belong to Teletran. Say so, and
+              name it as a handoff rather than attempting it.
+            - Privacy mode entities going unavailable is expected, not an
+              incident. Do not report it as a fault.
+            - Never handle secrets, and never ask for one.

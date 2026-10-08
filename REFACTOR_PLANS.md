@@ -1333,6 +1333,25 @@ is fail-open on a missing or malformed file, which is what makes it safe to roll
 onto the live agent; the cutover was additionally A/B-verified as a no-op across
 all 933 resolved keys first. Full notes in `docs/hermes-agent.md`.
 
+### 2026-10-08 (later) — household agent: separating Home Assistant by blast radius
+
+One Hermes identity held repo write access, cluster read access, and device
+control including locks and power. That is one instruction away from a bad
+outcome in any of three domains. `hermes-ha` is a second instance whose only
+reach is Home Assistant: no repo checkout, no `gh`, no kubeconfig, no
+ServiceAccount, no RBAC, and a toolset list without `terminal`, `file`, or
+`delegation`. The toolset list is the access control, pinned read-only by
+managed scope.
+
+Two constraints drove the shape. The operator agent keeps `homeassistant`
+until the new one answers, so device control is never absent. And a second
+Discord application is required — two gateway processes cannot share one bot
+token — so the pod lands structurally correct and blocked on a 1Password item
+rwaltr owns, which is the intended handoff rather than a failure.
+
+Personal-assistant agent (Muse-style, own browser, no cluster reach) is filed
+as issue #908 and comes after this.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
