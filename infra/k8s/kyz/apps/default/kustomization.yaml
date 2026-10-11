@@ -12,7 +12,7 @@ resources:
   - ./jellyfin/ks.yaml
   - ./matter-server/ks.yaml
   - ./mosquitto/ks.yaml
-  - ./music-assistant/ks.yaml
+  # - ./music-assistant/ks.yaml  # disabled 2026-10-11: never adopted; see REFACTOR_PLANS.md
   - ./otbr/ks.yaml
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml

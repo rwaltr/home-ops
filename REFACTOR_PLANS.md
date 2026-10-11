@@ -1371,6 +1371,28 @@ login form after — and renders inline rather than redirecting, so an anonymous
 GET is a 200 either way. Public exposure via `envoy-external`; see
 `docs/freshrss.md`.
 
+### 2026-10-11 — Music Assistant disabled (deployed, never adopted)
+
+- The server (`apps/default/music-assistant`, HA's `music_assistant`
+  integration's backend) ran for ~3 weeks and was never used. Disabled the
+  repo's way: the entry in `apps/default/kustomization.yaml` is commented out,
+  exactly as `slskd` and `go2rtc` are. The app directory stays in-tree and
+  uncommenting that one line is the whole revert — no manifests were deleted.
+- **Pruning takes the config PVC with it.** Removing the `Kustomization` prunes
+  the `HelmRelease`/`OCIRepository`, and the 5 Gi `music-assistant` PVC is
+  Helm-owned, so it goes too (`slskd`/`go2rtc` PVCs are likewise absent from
+  `kubectl get pvc -n default`). Nothing on the tank is touched: the library was
+  a plain `hostPath` mount of `/var/tank/nas/library/music`, not a PVC, and the
+  dataset is untouched by the prune.
+- Its kopiur `SnapshotPolicy`/`SnapshotSchedule` (`H 2 * * *`) are pruned with
+  it, so nightly snapshots stop. Snapshots already in the kopia repo are the
+  recovery point if this ever comes back.
+- **Out-of-band follow-up for rwaltr:** the `music_assistant` HA integration is
+  runtime state in HA's own config (not in git) and still points at
+  `http://music-assistant.default.svc.cluster.local:8095`, so it will log
+  connection failures until it is deleted in the HA UI. The gatus endpoint is
+  discovered from the HTTPRoute, so it disappears on its own.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
