@@ -1393,6 +1393,41 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   connection failures until it is deleted in the HA UI. The gatus endpoint is
   discovered from the HTTPRoute, so it disappears on its own.
 
+### 2026-10-11 — Terraform pipeline: Tofu Controller, staged so it cannot touch DNS
+
+The ask was to let the agent author Terraform and have it reconciled without rwaltr running
+anything. Three engines were compared in #913 (Tofu Controller, Crossplane +
+`provider-opentofu`, Pulumi) and the decision came down to two properties, not capability:
+a computed plan to review before anything changes, and state that is not the agent's to
+lose. Crossplane's unique strength — resource-level, namespace-scoped authorization via the
+API server — only pays off when unattended self-service is actually wanted, which it is not
+yet; the DNS workspace's safety mechanism is the plan.
+
+The adoption risk was entirely about state. The Cloudflare workspace is TFC-backed
+(`cloud { organization = "rwaltr", workspaces { name = "cloudflare-provisioner" } }`) and
+Tofu Controller speaks TFC natively via `spec.cloud`, so **state stays in Terraform Cloud**.
+Nothing is migrated or imported, and a controller cannot duplicate the 39 existing records
+because it reads the state that is already there.
+
+Shipped: the controller only (`apps/flux-system/tofu-controller/`, chart 0.16.5 pinned by
+digest), plus the ExternalSecret for the TFC token. **No `Terraform` objects** — nothing can
+act on DNS. When one lands it starts at `approvePlan: disable` (drift detection only, skips
+plan *and* apply).
+
+Two blockers surfaced, both in `docs/terraform-pipeline.md`. The TFC token is an owner step.
+The sharper one is that the Cloudflare workspace reads its credentials from SOPS files via
+`carlpett/sops`, so it needs the age private key — which today exists only on the
+workstation. That key decrypts every SOPS file in the repo, so the recommended fix is to
+refactor the workspace to take credentials from environment variables instead (ESO →
+1Password), which is also the opportunity to replace the global Cloudflare API key with the
+scoped token `external-dns` and `cert-manager` already use. That refactor is deliberately
+not bundled here: it changes a live DNS workspace and must be planned against TFC first,
+where the expected plan is empty.
+
+Lesson worth keeping: check *where the state lives* before adopting any IaC controller. A
+controller with no state does not "reconcile" existing resources — it creates a second copy
+of them.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
