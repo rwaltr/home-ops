@@ -1393,6 +1393,32 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   connection failures until it is deleted in the HA UI. The gatus endpoint is
   discovered from the HTTPRoute, so it disappears on its own.
 
+### 2026-10-18 — Seerr published (seerr.waltr.tech, now public)
+
+- Seerr (`apps/default/seerr`, the Jellyfin request portal) shipped on
+  `envoy-internal` only, i.e. the same LAN-only group as the `*arr` tooling —
+  reachable via k8s-gateway DNS inside the house, invisible from outside. It had
+  never been offered a public record: `external-dns` runs
+  `--gateway-name=envoy-external`, so a route attached to the internal gateway
+  alone never triggers one, and `seerr.waltr.tech` returned NODATA publicly while
+  Jellyfin/Immich/Calendar returned Cloudflare edge IPs.
+- Fix is the single documented edit: add `envoy-external` to the route's
+  `parentRefs` in `apps/default/seerr/app/httproute.yaml`, keeping the internal
+  parent so on-LAN access is unchanged. No Certificate work — `tls-wildcard`
+  already covers `*.waltr.tech` on both gateways — and no tunnel-side ingress
+  rule: cloudflared serves the whole origin through `envoy-external`.
+- **Exposure is deliberate, not a default.** The route is the only switch;
+  unpublishing is the reverse edit and `external-dns` deletes the record. Seerr
+  is public because it is a request portal rwaltr wants reachable off-LAN, not
+  because the internal-only convention changed — the arrs (bazarr, sonarr,
+  radarr, prowlarr, sabnzbd) and the rest of the internal set stay LAN-only.
+- Remote access depends on Seerr's own authentication staying on. Nothing in the
+  tunnel restricts who reaches the login page; the app's auth and Jellyfin
+  sign-in are the only gate in front of it.
+- Post-merge check: `scripts/public-dns-check.sh seerr.waltr.tech
+  jellyfin.waltr.tech` should show two edge IPs for both, and
+  `kubectl get httproute seerr -n default` should report two accepted parents.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
