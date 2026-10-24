@@ -1455,6 +1455,35 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   and `kubectl get pvc -n default navidrome-data`; the gatus endpoint appears
   from the HTTPRoute on its own.
 
+### 2026-10-24 (later) — Navidrome published (navidrome.waltr.tech, now public)
+
+- The deploy above shipped internal-only, with publication left as a question
+  rather than a default. rwaltr asked for it public after configuring the admin
+  account, so the route in `apps/default/navidrome/app/helmrelease.yaml` now
+  carries **both** parents: `envoy-internal` (unchanged on-LAN path) and
+  `envoy-external`.
+- No Certificate and no tunnel work: `external-dns` runs
+  `--gateway-name=envoy-external` and writes the record from the route, and the
+  `tls-wildcard` Certificate already covers `*.waltr.tech` on both gateways.
+  The parentRef **is** the publication step, in both directions.
+- **The gate is the app's own auth.** Public traffic terminates TLS at
+  Cloudflare's edge, so nothing declared in `infra/k8s` restricts *who* reaches
+  the login page — a `ClientTrafficPolicy`/IP allowlist on `envoy-external`
+  would cover LAN and tailnet clients only. Navidrome's own login plus the
+  Subsonic credentials are the access control, and that is the recorded
+  intent of this exposure.
+- The first-run step is done: the pod log shows `Creating initial user
+  user=rwaltr` and a NavidromeUI player registration, so the admin exists in the
+  `navidrome-data` PVC and a rebuild from manifests + a PVC restore does not
+  repeat it.
+- Still internal-only, deliberately and unaffected: the arrs (bazarr, sonarr,
+  radarr, prowlarr), sabnzbd, home-assistant, and the rest of the LAN set.
+- Post-merge check: `scripts/public-dns-check.sh navidrome.waltr.tech` must
+  return Cloudflare edge IPs (not NODATA), and
+  `kubectl get httproute navidrome -n default` must report **two** accepted
+  parents. A curl from this pod hits the internal gateway and proves nothing
+  about the public path.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

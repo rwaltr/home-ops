@@ -2,9 +2,10 @@
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 # Navidrome — music server (Subsonic/OpenSubsonic API) over the existing tank
 # music library at /var/tank/nas/library/music, the same host path jellyfin and
-# the disabled music-assistant mount. Internal only: navidrome.waltr.tech on
-# `envoy-internal` for on-LAN clients; off-LAN access would be a deliberate
-# second step (see docs/navidrome.md).
+# the disabled music-assistant mount. Published deliberately: the route carries
+# BOTH `envoy-internal` (on-LAN, k8s-gateway DNS) and `envoy-external` (public
+# via the cloudflare tunnel). Removing the second parentRef is the whole
+# unpublish step — see docs/navidrome.md.
 #
 # Library is mounted READ-ONLY: Navidrome only ever reads tracks. Write access
 # on the host path is what jellyfin needs for re-encoding plugins, not this.
@@ -118,6 +119,8 @@ spec:
           - navidrome.waltr.tech
         parentRefs:
           - name: envoy-internal
+            namespace: network
+          - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
             namespace: network
     persistence:
       # SQLite DB (navidrome.db + WAL), image/transcoding caches, plugins.
