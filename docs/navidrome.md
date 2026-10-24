@@ -7,10 +7,11 @@ part that decides it: there are mature native clients on both phone platforms
 server, no per-client setup.
 
 ```
- iPhone / Android (Subsonic client) ─┐
- Desktop browser ────────────────────┼─ HTTPS → k8s-gateway DNS → envoy-internal ┐
-                                     │   (navidrome.waltr.tech — LAN only)        ├→ navidrome:4533
- Jellyfin (unchanged, its own music library) ─────────────────────────────────────┘   │
+ iPhone / Android (Subsonic client) ─┬─ HTTPS → cloudflare tunnel → envoy-external ┐
+ Desktop browser ────────────────────┘       (navidrome.waltr.tech — public)      │
+                                     ┌─ HTTPS → k8s-gateway DNS → envoy-internal ─┤→ navidrome:4533
+ LAN clients ────────────────────────┘       (same hostname, on-LAN path)         │
+ Jellyfin (unchanged, its own music library) ────────────────────────────────────┘   │
                                                                      navidrome-data PVC (SQLite)
  /var/tank/nas/library/music ──(hostPath, read-only)──────────────────→ /music
 ```
@@ -25,31 +26,34 @@ artwork.
 `infra/k8s/kyz/apps/default/navidrome/` — `ks.yaml` plus `app/` (HelmRelease,
 OCIRepository, kustomization). Registered in `apps/default/kustomization.yaml`.
 
-| Piece    | Value                                                        |
-| -------- | ------------------------------------------------------------ |
-| Image    | `docker.io/navidrome/navidrome:0.64.2` (index digest pinned) |
-| Chart    | shared `app-template` `5.2.1` (no Navidrome-specific chart)  |
-| Port     | 4533 (`/ping` = chi heartbeat, used by all three probes)     |
-| Config   | env only — no `navidrome.toml` is rendered or created        |
-| Music    | `hostPath` `/var/tank/nas/library/music` → `/music` (ro)     |
-| State    | PVC `navidrome-data` (10Gi, openebs-hostpath) → `/data`      |
-| Temp     | emptyDir → `/tmp` (ffmpeg + scanner scratch)                 |
-| Root FS  | read-only, runs as `1000:1000`, `ND_ENFORCENONROOTUSER=true` |
-| Backup   | kopiur component, `H 1 * * *`                                |
-| Exposure | `envoy-internal` only — **not** published publicly           |
+| Piece    | Value                                                            |
+| -------- | ---------------------------------------------------------------- |
+| Image    | `docker.io/navidrome/navidrome:0.64.2` (index digest pinned)     |
+| Chart    | shared `app-template` `5.2.1` (no Navidrome-specific chart)      |
+| Port     | 4533 (`/ping` = chi heartbeat, used by all three probes)         |
+| Config   | env only — no `navidrome.toml` is rendered or created            |
+| Music    | `hostPath` `/var/tank/nas/library/music` → `/music` (ro)         |
+| State    | PVC `navidrome-data` (10Gi, openebs-hostpath) → `/data`          |
+| Temp     | emptyDir → `/tmp` (ffmpeg + scanner scratch)                     |
+| Root FS  | read-only, runs as `1000:1000`, `ND_ENFORCENONROOTUSER=true`     |
+| Backup   | kopiur component, `H 1 * * *`                                    |
+| Exposure | `envoy-internal` + `envoy-external` — **published** (2026-10-24) |
 
 Config being env-only is deliberate: the app keeps its mutable state —
 including the JWT secrets it generates on first run — in the SQLite DB under
 `/data`, so there is no generated config file to fight a ConfigMap over. Change
 a setting by editing `env:` in the HelmRelease; a restart is required.
 
-## First run: one browser step
+## First run: one browser step (done)
 
 There is no secret in git and nothing to provision in 1Password. While the
 instance has no users, `/app/` serves Navidrome's own signup form; the first
-account it creates is the admin. Deploy is complete only after that:
+account it creates is the admin. That is the state this doc was written for —
+the admin account (`rwaltr`) exists as of 2026-10-24, so a rebuild from these
+manifests plus the `navidrome-data` PVC restore needs no repeat of it. Only a
+genuinely empty instance does:
 
-1. Open `https://navidrome.waltr.tech/app/` from a device on the LAN.
+1. Open `https://navidrome.waltr.tech/app/`.
 2. Create the admin account (username + password of your choosing).
 3. Settings → _Music folders_ is already `/music`; the initial scan starts on
    its own. Add one folder per mount if the library layout ever changes.
@@ -77,23 +81,36 @@ The kopiur `SnapshotPolicy` covers the `navidrome-data` PVC nightly at `H 1`
 worst case is a re-scan, since the DB is a derived index of the library). The
 library itself is on the tank and is not snapshotted by this policy.
 
-## Publishing it publicly (not done)
+## Exposure (public, deliberately)
 
-Internal-only is the default here. Exposing it is a one-line edit in the
-HelmRelease (`route.app.parentRefs`: add `envoy-external`), and `external-dns`
-writes the record from the route — no Certificate or tunnel change, the
-`*.waltr.tech` wildcard already covers the hostname. It was **not** done
-because exposure is a deliberate decision, not a default: a public music server
-means the login page is reachable by anyone, and Navidrome's own auth is then
-the only gate. Ask first.
+Navidrome is reachable from off-LAN. The route carries both parents:
+
+- `envoy-internal` — the on-LAN path, via k8s-gateway DNS.
+- `envoy-external` — the public path. `external-dns` runs with
+  `--gateway-name=envoy-external`, so it writes `navidrome.waltr.tech` from the
+  route; the `*.waltr.tech` wildcard Certificate already covers it, so no
+  Certificate or tunnel change was involved.
+
+**This was a decision, not a default.** Public here means the login page is
+reachable by anyone on the internet and Navidrome's own authentication is the
+only gate — nothing in the tunnel restricts who reaches it. The published state
+is intentional (rwaltr, 2026-10-24): music is wanted from phones off the LAN,
+and a Subsonic client needs to reach the server directly.
+
+Unpublishing is the reverse edit — delete the `envoy-external` parentRef in
+`app/helmrelease.yaml` — and `external-dns` removes the record. The rest of the
+internal-only set (the arrs, bazarr, sabnzbd, prowlarr, home-assistant) is
+unchanged by this.
 
 ## Verification
 
 ```bash
 kubectl get hr,pvc,httproute -n default | grep navidrome
-kubectl get httproute navidrome -n default -o jsonpath='{.status.parents[*].name}'  # envoy-internal accepted
-curl -s https://navidrome.waltr.tech/ping   # 200 once resolved on the LAN
+kubectl get httproute navidrome -n default -o jsonpath='{.status.parents[*].name}'  # both gateways accepted
+scripts/public-dns-check.sh navidrome.waltr.tech   # two Cloudflare edge IPs, not NODATA
 ```
 
-Post-merge, read the deployed objects rather than the merge commit (see
-`gitops-merge-verification`).
+A plain `curl` from in-cluster resolves split-horizon and hits the _internal_
+gateway, so it proves nothing about the public path — the DNS record plus the
+external parent's `Accepted` condition is the evidence. Post-merge, read the
+deployed objects rather than the merge commit (see `gitops-merge-verification`).
