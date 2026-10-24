@@ -35,3 +35,4 @@ resources:
   - ./litellm/ks.yaml
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
+  - ./navidrome/ks.yaml

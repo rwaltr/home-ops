@@ -1,0 +1,145 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Navidrome — music server (Subsonic/OpenSubsonic API) over the existing tank
+# music library at /var/tank/nas/library/music, the same host path jellyfin and
+# the disabled music-assistant mount. Internal only: navidrome.waltr.tech on
+# `envoy-internal` for on-LAN clients; off-LAN access would be a deliberate
+# second step (see docs/navidrome.md).
+#
+# Library is mounted READ-ONLY: Navidrome only ever reads tracks. Write access
+# on the host path is what jellyfin needs for re-encoding plugins, not this.
+#
+# Config is environment only — no navidrome.toml is rendered into /data and the
+# app does not create one (verified against the 0.64.2 binary: it boots, scans
+# and serves with ND_* env alone, and the generated JWT secrets live in the
+# SQLite DB on the data PVC). Its own state is /data/navidrome.db + /data/cache,
+# so nothing is lost on a pod roll and the kopiur snapshot covers it.
+#
+# First-run: the web UI at /app/ serves its own signup form while the instance
+# has no users; the account it creates is the admin. No secret in git and
+# nothing to provision in 1Password — see docs/navidrome.md for the one browser
+# step.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: navidrome
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: navidrome
+  values:
+    fullnameOverride: navidrome
+    controllers:
+      navidrome:
+        # RWO PVC: never run two pods against the SQLite DB at once.
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/navidrome/navidrome
+              tag: 0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
+            env:
+              TZ: America/Chicago
+              ND_MUSICFOLDER: /music
+              ND_DATAFOLDER: /data
+              ND_LOGLEVEL: info
+              # Refuse to start as uid 0. The image's default user IS root
+              # (image config has no User), so this is the guard that keeps a
+              # future values edit from silently running the server as root.
+              ND_ENFORCENONROOTUSER: "true"
+            # /ping is chi's heartbeat middleware (status 200, no auth): the one
+            # path that answers before any user exists, so it is safe for both
+            # probes and for the startup gate on a cold database.
+            probes:
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /ping
+                    port: &port 4533
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /ping
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Verified: boot + full scan + shutdown touch nothing outside the
+              # data folder, so the root FS stays read-only. /tmp is an emptyDir
+              # because ffmpeg (transcoding) and the scanner use it.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                # Scanning tags a large library is bursty CPU and the process
+                # holds its index in memory; no CPU limit (it would throttle
+                # below 100% usage), memory bounded — this node has no swap.
+                memory: 1Gi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: navidrome
+        ports:
+          http:
+            appProtocol: http
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - navidrome.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      # SQLite DB (navidrome.db + WAL), image/transcoding caches, plugins.
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 10Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC
+        # exists, and the kopiur policy refers to this exact name.
+        forceRename: navidrome-data
+        globalMounts:
+          - path: /data
+      # The music library, straight off the tank DAS (ZFS). Read-only: the
+      # scanner only reads tags/artwork; transcoded output goes to /data/cache.
+      music:
+        type: hostPath
+        hostPath: /var/tank/nas/library/music
+        globalMounts:
+          - path: /music
+            readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

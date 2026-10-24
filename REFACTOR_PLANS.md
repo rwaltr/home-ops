@@ -1419,6 +1419,42 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   jellyfin.waltr.tech` should show two edge IPs for both, and
   `kubectl get httproute seerr -n default` should report two accepted parents.
 
+### 2026-10-24 — Navidrome deployed (navidrome.waltr.tech, internal only)
+
+- New music server in `apps/default/navidrome/` over the existing tank library
+  (`/var/tank/nas/library/music`, the same host path jellyfin and the disabled
+  music-assistant read). Chosen for the **Subsonic/OpenSubsonic API**: mature
+  native clients on both phone platforms and for desktop, versus Jellyfin's
+  music UX which is the weakest part of an otherwise fine app. No transcoding
+  service, no database service — SQLite, one container, one PVC.
+- **Library mounted read-only.** Navidrome only reads tags and artwork; write
+  access on the host path is jellyfin's requirement (its re-encode plugin), not
+  this app's. Host path, not a PVC: nothing on the tank is touched.
+- **Config is env-only and the app creates no config file.** Verified against
+  the 0.64.2 binary locally (boot + full scan + shutdown, non-root, with
+  `ND_ENFORCENONROOTUSER=true`): no `navidrome.toml` is written, nothing lands
+  outside `ND_DATAFOLDER`, and `scanner.schedule` defaults to disabled — the
+  inotify watcher is what notices new files. Generated JWT secrets live in the
+  SQLite DB on the PVC, which is why the root filesystem can stay read-only
+  (with an emptyDir on `/tmp` for ffmpeg/scanner scratch) and why the kopiur
+  snapshot covers sessions as well as the index.
+- **No secret, nothing to provision in 1Password.** Navidrome serves its own
+  signup form while it has no users; the first account created becomes the
+  admin. Same shape as FreshRSS: the deploy is not complete until that browser
+  step is done. `docs/navidrome.md` carries it.
+- `/ping` is chi's heartbeat middleware — 200, no auth, answers before any user
+  exists — so liveness and readiness both use it rather than the default
+  `tcpSocket`, which only proves something is listening.
+- **Not published.** The route carries `envoy-internal` alone; adding
+  `envoy-external` is the whole publication step. Held back on purpose — a
+  public music server puts the login page on the open internet with Navidrome's
+  own auth as the only gate — so this is a question for rwaltr, not a default.
+- kopiur `SnapshotPolicy`/`SnapshotSchedule` at `H 1 * * *`, the one unused
+  night hour, on PVC `navidrome-data`.
+- Post-merge check: `kubectl get hr,pvc,httproute -n default | grep navidrome`
+  and `kubectl get pvc -n default navidrome-data`; the gatus endpoint appears
+  from the HTTPRoute on its own.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
