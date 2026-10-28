@@ -4,7 +4,7 @@
 
 # home-ops
 
-### _Flatcar · k0s · Cilium — GitOps homelab, cloud-managed with Terraform/Pulumi_
+### _Flatcar · k0s · Cilium — GitOps homelab, cloud-managed with Terraform_
 
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
@@ -16,7 +16,7 @@
 
 ## 📖 Overview
 
-Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform (migrating to Pulumi). In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
+Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform + Terragrunt. In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
 
 > 🗺️ Migration plan, decisions log, and lessons: **[REFACTOR_PLANS.md](REFACTOR_PLANS.md)**
 
@@ -31,7 +31,7 @@ Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
 | `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)        |
 | `infra/k0s/`       | k0sctl cluster definitions                                   |
 | `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks)    |
-| `infra/terraform/` | Cloudflare, Backblaze B2, Terraform Cloud (maintenance mode) |
+| `infra/terraform/` | Cloudflare, Backblaze B2, Terraform Cloud                |
 | `infra/shared/`    | Shared SOPS-encrypted config                                 |
 | `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)            |
 
@@ -65,15 +65,11 @@ Key platform apps:
 
 ### 🌐 Terraform
 
-Cloud resources in maintenance mode — migrating to Pulumi:
+Cloud resources, managed with Terraform + Terragrunt:
 
 - **Cloudflare** — DNS and domain management (`infra/terraform/cloudflare/`)
 - **Backblaze B2** — backup storage provisioning (`infra/terraform/backblaze/`)
 - **Terraform Cloud** — workspace management (`infra/terraform/tf-cloud/`)
-
-### 🚀 Pulumi
-
-Planned migration target for cloud resources (Go). Early stubs were pruned; `infra/pulumi/` will be recreated when this migration becomes active.
 
 ### 🔐 SOPS
 
@@ -225,8 +221,7 @@ offsite leg (mirror to Backblaze B2) is planned via kopiur's
 | 1Password  | Secrets (Connect + ESO)      | ✅               |
 | ZFS        | Storage & Snapshots          | ✅               |
 | SOPS       | Secrets Management           | ✅               |
-| Terraform  | Cloud Resource Management    | ✅ (maintenance) |
-| Pulumi     | Cloud Resource Management    | 🚧 planned       |
+| Terraform  | Cloud Resource Management    | ✅               |
 | Netdata    | System Monitoring            | 🚧 planned       |
 | mise       | Task Runner & Tool Mgmt      | ✅               |
 | Pre-commit | Code Quality Automation      | ✅               |
