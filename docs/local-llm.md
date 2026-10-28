@@ -97,6 +97,11 @@ The node has **no disk swap**, only 4Gi zram, so:
 - `OLLAMA_CONTEXT_LENGTH=8192` bounds the KV cache. Overridable per request.
 - ollama is capped at 4Gi, speaches 2Gi, litellm 512Mi. Largest local model is
   1.4GB; 4Gi leaves room for a 4B-class swap.
+- **The litellm cap is tight and a newer `main-stable` digest exceeded it.** The
+  2026-10-12 digest (`c169fb3`) OOMKills the `app` container at startup against
+  512Mi, before it emits any log output; the digest pinned here (`625981c`) runs
+  clean at the same cap. Re-bumping requires raising the cap first — a digest
+  bump alone will crashloop.
 - Model weights are re-downloadable artifacts and are deliberately **not**
   kopia-backed.
 

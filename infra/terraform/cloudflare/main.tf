@@ -9,7 +9,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "4.52.9"
+      version = "4.52.10"
     }
     sops = {
       source  = "carlpett/sops"
@@ -17,7 +17,7 @@ terraform {
     }
     http = {
       source  = "hashicorp/http"
-      version = "3.6.2"
+      version = "3.6.3"
     }
   }
 }
