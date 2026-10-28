@@ -17,6 +17,15 @@ spec:
     remediation:
       strategy: rollback
       retries: 3
+    # Helm's `crds/` directory is INSTALL-ONLY: a plain upgrade never touches CRD
+    # schemas, so the CRDs here had drifted years behind the controller that reads
+    # them. CreateReplace creates missing CRDs and replaces existing ones on every
+    # upgrade (it never deletes), which is the CRD policy kopiur's own upgrade
+    # guide names as the Flux/Argo answer. Replacing a CRD keeps its custom
+    # resources — only the schema is rewritten. Skipping this silently prunes any
+    # field the running controller writes but the installed schema does not
+    # declare, which is how a configured feature ends up inert with no error.
+    crds: CreateReplace
   values:
     installScope: cluster # required: ClusterRepository is cluster-scoped
     webhook:
