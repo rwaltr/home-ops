@@ -8,7 +8,12 @@ task.timings = true
 [tools]
 # Core infrastructure tools
 "github:FiloSottile/age" = "latest"
-"github:fluxcd/flux2" = { version = "latest", exe = "flux" }
+# No `exe` option: mise 2026.10.21 removed it from the github backend ("option
+# `exe` is not used by the github backend"), which fails `mise install` outright
+# and so breaks the Lint workflow's setup step for every PR. The release tarball
+# already contains a single `flux` binary, so no option is needed — verified
+# installing and running flux 2.10.0 with mise 2026.10.21.
+"github:fluxcd/flux2" = "latest"
 kubectl = "latest"
 sops = "latest"
 terraform = "latest"
