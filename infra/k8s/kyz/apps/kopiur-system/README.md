@@ -99,6 +99,44 @@ kubectl get snapshotpolicies -A
 kubectl get snapshots -n default --sort-by=.metadata.creationTimestamp | tail
 ```
 
+### Verifying the backups themselves
+
+A snapshot reaching `Succeeded` proves the mover wrote _something_ to the
+repository. It does not prove the data is readable, and it does not prove it can
+be restored. The shared component therefore sets `spec.verification` on every
+policy, which is opt-in in kopiur: without the block the operator verifies
+nothing and `status.lastVerified` stays empty forever, so an unreadable backup
+looks exactly like a good one.
+
+- **`quick`** — `kopia snapshot verify` at blob level, daily at `H 4` (after the
+  backup window). Every stored blob is read and hash-checked. This is the tier
+  that catches silent corruption.
+- **`deep`** — a scratch **restore** of the latest snapshot into a throwaway
+  20Gi PVC, weekly at `H 5` on Sunday. This is the only tier that proves
+  restorability; it costs a full read of the source.
+- **`successExpr: stats.files > 0 && stats.errors == 0`** fails a run that read
+  no files. Without it a verify of an empty snapshot reports success.
+
+Read the verdict — the `LAST-VERIFIED` column is the whole point:
+
+```bash
+kubectl get snapshotpolicies -n default          # LAST-VERIFIED per policy
+kubectl get snapshots -n default --sort-by=.metadata.creationTimestamp | tail
+kubectl get jobs -n default | grep -iE 'verify|deep'   # the verify Jobs
+```
+
+`status.lastVerified` is the RFC3339 stamp of the most recent _successful_
+verification, any tier. It is empty until the first run lands, and it does not
+move when a run fails — a stale stamp next to a failing verify Job is the
+signal, which is why the column is read together with the Jobs, not alone.
+
+Cadence and scratch size are overridable per app from its `ks.yaml`
+(`KOPIUR_VERIFY_QUICK_CRON`, `KOPIUR_VERIFY_DEEP_CRON`, `KOPIUR_VERIFY_SCRATCH`).
+The scratch must hold the restored data, which cannot exceed the source PVC's own
+capacity — the largest backed-up PVC here is 10Gi, so the 20Gi default clears
+every current source. Do not omit `capacity`: the fallback is a node-ephemeral
+`emptyDir`, unbounded against the node's disk.
+
 ## Validated end-to-end (2026-09-06)
 
 PVC → 10MB random data → `Snapshot` Succeeded → data verified on
