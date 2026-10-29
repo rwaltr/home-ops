@@ -1484,6 +1484,67 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   parents. A curl from this pod hits the internal gateway and proves nothing
   about the public path.
 
+### 2026-10-29 — openebs chart moved off the deprecated charts-mirror
+
+- `infra/k8s/kyz/apps/openebs/openebs/app/ocirepository.yaml` pulled
+  `oci://ghcr.io/home-operations/charts-mirror/openebs`. That mirror is a
+  stop-gap that **deprecates a chart the moment upstream publishes OCI and prunes
+  it 6 months later** (`home-operations/charts-mirror#330`, "Official OCI chart
+  exists upstream", merged 2025-11-22). The prune landed 2026-10-28: every fetch
+  returned `DENIED: requested access to the resource is denied`, the OCIRepository
+  went `FetchFailed`, and because the `openebs` Kustomization has `wait: true` it
+  never became Ready.
+- Blast radius was the whole `dependsOn` graph: 19 Kustomizations reported
+  `dependency 'openebs/openebs' is not ready` — all 18 apps in `apps/default`
+  (degoog first among them) plus openebs itself. The workloads kept running the
+  already-applied revision; only reconciliation was blocked.
+- Fix: point at the upstream chart, `oci://ghcr.io/openebs/charts/openebs`, tag
+  unchanged (4.4.0). Verified with `helm template` against the upstream artifact
+  before committing — it renders the same `openebs-hostpath` StorageClass,
+  CRDs and localpv provisioner Deployment the mirror copy did.
+- **Lesson**: every `charts-mirror` OCIRepository is on a finite clock. The repo
+  keeps one other (`network/external-dns`, still published) and it must move to
+  upstream OCI as soon as external-dns ships one.
+
+### 2026-10-29 — kopiur deep-verify scratch PVC had no storage class
+
+- #953 turned on `verification:` for every backed-up PVC. The first scheduled
+  deep run created 20 Jobs and 20 scratch PVCs, all of which stuck `Pending`:
+  `no persistent volumes available for this claim and no storage class is set`.
+- Cause: `capacity` alone on `verification.deep` leaves the scratch volume's
+  **generic ephemeral PVC** with an empty `storageClassName`, which means "use
+  the cluster default" — and this cluster deliberately has none
+  (`localpv-provisioner.hostpathClass.isDefaultClass: false`, so
+  `openebs-hostpath` is never the default). The kopiur CRD documents exactly
+  this: *"StorageClass for the ephemeral scratch PVC; absent uses the cluster
+  default"*.
+- Fix: set `storageClassName: ${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}`
+  in `components/kopiur/backup/snapshotpolicy.yaml`.
+- **Lesson**: on a cluster with no default StorageClass, every PVC-shaped
+  object — including a generic ephemeral volume the CRD creates for you —
+  needs its class stated explicitly. `hostpathClass.isDefaultClass: false` is
+  the right call for safety, but it makes silence a failure mode.
+- The 20 already-Pending Jobs keep their unbound PVCs; they do not heal when the
+  component changes. They clear on the next deep-verify cycle, or with
+  `kubectl delete job -n default -l 'app.kubernetes.io/component=verify'`
+  (`hermes-pod-restart` gained `delete` on `jobs` for exactly this).
+- **Two of the twenty were not the component at all.** `freshrss` and
+  `home-assistant` hand-write their `SnapshotPolicy` (two source PVCs; a
+  string-level `postBuild.substitute` cannot express a variable-length `sources`
+  list), so they do not inherit component edits and their scratch PVCs stayed
+  unbound after the component was fixed — the same one-liner has to be applied on
+  both sides. `find infra/k8s/kyz/apps -name 'kopia.yaml'` is the enumeration;
+  the two by-hand policies already carry a "keep the two in step" comment and it
+  was still missed.
+- Verification in full: source-controller's *first* fetch of the upstream openebs
+  artifact failed with `failed to extract the first layer from artifact: ... dial
+  tcp [2606:50c0:8000::154]:443: i/o timeout` — an IPv6 dial into the ghcr CDN,
+  which this cluster can never complete (dual-stack over ULA, no v6 delegation).
+  The identical token → manifest → layer fetch succeeds from a pod here, and a
+  `delete pod -l app=source-controller` (forcing an immediate re-reconcile) made
+  it succeed on the first attempt, so it was a stalled dial and not a broken
+  chart source. 53/53 Kustomizations Ready afterwards.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

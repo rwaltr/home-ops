@@ -46,3 +46,43 @@ spec:
     keepLatest: 7
     keepDaily: 14
     keepWeekly: 4
+  # Opt-in: with no `verification` block the operator never verifies anything and
+  # `status.lastVerified` stays empty forever, so a backup that cannot be read
+  # back looks exactly like one that can. Two tiers:
+  #
+  #   quick — `kopia snapshot verify` at blob level. Cheap; every stored blob is
+  #           read and hash-checked. This is the tier that catches silent
+  #           corruption or a half-written upload.
+  #   deep  — a scratch RESTORE of the latest snapshot into a throwaway volume,
+  #           which is the only thing that actually proves restorability. It runs
+  #           weekly because it costs a full read of the source.
+  #
+  # `successExpr` is not optional in spirit: without it a verify that read 0 files
+  # reports success. It fails the run unless files were seen and no error occurred.
+  #
+  # Scratch sizing: `capacity` provisions an ephemeral PVC per deep run (deleted
+  # with the Job) and must hold the restored data, which cannot exceed the source
+  # PVC's own capacity — the largest backed-up PVC here is 10Gi, so 20Gi is above
+  # every current source. A source larger than this fails the deep verify loudly;
+  # raise the value rather than removing it (omitting it falls back to a
+  # node-ephemeral emptyDir, which is unbounded against the node's disk).
+  verification:
+    quick:
+      schedule:
+        cron: "${KOPIUR_VERIFY_QUICK_CRON:=H 4 * * *}"
+        jitter: 30m
+      maxErrors: 0 # stop at the first error rather than reporting a summary
+    deep:
+      schedule:
+        cron: "${KOPIUR_VERIFY_DEEP_CRON:=H 5 * * 0}"
+        jitter: 1h
+      capacity: "${KOPIUR_VERIFY_SCRATCH:=20Gi}"
+      # Required here: the scratch volume is a generic ephemeral PVC and
+      # `capacity` alone leaves its storageClassName empty, which resolves to
+      # the cluster default — and this cluster deliberately has none
+      # (`hostpathClass.isDefaultClass: false`). The PVC then never binds
+      # ("no storage class is set"), the Job sits Pending, and
+      # KubeJobNotCompleted pages once per app per run.
+      storageClassName: "${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}"
+    successExpr: "stats.files > 0 && stats.errors == 0"
+    verifyFilesPercent: 10 # fraction of each file `quick` reads in full

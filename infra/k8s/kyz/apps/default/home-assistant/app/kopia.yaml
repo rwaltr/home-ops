@@ -42,6 +42,29 @@ spec:
     keepLatest: 7
     keepDaily: 14
     keepWeekly: 4
+  # Verification is duplicated from components/kopiur/backup rather than shared,
+  # because this policy is hand-written for the two-PVC reason above. Keep the
+  # two in step: without this block kopiur verifies nothing here and HA's
+  # `status.lastVerified` stays empty, which is the one backup nobody wants to
+  # discover is unreadable. Tiers and the successExpr trap are documented in
+  # kopiur-system/README.md.
+  verification:
+    quick:
+      schedule:
+        cron: "H 4 * * *"
+        jitter: 30m
+      maxErrors: 0
+    deep:
+      schedule:
+        cron: "H 5 * * 0"
+        jitter: 1h
+      capacity: 20Gi
+      # Same reason as the component: no default StorageClass on this cluster,
+      # so the ephemeral scratch PVC needs the class named. Duplicated policy,
+      # duplicated one-liner.
+      storageClassName: openebs-hostpath
+    successExpr: "stats.files > 0 && stats.errors == 0"
+    verifyFilesPercent: 10
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
 apiVersion: kopiur.home-operations.com/v1alpha1

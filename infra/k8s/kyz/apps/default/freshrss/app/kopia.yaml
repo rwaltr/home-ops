@@ -40,6 +40,26 @@ spec:
     keepLatest: 7
     keepDaily: 14
     keepWeekly: 4
+  # Verification duplicated from components/kopiur/backup — this policy is
+  # hand-written for the two-PVC reason above. Keep the two in step; without it
+  # kopiur verifies nothing here and `status.lastVerified` stays empty. The
+  # duplication is why `storageClassName` had to be added in two places, not
+  # one: this cluster has no default StorageClass, so a scratch PVC that omits
+  # it never binds and the deep-verify Job sits Pending.
+  verification:
+    quick:
+      schedule:
+        cron: "H 4 * * *"
+        jitter: 30m
+      maxErrors: 0
+    deep:
+      schedule:
+        cron: "H 5 * * 0"
+        jitter: 1h
+      capacity: 20Gi
+      storageClassName: openebs-hostpath
+    successExpr: "stats.files > 0 && stats.errors == 0"
+    verifyFilesPercent: 10
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
 apiVersion: kopiur.home-operations.com/v1alpha1
