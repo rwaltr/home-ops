@@ -1484,6 +1484,28 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   parents. A curl from this pod hits the internal gateway and proves nothing
   about the public path.
 
+### 2026-10-29 — openebs chart moved off the deprecated charts-mirror
+
+- `infra/k8s/kyz/apps/openebs/openebs/app/ocirepository.yaml` pulled
+  `oci://ghcr.io/home-operations/charts-mirror/openebs`. That mirror is a
+  stop-gap that **deprecates a chart the moment upstream publishes OCI and prunes
+  it 6 months later** (`home-operations/charts-mirror#330`, "Official OCI chart
+  exists upstream", merged 2025-11-22). The prune landed 2026-10-28: every fetch
+  returned `DENIED: requested access to the resource is denied`, the OCIRepository
+  went `FetchFailed`, and because the `openebs` Kustomization has `wait: true` it
+  never became Ready.
+- Blast radius was the whole `dependsOn` graph: 19 Kustomizations reported
+  `dependency 'openebs/openebs' is not ready` — all 18 apps in `apps/default`
+  (degoog first among them) plus openebs itself. The workloads kept running the
+  already-applied revision; only reconciliation was blocked.
+- Fix: point at the upstream chart, `oci://ghcr.io/openebs/charts/openebs`, tag
+  unchanged (4.4.0). Verified with `helm template` against the upstream artifact
+  before committing — it renders the same `openebs-hostpath` StorageClass,
+  CRDs and localpv provisioner Deployment the mirror copy did.
+- **Lesson**: every `charts-mirror` OCIRepository is on a finite clock. The repo
+  keeps one other (`network/external-dns`, still published) and it must move to
+  upstream OCI as soon as external-dns ships one.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

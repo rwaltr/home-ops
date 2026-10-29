@@ -11,4 +11,10 @@ spec:
     operation: copy
   ref:
     tag: 4.4.0
-  url: oci://ghcr.io/home-operations/charts-mirror/openebs
+  # Upstream OCI chart (openebs/openebs publishes it as ghcr.io/openebs/charts).
+  # Was oci://ghcr.io/home-operations/charts-mirror/openebs, which the mirror
+  # deprecated as soon as upstream shipped OCI and then pruned ("Official OCI
+  # chart exists upstream", charts-mirror#330). The pruning broke every fetch
+  # with `DENIED: requested access to the resource is denied`, which left this
+  # Kustomization unready and blocked every app that dependsOn it.
+  url: oci://ghcr.io/openebs/charts/openebs
