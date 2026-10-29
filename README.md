@@ -26,14 +26,14 @@ Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
 
 ## 🗂️ Repository Structure
 
-| Path               | Purpose                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)        |
-| `infra/k0s/`       | k0sctl cluster definitions                                   |
-| `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks)    |
-| `infra/terraform/` | Cloudflare, Backblaze B2, Terraform Cloud                |
-| `infra/shared/`    | Shared SOPS-encrypted config                                 |
-| `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)            |
+| Path               | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)     |
+| `infra/k0s/`       | k0sctl cluster definitions                                |
+| `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks) |
+| `infra/terraform/` | Cloudflare, Porkbun registrar NS, Terraform Cloud         |
+| `fnox.toml`        | Project secret references (1Password via fnox)            |
+| `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)         |
 
 ## 🔧 Infrastructure
 
@@ -67,13 +67,15 @@ Key platform apps:
 
 Cloud resources, managed with Terraform + Terragrunt:
 
-- **Cloudflare** — DNS and domain management (`infra/terraform/cloudflare/`)
-- **Backblaze B2** — backup storage provisioning (`infra/terraform/backblaze/`)
+- **Cloudflare** — DNS, zones and zone settings (`infra/terraform/cloudflare/`)
+- **Porkbun** — registrar nameserver delegation, in the same workspace (`porkbun.tf`)
 - **Terraform Cloud** — workspace management (`infra/terraform/tf-cloud/`)
 
-### 🔐 SOPS
+### 🔐 Secrets
 
-Age-based secrets management — sensitive values are encrypted inline alongside repository files.
+[1Password](https://1password.com) is the source of truth. Local and CI tooling reads it through
+[fnox](https://fnox.jdx.dev) (references in `fnox.toml`); in-cluster workloads get secrets via
+1Password Connect + External Secrets. No secrets are encrypted into this repository.
 
 ## 🖥️ Current Host
 
@@ -209,22 +211,22 @@ offsite leg (mirror to Backblaze B2) is planned via kopiur's
 
 ## 🧰 Tools
 
-| Tool       | Use                          | Status           |
-| ---------- | ---------------------------- | ---------------- |
-| Flatcar    | Operating System             | ✅               |
-| k0s        | Kubernetes (single-node)     | ✅               |
-| Cilium     | CNI (kube-proxy replacement) | ✅               |
-| Flux       | GitOps                       | ✅               |
-| OpenEBS    | Hostpath local storage       | ✅               |
-| kopiur     | PVC backups (kopia-native)   | ✅               |
-| RustFS     | S3-compatible Storage        | ✅               |
-| 1Password  | Secrets (Connect + ESO)      | ✅               |
-| ZFS        | Storage & Snapshots          | ✅               |
-| SOPS       | Secrets Management           | ✅               |
-| Terraform  | Cloud Resource Management    | ✅               |
-| Netdata    | System Monitoring            | 🚧 planned       |
-| mise       | Task Runner & Tool Mgmt      | ✅               |
-| Pre-commit | Code Quality Automation      | ✅               |
+| Tool       | Use                           | Status     |
+| ---------- | ----------------------------- | ---------- |
+| Flatcar    | Operating System              | ✅         |
+| k0s        | Kubernetes (single-node)      | ✅         |
+| Cilium     | CNI (kube-proxy replacement)  | ✅         |
+| Flux       | GitOps                        | ✅         |
+| OpenEBS    | Hostpath local storage        | ✅         |
+| kopiur     | PVC backups (kopia-native)    | ✅         |
+| RustFS     | S3-compatible Storage         | ✅         |
+| 1Password  | Secrets (Connect + ESO)       | ✅         |
+| ZFS        | Storage & Snapshots           | ✅         |
+| fnox       | Secret Resolution (1Password) | ✅         |
+| Terraform  | Cloud Resource Management     | ✅         |
+| Netdata    | System Monitoring             | 🚧 planned |
+| mise       | Task Runner & Tool Mgmt       | ✅         |
+| Pre-commit | Code Quality Automation       | ✅         |
 
 ## 🖊️ TODOs
 

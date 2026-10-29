@@ -59,7 +59,8 @@ function collectStrings(value: unknown, out: string[]): void {
 }
 
 // Well-known documented placeholder values (AWS docs examples, obvious dummies).
-const PLACEHOLDER = /^(AKIAIOSFODNN7EXAMPLE|ASIAIOSFODNN7EXAMPLE|EXAMPLE|PLACEHOLDER|CHANGEME|changeme|xxx+|your[-_]?key.*)$/i;
+const PLACEHOLDER =
+  /^(AKIAIOSFODNN7EXAMPLE|ASIAIOSFODNN7EXAMPLE|EXAMPLE|PLACEHOLDER|CHANGEME|changeme|xxx+|your[-_]?key.*)$/i;
 
 function matchSecretContent(text: string): string | undefined {
   for (const re of SECRET_CONTENT) {
@@ -127,7 +128,10 @@ export default function (pi: ExtensionAPI) {
       }
       if (contentHit) {
         if (path && (await isGitIgnored(path, ctx.cwd))) return undefined;
-        return confirmOrBlock(`content for "${path || "file"}" looks like a secret (${contentHit}…)`, ctx);
+        return confirmOrBlock(
+          `content for "${path || "file"}" looks like a secret (${contentHit}…)`,
+          ctx,
+        );
       }
       return undefined;
     }
@@ -140,7 +144,8 @@ export default function (pi: ExtensionAPI) {
 
       const referenced: string[] = [];
       // redirects: > path, >> path, tee path, cp/mv ... path
-      const redirectRe = /(?:>>?\s*|tee\s+(?:-a\s+)?|(?:cp|mv|install)\s+(?:-\S+\s+)*\S+\s+)(["']?)([^\s"'|;&>)]+)\1/g;
+      const redirectRe =
+        /(?:>>?\s*|tee\s+(?:-a\s+)?|(?:cp|mv|install)\s+(?:-\S+\s+)*\S+\s+)(["']?)([^\s"'|;&>)]+)\1/g;
       let m: RegExpExecArray | null;
       while ((m = redirectRe.exec(command)) !== null) referenced.push(m[2]);
 
@@ -165,7 +170,10 @@ export default function (pi: ExtensionAPI) {
 
       const contentHit = matchSecretContent(command);
       if (contentHit) {
-        return confirmOrBlock(`bash command contains what looks like a secret (${contentHit}…)`, ctx);
+        return confirmOrBlock(
+          `bash command contains what looks like a secret (${contentHit}…)`,
+          ctx,
+        );
       }
       return undefined;
     }

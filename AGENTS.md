@@ -105,7 +105,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - **Testing**: always exercise Flatcar changes in a VM; run `mise run lint` and
   validate syntax before committing; check for secret leakage.
 - **Idempotency & rollback**: changes should be safe to re-apply; consider how to revert.
-- **Comments**: explain *why*, not just *what*. Keep commits atomic.
+- **Comments**: explain _why_, not just _what_. Keep commits atomic.
 
 ## 💡 Tips for AI Agents
 
