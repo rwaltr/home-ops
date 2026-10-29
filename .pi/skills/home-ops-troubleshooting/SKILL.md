@@ -1,6 +1,6 @@
 ---
 name: home-ops-troubleshooting
-description: Troubleshoot common home-ops failures: mise task errors, Flatcar/Butane build and boot failures, SOPS age decryption, and Terraform/Terragrunt state. Use when a mise task, build, or apply fails in the home-ops repo.
+description: "Troubleshoot common home-ops failures: mise task errors, Flatcar/Butane build and boot failures, SOPS age decryption, and Terraform/Terragrunt state. Use when a mise task, build, or apply fails in the home-ops repo."
 ---
 
 # home-ops troubleshooting
