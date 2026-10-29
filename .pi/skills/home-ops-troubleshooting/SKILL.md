@@ -38,6 +38,12 @@ description: "Troubleshoot common home-ops failures: mise task errors, Flatcar/B
 - Verify provider versions match and re-run `mise run tf:init` if the lock/init is stale
 - A workspace lock in HCP Terraform blocks every plan/apply; unlock it in the
   TFC UI or `POST /api/v2/workspaces/<id>/actions/unlock`
-- Providers: `cloudflare/cloudflare` (v4 era), `icco/porkbun`; both are pinned in
-  `.terraform.lock.hcl` — run `terraform init` after any version bump
+- Providers: `cloudflare/cloudflare` (v5), `icco/porkbun`; both are pinned in
+  `.terraform.lock.hcl` — run `terraform init -upgrade` after any version bump
+- The cloudflare v5 migration is done: `cloudflare_record` is now
+  `cloudflare_dns_record` and the old `cloudflare_zone_settings_override` was
+  replaced by one `cloudflare_zone_setting` per setting (`for_each` over
+  `local.zone_settings` in `zone_settings.tf`). If a plan reports "no schema
+  available for cloudflare_zone_settings_override", the v4 resource is still in
+  state — remove it with `terraform state rm` while the v4 provider is installed
 - Use the mise `tf:*` tasks rather than raw `terraform`/`terragrunt` where a task exists

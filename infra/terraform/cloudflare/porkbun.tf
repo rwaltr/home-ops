@@ -13,9 +13,13 @@ locals {
 
 # Singular data source: it exposes name_servers, the plural cloudflare_zones does not.
 data "cloudflare_zone" "porkbun" {
-  for_each   = local.porkbun_domains
-  name       = each.value
-  account_id = cloudflare_account.waltrtech.id
+  for_each = local.porkbun_domains
+  filter = {
+    name = each.value
+    account = {
+      id = cloudflare_account.waltrtech.id
+    }
+  }
 }
 
 resource "porkbun_domain_nameservers" "domain" {

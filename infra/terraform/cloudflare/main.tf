@@ -11,7 +11,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "4.52.10"
+      version = "5.28.1"
     }
     porkbun = {
       source  = "icco/porkbun"
@@ -41,7 +41,8 @@ locals {
 }
 
 resource "cloudflare_account" "waltrtech" {
-  name              = "WaltrTech"
-  type              = "standard"
-  enforce_twofactor = "false"
+  name = "WaltrTech"
+  settings = {
+    enforce_twofactor = false
+  }
 }
