@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "terraform-mcp-server",
+      "args": [
+        "stdio"
+      ],
+      "exposure": "codemode",
+      "description": "Terraform Registry + HCP Terraform (auto-reads TFE_TOKEN from ~/.terraform.d/credentials.tfrc.json)"
+    }
+  }
+}
