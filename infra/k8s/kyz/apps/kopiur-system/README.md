@@ -149,5 +149,16 @@ PVC → `sha256sum -c` matched the original.
   — hardcode swaps to a pool-presence label when node labels/feature detection land.
 - If the `kopia` bucket is ever wiped (data loss), recreate with `mc mb` and
   `kubectl delete clusterrepository cluster-kopia` (then Flux re-creates it).
+- **CRDs upgrade via the HelmRelease, not by hand.** The `kopiur` HelmRelease
+  sets `spec.upgrade.crds: CreateReplace`, because Helm's `crds/` directory is
+  install-only and a plain chart bump never touches CRD schemas. Without it a
+  chart bump ships a newer controller against an older schema, and the apiserver
+  silently **prunes** any field the controller writes that the installed schema
+  does not declare — a configured feature ends up inert with no error anywhere.
+  `CreateReplace` creates missing CRDs and replaces existing ones on each
+  upgrade; it never deletes, and replacing a CRD keeps its custom resources.
+  Kopiur's own upgrade guide names this as the Flux/Argo answer. Do not "fix" a
+  schema drift with `kubectl apply -f deploy/crds/` — that reintroduces the
+  out-of-band write the GitOps rule exists to prevent.
 - 3-2-1 offsite leg (planned): kopiur `RepositoryReplication` → Backblaze B2
   (bucket exists in `infra/terraform/backblaze`; creds via 1Password).
