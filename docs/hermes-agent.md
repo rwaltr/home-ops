@@ -90,9 +90,11 @@ them.
    material, and does not use SOPS/age. 1Password and ExternalSecrets remain
    rwaltr's to manage; if a change needs a secret, it stops and asks.
 5. **Cluster access: direct is allowed**, but the PR loop must stay tight
-   (see below). Read-only by default; scoped writes only if earned. One has been
-   earned: `delete` on pods (2026-10-04) so a restart does not need a human. See
-   the RBAC note below — the grant is a restart lever, not a configuration path.
+   (see below). Read-only by default; scoped writes only if earned. Two have been
+   earned, both deletes of controller-managed objects: pods (2026-10-04) so a
+   restart does not need a human, and jobs (2026-10-29) so a Job that will never
+   finish can be cleared. See the RBAC note below — these are operational levers,
+   not a configuration path.
 6. **Autonomy: approve destructive commands.** Reads and builds run freely;
    destructive/irreversible ops require an explicit in-chat approval.
 7. **Exposure: Tailscale is the intended answer but not yet established.**
@@ -140,13 +142,13 @@ structural, not prompt-based.
   `REFACTOR_PLANS.md` and/or `docs/`), so the history explains itself.
 - **Direct cluster writes are not the deploy path.** `kubectl` is for
   observation (get/logs/events) and debugging; changes land via PR → merge →
-  Flux. If a scoped write role is ever added, it is explicit and reviewed.
+  Flux. The scoped write grants are explicit and enumerable in one file (below).
 
-## Cluster RBAC (read-only)
+## Cluster RBAC
 
-All grants live in `infra/k8s/kyz/apps/default/hermes/app/rbac.yaml` and use
-`get`/`list`/`watch` only — no verb outside the read set exists anywhere in the
-file.
+All grants live in `infra/k8s/kyz/apps/default/hermes/app/rbac.yaml`. Everything
+is `get`/`list`/`watch` except one role — `hermes-pod-restart` — whose two
+`delete` rules are the restart lever described below.
 
 | Role                  | Covers                                                                                                                 |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -154,6 +156,7 @@ file.
 | `hermes-pod-logs`     | `pods/log` (the `view` role omits it; logs are the main debugging surface)                                             |
 | `hermes-cluster-read` | `nodes`, `persistentvolumes`, `namespaces`, `storageclasses`, `volumeattachments`, `scheduling.k8s.io/priorityclasses` |
 | `hermes-crd-read`     | Cilium, Gateway API, `storage.k8s.io`, `coordination.k8s.io/leases`, kopiur                                            |
+| `hermes-pod-restart`  | `delete` on `pods` (restart) and `batch/jobs` (clear a stuck batch object) — the only write verbs in the file          |
 
 The `priorityclasses` rule is the newest addition. A pod spec proves only that
 a `PriorityClass` _name_ resolved at admission; it cannot prove that the class
@@ -171,6 +174,23 @@ to read except the `Snapshot`/`SnapshotPolicy` status. The rule grants read on
 exactly nine resources in `kopiur.home-operations.com` — `clusterrepositories`
 (cluster-scoped) plus the eight namespaced kinds — and nothing else in the group.
 `pods/log` already covers the mover pod while it is alive.
+
+`hermes-pod-restart` is the one write grant, and it holds exactly two rules:
+
+- `delete` on `pods` (2026-10-04) — restart a workload without asking rwaltr to
+  type `kubectl` for something mechanical. The owning controller recreates it.
+- `delete` on `batch/jobs` (2026-10-29) — clear a Job that is stuck and will
+  never finish. The case that earned it: 20 kopiur deep-verify Jobs sat `Pending`
+  for 12h on unbound scratch PVCs, each raising `KubeJobNotCompleted`, and
+  clearing them needed a verb this identity did not have. Nothing in git declares
+  a Job; the controller that does (a CronJob, or the kopiur operator on its next
+  tick) creates a fresh one, and the Job's pod and scratch PVC are
+  garbage-collected with it, so deleting a dead record is not a change to desired
+  state.
+
+Both are deletes of controller-managed objects, which is why the git-only rule
+for _configuration_ still holds. The role keeps its original name rather than
+gaining a new role/binding.
 
 ## Phases
 
@@ -290,13 +310,14 @@ requests read-write (and Workflows write to touch `.github/workflows`).
   read-write (and Workflows write if it edits `.github/workflows`).
 - **In-cluster `kubectl` via SA** changes `automountServiceAccountToken`; review
   the RBAC diff before merge.
-- **RBAC is read-only except for one operational verb.** Every grant is
+- **RBAC is read-only except for two operational deletes.** Every grant is
   `get`/`list`/`watch` except `delete` on `pods` (`hermes-pod-restart`,
-  2026-10-04). That grant exists so Teletran can restart a workload itself rather
-  than asking rwaltr to type `kubectl` for something mechanical. A restart is not
-  a configuration change — the owning controller recreates the pod, PVCs and
-  Secrets are untouched, and desired state is unchanged. It is deliberately
-  pods-only: it does not extend to workload objects, replica counts,
+  2026-10-04) and `delete` on `batch/jobs` (2026-10-29). They exist so Teletran
+  can restart a workload, or clear a Job that will never finish, rather than
+  asking rwaltr to type `kubectl` for something mechanical. Neither is a
+  configuration change — the owning controller recreates the pod or the Job,
+  PVCs and Secrets are untouched, and desired state is unchanged. Deliberately
+  narrow: they do not extend to workload objects, replica counts,
   `deletecollection`, or `pods/exec`. Cluster-scoped roles are enumerated above
   so a bulk widening (e.g. adding a whole API group) is visible in the diff
   rather than hidden behind a wildcard.
