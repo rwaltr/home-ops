@@ -7,6 +7,26 @@
       ],
       "exposure": "codemode",
       "description": "Terraform Registry + HCP Terraform (auto-reads TFE_TOKEN from ~/.terraform.d/credentials.tfrc.json)"
+    },
+    "arr": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-arr-server"
+      ],
+      "env": {
+        "RADARR_URL": "http://127.0.0.1:7878",
+        "RADARR_API_KEY": "!fnox get RADARR_API_KEY",
+        "SONARR_URL": "http://127.0.0.1:8989",
+        "SONARR_API_KEY": "!fnox get SONARR_API_KEY"
+      },
+      "exposure": "codemode",
+      "description": "Radarr/Sonarr media management (loopback via homelab-portforward)"
+    },
+    "mqtt": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "exposure": "codemode",
+      "description": "MQTT broker inspection/control (mosquitto via homelab-portforward)"
     }
   }
 }
