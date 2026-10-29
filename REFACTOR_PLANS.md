@@ -1506,6 +1506,29 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   keeps one other (`network/external-dns`, still published) and it must move to
   upstream OCI as soon as external-dns ships one.
 
+### 2026-10-29 — kopiur deep-verify scratch PVC had no storage class
+
+- #953 turned on `verification:` for every backed-up PVC. The first scheduled
+  deep run created 20 Jobs and 20 scratch PVCs, all of which stuck `Pending`:
+  `no persistent volumes available for this claim and no storage class is set`.
+- Cause: `capacity` alone on `verification.deep` leaves the scratch volume's
+  **generic ephemeral PVC** with an empty `storageClassName`, which means "use
+  the cluster default" — and this cluster deliberately has none
+  (`localpv-provisioner.hostpathClass.isDefaultClass: false`, so
+  `openebs-hostpath` is never the default). The kopiur CRD documents exactly
+  this: *"StorageClass for the ephemeral scratch PVC; absent uses the cluster
+  default"*.
+- Fix: set `storageClassName: ${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}`
+  in `components/kopiur/backup/snapshotpolicy.yaml`.
+- **Lesson**: on a cluster with no default StorageClass, every PVC-shaped
+  object — including a generic ephemeral volume the CRD creates for you —
+  needs its class stated explicitly. `hostpathClass.isDefaultClass: false` is
+  the right call for safety, but it makes silence a failure mode.
+- The 20 already-Pending Jobs keep their unbound PVCs; they do not heal when the
+  component changes. They clear on the next deep-verify cycle, or with
+  `kubectl delete job -n default -l 'app.kubernetes.io/component=verify'`
+  (`hermes-pod-restart` gained `delete` on `jobs` for exactly this).
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

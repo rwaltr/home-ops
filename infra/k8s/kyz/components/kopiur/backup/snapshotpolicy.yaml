@@ -77,5 +77,12 @@ spec:
         cron: "${KOPIUR_VERIFY_DEEP_CRON:=H 5 * * 0}"
         jitter: 1h
       capacity: "${KOPIUR_VERIFY_SCRATCH:=20Gi}"
+      # Required here: the scratch volume is a generic ephemeral PVC and
+      # `capacity` alone leaves its storageClassName empty, which resolves to
+      # the cluster default — and this cluster deliberately has none
+      # (`hostpathClass.isDefaultClass: false`). The PVC then never binds
+      # ("no storage class is set"), the Job sits Pending, and
+      # KubeJobNotCompleted pages once per app per run.
+      storageClassName: "${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}"
     successExpr: "stats.files > 0 && stats.errors == 0"
     verifyFilesPercent: 10 # fraction of each file `quick` reads in full
