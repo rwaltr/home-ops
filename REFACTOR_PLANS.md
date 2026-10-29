@@ -1528,6 +1528,22 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   component changes. They clear on the next deep-verify cycle, or with
   `kubectl delete job -n default -l 'app.kubernetes.io/component=verify'`
   (`hermes-pod-restart` gained `delete` on `jobs` for exactly this).
+- **Two of the twenty were not the component at all.** `freshrss` and
+  `home-assistant` hand-write their `SnapshotPolicy` (two source PVCs; a
+  string-level `postBuild.substitute` cannot express a variable-length `sources`
+  list), so they do not inherit component edits and their scratch PVCs stayed
+  unbound after the component was fixed — the same one-liner has to be applied on
+  both sides. `find infra/k8s/kyz/apps -name 'kopia.yaml'` is the enumeration;
+  the two by-hand policies already carry a "keep the two in step" comment and it
+  was still missed.
+- Verification in full: source-controller's *first* fetch of the upstream openebs
+  artifact failed with `failed to extract the first layer from artifact: ... dial
+  tcp [2606:50c0:8000::154]:443: i/o timeout` — an IPv6 dial into the ghcr CDN,
+  which this cluster can never complete (dual-stack over ULA, no v6 delegation).
+  The identical token → manifest → layer fetch succeeds from a pod here, and a
+  `delete pod -l app=source-controller` (forcing an immediate re-reconcile) made
+  it succeed on the first attempt, so it was a stalled dial and not a broken
+  chart source. 53/53 Kustomizations Ready afterwards.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
