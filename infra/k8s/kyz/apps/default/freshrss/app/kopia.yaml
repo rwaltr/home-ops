@@ -42,7 +42,10 @@ spec:
     keepWeekly: 4
   # Verification duplicated from components/kopiur/backup — this policy is
   # hand-written for the two-PVC reason above. Keep the two in step; without it
-  # kopiur verifies nothing here and `status.lastVerified` stays empty.
+  # kopiur verifies nothing here and `status.lastVerified` stays empty. The
+  # duplication is why `storageClassName` had to be added in two places, not
+  # one: this cluster has no default StorageClass, so a scratch PVC that omits
+  # it never binds and the deep-verify Job sits Pending.
   verification:
     quick:
       schedule:
@@ -54,6 +57,7 @@ spec:
         cron: "H 5 * * 0"
         jitter: 1h
       capacity: 20Gi
+      storageClassName: openebs-hostpath
     successExpr: "stats.files > 0 && stats.errors == 0"
     verifyFilesPercent: 10
 ---

@@ -59,6 +59,10 @@ spec:
         cron: "H 5 * * 0"
         jitter: 1h
       capacity: 20Gi
+      # Same reason as the component: no default StorageClass on this cluster,
+      # so the ephemeral scratch PVC needs the class named. Duplicated policy,
+      # duplicated one-liner.
+      storageClassName: openebs-hostpath
     successExpr: "stats.files > 0 && stats.errors == 0"
     verifyFilesPercent: 10
 ---
