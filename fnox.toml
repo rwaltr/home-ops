@@ -1,0 +1,15 @@
+# home-ops project secrets — references only, never values.
+#
+# Layers over the global ~/.config/fnox/config.toml, which defines the providers
+# (op, keychain) and the machine-wide secrets. Put a secret here only when it is
+# used exclusively by home-ops project tooling; keep general ones global.
+
+[secrets.RADARR_API_KEY]
+provider = "op"
+value = "arr/radarr"
+description = "Radarr API key (mcp-arr-server)"
+
+[secrets.SONARR_API_KEY]
+provider = "op"
+value = "arr/sonarr"
+description = "Sonarr API key (mcp-arr-server)"
