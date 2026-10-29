@@ -8,41 +8,32 @@ data "cloudflare_zones" "public_domain" {
 resource "cloudflare_record" "public_githubverify" {
   name    = "_github-pages-challenge-rwaltr"
   type    = "TXT"
-  value   = "b79e49f4db1fd5edf70c1ccaf4a124"
+  content = "b79e49f4db1fd5edf70c1ccaf4a124"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
-resource "cloudflare_record" "public_blog" {
-  name    = "blog"
+# Was a hand-made record until now (not owned by external-dns).
+resource "cloudflare_record" "public_keybase" {
+  name    = "waltr.tech"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  type    = "CNAME"
-  ttl     = "1"
-  value   = "rwaltr.github.io"
-  proxied = true
+  type    = "TXT"
+  content = "keybase-site-verification=i3hgyKry6zWhKMMXBj87-yQrHAFfJOWt6sCqmG1slfk"
+  ttl     = 3600
 }
 
-resource "cloudflare_record" "public_kyz" {
-  name    = "kyz"
-  zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
-  type    = "CNAME"
-  ttl     = "1"
-  value   = "gw.kyz.waltr.tech"
-  proxied = true
-
-}
 
 # Email Records /
 resource "cloudflare_record" "public_MigaduVerify" {
   type    = "TXT"
   name    = "@"
-  value   = "hosted-email-verify=ddjnsvhm"
+  content = "hosted-email-verify=ddjnsvhm"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_mx1" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx1.migadu.com"
+  content  = "aspmx1.migadu.com"
   priority = 10
   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
@@ -50,7 +41,7 @@ resource "cloudflare_record" "public_mx1" {
 resource "cloudflare_record" "public_mx2" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx2.migadu.com"
+  content  = "aspmx2.migadu.com"
   priority = 20
   zone_id  = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
@@ -58,35 +49,35 @@ resource "cloudflare_record" "public_mx2" {
 resource "cloudflare_record" "public_dkim1" {
   type    = "CNAME"
   name    = "key1._domainkey"
-  value   = "key1.waltr.tech._domainkey.migadu.com."
+  content = "key1.waltr.tech._domainkey.migadu.com."
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_dkim2" {
   type    = "CNAME"
   name    = "key2._domainkey"
-  value   = "key2.waltr.tech._domainkey.migadu.com."
+  content = "key2.waltr.tech._domainkey.migadu.com."
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_dkim3" {
   type    = "CNAME"
   name    = "key3._domainkey"
-  value   = "key3.waltr.tech._domainkey.migadu.com."
+  content = "key3.waltr.tech._domainkey.migadu.com."
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_spf" {
   type    = "TXT"
   name    = "@"
-  value   = "v=spf1 include:spf.migadu.com -all"
+  content = "v=spf1 include:spf.migadu.com -all"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
 resource "cloudflare_record" "public_dmarc" {
   type    = "TXT"
   name    = "_dmarc"
-  value   = "v=DMARC1; p=quarantine;"
+  content = "v=DMARC1; p=quarantine;"
   zone_id = lookup(data.cloudflare_zones.public_domain.zones[0], "id")
 }
 
@@ -184,11 +175,8 @@ resource "cloudflare_zone_settings_override" "public_domain_settings" {
     privacy_pass             = "on"
     security_level           = "medium"
     brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
+    # minify removed: Cloudflare deprecated/removed Auto Minify on 2024-08-05,
+    # so the setting is forced off for every zone and can never be satisfied here.
     rocket_loader       = "off"
     always_online       = "off"
     development_mode    = "off"

@@ -8,14 +8,14 @@ resource "cloudflare_zone" "legacyfamily" {
 resource "cloudflare_record" "familylegacy_MigaduVerify" {
   type    = "TXT"
   name    = "@"
-  value   = "hosted-email-verify=gl6knkig"
+  content = "hosted-email-verify=gl6knkig"
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
 resource "cloudflare_record" "familylegacy_MX1" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx1.migadu.com"
+  content  = "aspmx1.migadu.com"
   priority = 10
   zone_id  = cloudflare_zone.legacyfamily.id
 }
@@ -23,7 +23,7 @@ resource "cloudflare_record" "familylegacy_MX1" {
 resource "cloudflare_record" "familylegacy_MX2" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx2.migadu.com"
+  content  = "aspmx2.migadu.com"
   priority = 20
   zone_id  = cloudflare_zone.legacyfamily.id
 }
@@ -31,35 +31,35 @@ resource "cloudflare_record" "familylegacy_MX2" {
 resource "cloudflare_record" "familylegacy_DKIM1" {
   type    = "CNAME"
   name    = "key1._domainkey"
-  value   = "key1.rwwalter.com._domainkey.migadu.com."
+  content = "key1.rwwalter.com._domainkey.migadu.com."
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
 resource "cloudflare_record" "familylegacy_DKIM2" {
   type    = "CNAME"
   name    = "key2._domainkey"
-  value   = "key2.rwwalter.com._domainkey.migadu.com."
+  content = "key2.rwwalter.com._domainkey.migadu.com."
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
 resource "cloudflare_record" "familylegacy_DKIM3" {
   type    = "CNAME"
   name    = "key3._domainkey"
-  value   = "key3.rwwalter.com._domainkey.migadu.com."
+  content = "key3.rwwalter.com._domainkey.migadu.com."
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
 resource "cloudflare_record" "familylegacy_SPF" {
   type    = "TXT"
   name    = "@"
-  value   = "v=spf1 include:spf.migadu.com -all"
+  content = "v=spf1 include:spf.migadu.com -all"
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
 resource "cloudflare_record" "familylegacy_DMARC" {
   type    = "TXT"
   name    = "_dmarc"
-  value   = "v=DMARC1; p=quarantine;"
+  content = "v=DMARC1; p=quarantine;"
   zone_id = cloudflare_zone.legacyfamily.id
 
 }
@@ -67,7 +67,7 @@ resource "cloudflare_record" "familylegacy_DMARC" {
 resource "cloudflare_record" "familylegacy_autoconfig" {
   type    = "CNAME"
   name    = "autoconfig"
-  value   = "autoconfig.migadu.com."
+  content = "autoconfig.migadu.com."
   zone_id = cloudflare_zone.legacyfamily.id
 }
 
@@ -88,11 +88,7 @@ resource "cloudflare_zone_settings_override" "legacyfamily_domain_settings" {
     privacy_pass             = "on"
     security_level           = "medium"
     brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
+    # minify removed: Cloudflare deprecated/removed Auto Minify on 2024-08-05.
     rocket_loader       = "off"
     always_online       = "off"
     development_mode    = "off"

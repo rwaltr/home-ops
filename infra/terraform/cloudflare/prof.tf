@@ -6,21 +6,21 @@ resource "cloudflare_zone" "prof_domain" {
 resource "cloudflare_record" "prof_root" {
   type    = "CNAME"
   name    = "@"
-  value   = "rwaltr.github.io"
+  content = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_www" {
   type    = "CNAME"
   name    = "www"
-  value   = "rwaltr.github.io"
+  content = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_githubverify" {
   type    = "TXT"
   name    = "_github-pages-challenge-rwaltr"
-  value   = "8697f334fc9261ca5d28a65ce0544e"
+  content = "8697f334fc9261ca5d28a65ce0544e"
   zone_id = cloudflare_zone.prof_domain.id
 
 }
@@ -28,14 +28,14 @@ resource "cloudflare_record" "prof_githubverify" {
 resource "cloudflare_record" "prof_MigaduVerify" {
   type    = "TXT"
   name    = "@"
-  value   = "hosted-email-verify=mtm4pnvs"
+  content = "hosted-email-verify=mtm4pnvs"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_MX1" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx1.migadu.com"
+  content  = "aspmx1.migadu.com"
   priority = 10
   zone_id  = cloudflare_zone.prof_domain.id
 }
@@ -43,7 +43,7 @@ resource "cloudflare_record" "prof_MX1" {
 resource "cloudflare_record" "prof_MX2" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx2.migadu.com"
+  content  = "aspmx2.migadu.com"
   priority = 20
   zone_id  = cloudflare_zone.prof_domain.id
 }
@@ -51,35 +51,35 @@ resource "cloudflare_record" "prof_MX2" {
 resource "cloudflare_record" "prof_DKIM1" {
   type    = "CNAME"
   name    = "key1._domainkey"
-  value   = "key1.rwalt.pro._domainkey.migadu.com."
+  content = "key1.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DKIM2" {
   type    = "CNAME"
   name    = "key2._domainkey"
-  value   = "key2.rwalt.pro._domainkey.migadu.com."
+  content = "key2.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DKIM3" {
   type    = "CNAME"
   name    = "key3._domainkey"
-  value   = "key3.rwalt.pro._domainkey.migadu.com."
+  content = "key3.rwalt.pro._domainkey.migadu.com."
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_SPF" {
   type    = "TXT"
   name    = "@"
-  value   = "v=spf1 include:spf.migadu.com -all"
+  content = "v=spf1 include:spf.migadu.com -all"
   zone_id = cloudflare_zone.prof_domain.id
 }
 
 resource "cloudflare_record" "prof_DMARC" {
   type    = "TXT"
   name    = "_dmarc"
-  value   = "v=DMARC1; p=quarantine;"
+  content = "v=DMARC1; p=quarantine;"
   zone_id = cloudflare_zone.prof_domain.id
 
 }
@@ -101,11 +101,7 @@ resource "cloudflare_zone_settings_override" "prof_domain" {
     privacy_pass             = "on"
     security_level           = "medium"
     brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
+    # minify removed: Cloudflare deprecated/removed Auto Minify on 2024-08-05.
     rocket_loader       = "off"
     always_online       = "off"
     development_mode    = "off"

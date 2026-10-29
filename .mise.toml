@@ -47,7 +47,7 @@ shellcheck = "latest"
 # Tips:
 #   - View dependency tree: mise tasks deps flatcar:bootstrap
 #   - Watch for changes:   mise watch flatcar:build
-#   - Pass extra args to underlying tools: mise run tf:plan cloudflare -target=x
+#   - Pass extra args to underlying tools: mise run tf:plan cloudflare -- -target=x
 #   - Destructive tasks (flatcar:clean, tf:apply) prompt for confirmation
 
 [env]

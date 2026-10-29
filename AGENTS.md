@@ -15,7 +15,7 @@ It manages:
 - **Kubernetes**: k0s v1.36 + Cilium (kube-proxy replacement), Flux GitOps rooted at `infra/k8s/kyz`
 - **Cloud Resources**: Terraform for Cloudflare DNS and Terraform Cloud (plus Terragrunt for layering)
 - **Services**: run **in the k0s cluster**
-- **Secrets**: SOPS with age encryption
+- **Secrets**: 1Password — fnox for local/CI tooling, Connect + External Secrets in-cluster
 
 > `REFACTOR_PLANS.md` is a historical decision log and lessons file, not an active plan.
 > Read it for background, not as a to-do list.
@@ -33,15 +33,14 @@ It manages:
 │   ├── k8s/
 │   │   ├── bootstrap/     # helmfile + kustomize bootstrap
 │   │   └── kyz/           # Flux GitOps site (apps/, components/, flux/)
-│   ├── terraform/         # cloudflare/, tf-cloud/
+│   ├── terraform/         # cloudflare/ (Cloudflare + Porkbun), tf-cloud/
 │   ├── routeros/          # MikroTik router notes
-│   ├── media-tools/       # transcode tooling
-│   └── shared/            # domains.sops.yaml
+│   └── media-tools/       # transcode tooling
 ├── docs/                  # Per-service runbooks (see index below)
 ├── .mise/
 │   ├── lib/common.sh      # Shared task helpers
 │   └── tasks/             # flatcar/, tf/, lint/, fmt/, op/
-├── .sops.yaml             # SOPS configuration
+├── fnox.toml              # project secret refs (1Password-backed)
 └── .mise.toml             # Tool versions and tasks
 ```
 
@@ -53,15 +52,15 @@ It manages:
 - **Flux**: GitOps (`infra/k8s/kyz`); apps grouped under `apps/`
 - **Storage**: OpenEBS `openebs-hostpath` (NVMe); the ZFS `tank` pool stays outside the PVC lifecycle
 - **Backups**: kopiur + kopia → in-cluster RustFS on `tank/backup/k8s`
-- **Secrets**: 1Password Connect + External Secrets; SOPS + age for repo-encrypted values
+- **Secrets**: 1Password Connect + External Secrets in-cluster; fnox (1Password-backed) for local and CI tooling — no secrets in git
 - **IaC**: Terraform + Terragrunt (Pulumi was abandoned; OpenTofu is the intended direction — no active migration)
 - **ZFS**: `tank` pool (raidz1×2, `/var/tank`) — created by hand, imported by Ignition
 - **mise**: task runner and dev environment
 
 ## ✅ Hard Rules
 
-1. **Secrets**: NEVER commit plaintext secrets. Use SOPS / age. If you need a
-   credential, remind the user to decrypt via SOPS rather than pasting it.
+1. **Secrets**: NEVER commit plaintext secrets. Use fnox / 1Password. If you need
+   a credential, remind the user to add it to 1Password rather than pasting it.
 2. **Host config → Flatcar**: all host configuration goes in `infra/flatcar/`.
 3. **Services in k0s**: do NOT add host-level containers/quadlets; workloads run in the cluster.
 4. **Test infrastructure changes in a VM**: `mise run flatcar:bootstrap <host>`.
@@ -73,7 +72,7 @@ It manages:
 
 - **`flatcar-vm`** — build/boot/verify/teardown Flatcar VMs, mise task reference,
   manual Butane compilation, adding a new host.
-- **`home-ops-troubleshooting`** — mise, Flatcar/Butane, SOPS, Terraform/Terragrunt failures.
+- **`home-ops-troubleshooting`** — mise, Flatcar/Butane, fnox/1Password, Terraform/Terragrunt failures.
 - **`verify-change`** — the verification loop to follow before declaring work done.
 
 Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-load it.

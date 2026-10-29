@@ -4,6 +4,23 @@
 # (op, keychain) and the machine-wide secrets. Put a secret here only when it is
 # used exclusively by home-ops project tooling; keep general ones global.
 
+# Read by the Cloudflare provider (CLOUDFLARE_API_TOKEN) via `fnox exec` in the
+# tf:* mise tasks. Deliberately not in [mcp].secrets — only terraform needs it.
+[secrets.CLOUDFLARE_API_TOKEN]
+provider = "op"
+value = "cloudflare/CLOUDFLARE_ACCOUNT_TOKEN"
+description = "Scoped Cloudflare API token for Terraform"
+
+[secrets.PORKBUN_API_KEY]
+provider = "op"
+value = "porkbun/apikey"
+description = "Porkbun API key (Terraform nameserver delegation)"
+
+[secrets.PORKBUN_SECRET_KEY]
+provider = "op"
+value = "porkbun/secretkey"
+description = "Porkbun secret API key (Terraform nameserver delegation)"
+
 [secrets.RADARR_API_KEY]
 provider = "op"
 value = "arr/radarr"
