@@ -27,6 +27,19 @@
       "url": "http://127.0.0.1:8765/mcp",
       "exposure": "codemode",
       "description": "MQTT broker inspection/control (mosquitto via homelab-portforward)"
+    },
+    "grafana": {
+      "command": "mcp-grafana",
+      "args": [
+        "-t",
+        "stdio"
+      ],
+      "env": {
+        "GRAFANA_URL": "https://grafana.waltr.tech",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "!fnox get GRAFANA_TOKEN"
+      },
+      "exposure": "codemode",
+      "description": "Grafana dashboards, datasources, metrics, and Loki queries"
     }
   }
 }

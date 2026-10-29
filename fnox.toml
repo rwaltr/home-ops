@@ -13,3 +13,8 @@ description = "Radarr API key (mcp-arr-server)"
 provider = "op"
 value = "arr/sonarr"
 description = "Sonarr API key (mcp-arr-server)"
+
+[secrets.GRAFANA_TOKEN]
+provider = "op"
+value = "grafana/GRAFANA_TOKEN"
+description = "Grafana service account token (mcp-grafana)"
