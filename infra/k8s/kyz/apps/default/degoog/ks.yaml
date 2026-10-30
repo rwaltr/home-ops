@@ -5,8 +5,19 @@ kind: Kustomization
 metadata:
   name: degoog
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/degoog/app
+  postBuild:
+    substitute:
+      APP: degoog
+      # NOT `degoog`: app-template renders a lone PVC as the release name, and
+      # this one is pinned with forceRename. The component hardcodes
+      # `pvc.name: ${PVC}`.
+      PVC: degoog-data
+      # Free hour — the movers are spread across the night (1-9, 11, 12 taken).
+      KOPIUR_CRON: "H 13 * * *"
   prune: true
   sourceRef:
     kind: GitRepository
