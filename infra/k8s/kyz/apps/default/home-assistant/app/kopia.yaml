@@ -63,7 +63,7 @@ spec:
       # so the ephemeral scratch PVC needs the class named. Duplicated policy,
       # duplicated one-liner.
       storageClassName: openebs-hostpath
-    successExpr: "stats.files > 0 && stats.errors == 0"
+    successExpr: "(tier == 'quick' ? stats.bytes > 0 : restored.files > 0) && stats.errors == 0"
     verifyFilesPercent: 10
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json

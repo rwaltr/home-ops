@@ -1545,6 +1545,36 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   it succeed on the first attempt, so it was a stalled dial and not a broken
   chart source. 53/53 Kustomizations Ready afterwards.
 
+### 2026-10-30 — kopiur quick verification fails for policies whose source never changes
+
+- Four policies — `esphome`, `matter-server`, `wyoming-piper`, `wyoming-whisper` —
+  failed quick verification on *every* run from the day `verification:` landed,
+  while the other sixteen passed. The four are exactly the policies whose
+  snapshot content is byte-identical run after run (one distinct `sizeBytes`
+  across all fifteen retained snapshots each; every other policy has several).
+- The mover's failure is `successExpr` returning false, not a kopia error. Its
+  `quick_coverage` fills `stats.files` from the manifest's `stats.fileCount`
+  (`crates/mover/src/main.rs`). In kopia v0.23.1 that counter is incremented only
+  on the two paths that read a file *in full*; a file served from the local cache
+  because it is unchanged since the previous snapshot bumps `cachedFiles`
+  instead (`snapshot/upload/upload.go`). A source that never changes is therefore
+  100% cache hits, and `stats.fileCount` is **0** for a snapshot that covers the
+  whole tree — so `stats.files > 0` can never be true for it.
+- `status.stats.filesNew` on the `Snapshot` CR is unaffected because it is mapped
+  from `rootEntry.summ.files` (`crates/mover/src/status.rs`), which is a different
+  field. That is why the CRs look healthy and the verification looks broken.
+- Fix here: `successExpr` in `components/kopiur/backup/snapshotpolicy.yaml` now
+  reads `(tier == 'quick' ? stats.bytes > 0 : restored.files > 0) && stats.errors == 0`.
+  `stats.bytes` accumulates on the cache-hit path too, so it stays a real coverage
+  guard; the deep tier hardcodes `stats.bytes` to 0 and keeps checking
+  `restored.files`. The two hand-written policies (`freshrss`,
+  `home-assistant`) carry the same one-liner, because a component edit does not
+  reach them.
+- **Lesson**: a verification predicate is only as good as the counter it reads.
+  `fileCount` in a kopia manifest means "files read this run", not "files in the
+  snapshot"; the two diverge exactly when a backup is healthy and unchanging,
+  which is the case most likely to be dismissed as harmless.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

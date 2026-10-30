@@ -58,7 +58,18 @@ spec:
   #           weekly because it costs a full read of the source.
   #
   # `successExpr` is not optional in spirit: without it a verify that read 0 files
-  # reports success. It fails the run unless files were seen and no error occurred.
+  # reports success. It fails the run unless the verify covered something and no
+  # error occurred.
+  #
+  # `stats.files` (quick) is kopia's manifest `stats.fileCount`, which counts only
+  # the files READ IN FULL during that run. A source that has not changed since the
+  # previous snapshot is served entirely from kopia's local cache, which increments
+  # `cachedFiles` and not `fileCount` — so a healthy snapshot of a static tree
+  # reports `stats.files == 0` and fails `stats.files > 0` on EVERY quick verify,
+  # forever, with the run itself perfectly clean. `stats.bytes` is accumulated on
+  # the cache-hit path as well, so it is the reliable coverage signal for `quick`.
+  # The `deep` tier hardcodes `stats.bytes` to 0 and reports the real restored file
+  # count instead, so it keeps checking `restored.files`.
   #
   # Scratch sizing: `capacity` provisions an ephemeral PVC per deep run (deleted
   # with the Job) and must hold the restored data, which cannot exceed the source
@@ -84,5 +95,5 @@ spec:
       # ("no storage class is set"), the Job sits Pending, and
       # KubeJobNotCompleted pages once per app per run.
       storageClassName: "${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}"
-    successExpr: "stats.files > 0 && stats.errors == 0"
+    successExpr: "(tier == 'quick' ? stats.bytes > 0 : restored.files > 0) && stats.errors == 0"
     verifyFilesPercent: 10 # fraction of each file `quick` reads in full
