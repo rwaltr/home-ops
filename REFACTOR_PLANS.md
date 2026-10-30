@@ -1643,6 +1643,34 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   body shape, auth scheme — before designing the integration around what the
   receiver prefers, or the design ends up needing a signing proxy nobody asked for.
 
+### 2026-10-30 — the MQTT probe could not see its own failure, and paged instead
+
+- `o11y/mqtt-probe` subscribes with `mosquitto_sub -W 8` and no `-C`, and decided
+  `mqtt_probe_broker_reachable` from `RC == 0`. A subscriber with a bounded window
+  and no message count ends by itself: `client/sub_client.c` arms
+  `alarm(cfg.timeout)`, and on expiry prints `Timed out` and returns
+  `MOSQ_ERR_TIMEOUT` — **27** (checked in the pinned v2.0.22 source). Every run
+  therefore exited 27, so reachable was permanently 0.
+- Two consequences, pulling in opposite directions: `MqttBrokerUnreachable`
+  (critical) fired from the moment the probe landed — a false page on the pushover
+  path — while `MqttRetainedDiscoveryMissing`, which requires `reachable == 1`,
+  could never fire at all. The probe was blind to the exact latent condition it was
+  written for (an empty retained store) and loud about a condition that was false.
+- The store itself proved it in one read: `mqtt_retained_discovery_messages 49` and
+  `mqtt_bridge_state_online 1` — payload only arrives over a working connection —
+  beside `mqtt_probe_broker_reachable 0`. Metrics that contradict each other inside
+  one textfile are the tell.
+- Fix: reachability is evidence, not an exit code. Any payload received means the
+  subscribe worked; with an empty store the exit code is the only evidence left,
+  and 0/27 both mean connected. Genuine connect failures (5 refused, 15 unknown
+  host, 7 connection lost) still read 0, and their text now goes to the CronJob log
+  rather than `/dev/null`.
+- **Lesson**: when a probe's timeout window is the *designed* end of its run, the
+  timeout exit code is not a failure signal. Establish which non-zero codes the
+  client returns as part of doing its job before wiring any of them to an alert —
+  and read a probe's own metrics against each other first, since that is cheaper
+  than diagnosing the alert they produce.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

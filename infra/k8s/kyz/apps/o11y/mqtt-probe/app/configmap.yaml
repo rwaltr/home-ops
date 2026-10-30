@@ -30,16 +30,33 @@ data:
     TIMEOUT="${TIMEOUT:-8}"
 
     # Retained messages are delivered immediately on subscribe, so this timeout
-    # bounds how long we wait for them, it is not a poll interval.
+    # bounds how long we wait for them, it is not a poll interval. mosquitto_sub
+    # ends that wait by ITSELF: with -W and no -C it exits 27 (MOSQ_ERR_TIMEOUT)
+    # once the window closes, which is the designed end of this run. Reading that
+    # as a failure made every probe report unreachable — and since the empty-store
+    # rule requires reachable == 1, the one condition this probe exists to detect
+    # became undetectable while a critical false alert fired instead.
+    # stderr is kept for the log rather than discarded: it is the only place the
+    # reason for a genuine connect failure appears.
     set +e
     RAW=$(mosquitto_sub -h "$BROKER" -p "$PORT" \
       -t 'homeassistant/#' \
       -t 'zigbee2mqtt/bridge/state' \
-      -v -W "$TIMEOUT" 2>/dev/null)
+      -v -W "$TIMEOUT" 2>/tmp/mqtt-probe.err)
     RC=$?
     set -e
 
-    if [ "$RC" -eq 0 ]; then REACHABLE=1; else REACHABLE=0; fi
+    # Reachability is evidence, not an exit code: any payload received proves the
+    # subscribe worked, and with an empty retained store (the latent failure) the
+    # exit code is the only evidence left, where 0 and 27 both mean "connected".
+    # Anything else — 5 refused, 15 unknown host, 7 connection lost — is a real
+    # connect failure.
+    if [ -n "$RAW" ] || [ "$RC" -eq 0 ] || [ "$RC" -eq 27 ]; then
+      REACHABLE=1
+    else
+      REACHABLE=0
+      echo "mqtt-probe: subscribe to $BROKER:$PORT failed (exit $RC): $(head -n 1 /tmp/mqtt-probe.err 2>/dev/null)" >&2
+    fi
 
     # Counts retained discovery plus anything published live during the window,
     # so treat it as a lower bound — only "zero" is meaningful.

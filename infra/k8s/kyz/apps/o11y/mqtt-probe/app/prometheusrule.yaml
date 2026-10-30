@@ -51,6 +51,9 @@ spec:
           labels:
             severity: critical
 
+        # reachable == 0 is only ever a genuine connect failure: the probe treats
+        # mosquitto_sub's -W timeout exit (27) as the connected case it is, so a
+        # healthy broker with an empty store still reports reachable == 1 here.
         - alert: MqttBrokerUnreachable
           expr: mqtt_probe_broker_reachable == 0
           for: 10m

@@ -89,6 +89,15 @@ fires only once the outage is already visible.
 The probe counts retained payloads plus anything published during its 8-second
 window, so the number is a lower bound; only a value of zero is meaningful.
 
+`mqtt_probe_broker_reachable` is decided by evidence rather than by
+`mosquitto_sub`'s exit code, because with `-W` and no `-C` the client ends every
+run itself by returning 27 (`Timed out` / `MOSQ_ERR_TIMEOUT`) once the window
+closes — a non-zero exit that means the opposite of a failure. Any payload
+received proves the subscribe worked; with an empty store, where the exit code is
+the only evidence left, 0 and 27 both count as connected. Only a genuine connect
+failure (refused, unknown host, connection lost) reads 0, and its text is written
+to the CronJob's log.
+
 ## Operational note
 
 Restarting Home Assistant and the broker within the same minute turns a routine
