@@ -36,11 +36,29 @@ spec:
           - name: alertname
             value: .*CPU.*
             matchType: =~
+      # Teletran's alert feed. Every alert that survived the blackholes above also
+      # wakes the Hermes alert-triage job (POST /api/jobs/<id>/run on the gateway
+      # API server, bearer-authenticated from the ExternalSecret below), which
+      # reads Prometheus and Alertmanager itself and reports to the phone. The
+      # webhook body is deliberately ignored: Alertmanager cannot sign a Hermes
+      # webhook route (it sends no HMAC header), and the trigger only has to be a
+      # wake-up -- the job re-derives the state, which is the whole method in the
+      # cluster-alert-review skill. `continue: true` keeps matching siblings, so
+      # the two routes below still deliver pushover's copy.
+      - receiver: hermes
+        continue: true
       - receiver: pushover
         matchers:
           - name: severity
             value: critical
             matchType: =
+      # Explicit catch-all. Today this case is handled by the root receiver's
+      # `pushover`, and Alertmanager only falls back to the root when NO child
+      # matched -- the `hermes` child above matches everything, so without this
+      # route warning-grade alerts would silently stop reaching pushover. Net
+      # behaviour of the pushover path is unchanged: one notification per alert,
+      # critical or not.
+      - receiver: pushover
     groupBy:
       - alertname
       - job
@@ -81,6 +99,25 @@ spec:
 
   receivers:
     - name: blackhole
+    # The alert feed's consumer: wakes the Hermes alert-triage cron job, which
+    # reports to the phone. The URL carries a fixed job id — that id is the cron
+    # job's identity in the Hermes store, so recreating the job means updating
+    # this line (a trigger against a missing id gets a 404 and shows up as a
+    # failed notification in the Alertmanager log, never as a silent drop).
+    - name: hermes
+      webhookConfigs:
+        - url: http://hermes.default.svc.cluster.local:8642/api/jobs/aa9524f0f633/run
+          httpConfig:
+            authorization:
+              type: Bearer
+              # Same value the Hermes API server validates against; see
+              # externalsecret-hermes-trigger.yaml.
+              credentials:
+                name: hermes-alert-trigger
+                key: API_SERVER_KEY
+          # One wake-up per firing group is the point. The resolved follow-up
+          # would only run the triage again to report that something stopped.
+          sendResolved: false
     - name: pushover
       pushoverConfigs:
         - html: true

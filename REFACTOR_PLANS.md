@@ -1604,6 +1604,45 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   with a `successExpr` that requires a non-empty snapshot (as of the 2026-10-30
   fix: `stats.bytes > 0` for the quick tier).
 
+### 2026-10-30 — the alert feed now wakes Teletran directly
+
+- Ask: "hook your soft directly into the alert's feed". The review work was
+  arriving through rwaltr relaying it ("resolve the alerts for degoog pls"); the
+  feed had no consumer on the agent side.
+- A Hermes **webhook route cannot be the receiver**: Alertmanager sends no HMAC
+  signature header and cannot be made to (its `webhook_configs` has no header
+  templating), while a Hermes route refuses an unauthenticated request on a
+  non-loopback bind — `INSECURE_NO_AUTH` is validated against the bind host at
+  adapter start, not per request. The working shape is instead a
+  bearer-authenticated trigger straight into the gateway API server,
+  `POST /api/jobs/<id>/run`.
+- That endpoint's only payload field is `prompt`, which Alertmanager likewise
+  cannot set, so the job re-derives the state from Prometheus and Alertmanager
+  rather than parsing a webhook body. That suits the existing method: a cascade
+  reads as one incident from the live state and as N payloads from the feed.
+- `webhookConfigs.httpConfig.authorization` (bearer credential from a
+  SecretKeySelector) is present in the **installed** AlertmanagerConfig CRD —
+  checked against the served OpenAPI v3 schema, because cluster-scoped CRD read is
+  not granted to this identity.
+- Credential: the existing 1Password field `hermes` / `api_server_key`, pulled into
+  `o11y` by a new ExternalSecret (`hermes-alert-trigger`). No new credential is
+  minted, so the integration needs no owner step and no value enters git.
+- Routing: the `hermes` child matches every non-blackholed alert with
+  `continue: true`, so pushover still receives its copy. It needed an explicit
+  `pushover` catch-all child beside it: Alertmanager falls back to a route's own
+  receiver only when **no child matched**, so the new catch-all-matching child
+  would otherwise have silently stopped warning-grade alerts from paging.
+- The consumer is the `alert-feed-triage` cron job — event-triggered, with a
+  weekly sweep as a fallback. It lives in the Hermes cron store rather than git, so
+  its id is a hard coupling into the Alertmanager receiver URL; `docs/alerting.md`
+  records that, the verification recipe (config.original, then
+  `/api/v2/alerts/groups` for the receiver each group actually dispatches to) and
+  the failure modes.
+- **Lesson**: "push this alert into the agent" is an auth-mechanism question before
+  it is a routing question. Establish what the sender can put on the wire — headers,
+  body shape, auth scheme — before designing the integration around what the
+  receiver prefers, or the design ends up needing a signing proxy nobody asked for.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
