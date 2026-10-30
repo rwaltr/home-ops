@@ -1,0 +1,71 @@
+---
+# Probe script for the broker's retained state. Runs in the mosquitto image so
+# mosquitto_sub is the same version as the broker it is reading.
+#
+# Why this exists at all: Home Assistant builds its MQTT entities from *retained*
+# discovery messages that live only in the broker (docs/mosquitto.md). The
+# retained store can be empty while everything still looks healthy — HA keeps
+# serving the entities it already discovered, from memory, until it restarts. So
+# the failure is latent for as long as HA happens to stay up, and only becomes
+# visible as a fleet of `unavailable` entities at the next HA restart. This probe
+# reads the store directly, which is the only place the latent state is visible.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mqtt-probe
+data:
+  mqtt-probe.sh: |
+    #!/bin/sh
+    # Reads the broker's retained state and writes node-exporter textfile metrics.
+    #
+    # Three signals, because they fail differently:
+    #   mqtt_probe_broker_reachable      — can we talk to the broker at all
+    #   mqtt_retained_discovery_messages — is the discovery store populated
+    #   mqtt_bridge_state_online         — does the z2m availability topic read online
+    set -eu
+
+    BROKER="${BROKER:-mosquitto.default.svc.cluster.local}"
+    PORT="${PORT:-1883}"
+    OUT="${OUT:-/textfile/mqtt-retained.prom}"
+    TIMEOUT="${TIMEOUT:-8}"
+
+    # Retained messages are delivered immediately on subscribe, so this timeout
+    # bounds how long we wait for them, it is not a poll interval.
+    set +e
+    RAW=$(mosquitto_sub -h "$BROKER" -p "$PORT" \
+      -t 'homeassistant/#' \
+      -t 'zigbee2mqtt/bridge/state' \
+      -v -W "$TIMEOUT" 2>/dev/null)
+    RC=$?
+    set -e
+
+    if [ "$RC" -eq 0 ]; then REACHABLE=1; else REACHABLE=0; fi
+
+    # Counts retained discovery plus anything published live during the window,
+    # so treat it as a lower bound — only "zero" is meaningful.
+    DISCOVERY=$(printf '%s\n' "$RAW" | grep -c '^homeassistant/.*/config ' || true)
+
+    if printf '%s\n' "$RAW" | grep -m1 '^zigbee2mqtt/bridge/state ' | grep -q '"state":"online"'; then
+      ONLINE=1
+    else
+      ONLINE=0
+    fi
+
+    # Written to a temp file and moved into place: node-exporter may read the
+    # directory at any moment and a half-written file would fail to parse.
+    TMP="${OUT}.$$"
+    cat > "$TMP" <<EOF
+    # HELP mqtt_probe_broker_reachable 1 when the probe could subscribe to the broker.
+    # TYPE mqtt_probe_broker_reachable gauge
+    mqtt_probe_broker_reachable $REACHABLE
+    # HELP mqtt_retained_discovery_messages Retained Home Assistant discovery payloads found on the broker (lower bound).
+    # TYPE mqtt_retained_discovery_messages gauge
+    mqtt_retained_discovery_messages $DISCOVERY
+    # HELP mqtt_bridge_state_online 1 when the retained zigbee2mqtt/bridge/state payload reads online.
+    # TYPE mqtt_bridge_state_online gauge
+    mqtt_bridge_state_online $ONLINE
+    # HELP mqtt_probe_timestamp_seconds Unix time this probe last completed.
+    # TYPE mqtt_probe_timestamp_seconds gauge
+    mqtt_probe_timestamp_seconds $(date +%s)
+    EOF
+    mv "$TMP" "$OUT"

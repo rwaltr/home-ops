@@ -1,0 +1,87 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Two layers of the same failure, and the second is the reason this exists.
+#
+# Home Assistant builds its MQTT entities from retained discovery payloads held
+# only by the broker. When the retained store empties, HA does not notice: it
+# keeps serving the entities it already discovered, from memory, until it
+# restarts. So the store can be empty for weeks while everything looks fine, and
+# the outage only appears at the next HA restart (docs/mosquitto.md).
+#
+#   Layer 1 (mqtt_*)      reads the broker directly — sees the latent state, fires
+#                         while HA is still working.
+#   Layer 2 (homeassistant_*) reads HA's own view — fires once HA has already
+#                         lost the entities. The backstop, not the detector.
+#
+# Every rule is severity: critical — AlertmanagerConfig routes only
+# severity=critical to Pushover, and its inhibitRule makes a critical suppress its
+# warning counterpart.
+#
+# Motivating incident: a broker rollout 2026-10-02 emptied the retained store
+# (persistence was off, fixed in #893). HA kept the entities from memory until a
+# restart 26 days later, when every zigbee2mqtt entity went `unavailable` at once
+# and nothing had alerted in between.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mqtt-probe-rules
+spec:
+  groups:
+    - name: mqtt-probe.rules
+      rules:
+        # The latent failure. Deliberately requires the broker to be reachable so
+        # a broker outage reports as MqttBrokerUnreachable instead of being
+        # misattributed to an empty store.
+        - alert: MqttRetainedDiscoveryMissing
+          expr: mqtt_probe_broker_reachable == 1 and mqtt_retained_discovery_messages == 0
+          for: 15m
+          annotations:
+            summary: >-
+              The MQTT broker holds no retained Home Assistant discovery payloads. Home Assistant will keep working until its next restart, then every MQTT-backed entity (all zigbee2mqtt lights and sensors, zwave-js-ui, the bridge sensors) will come back `unavailable`. Fix: restart the publishers — `kubectl -n default delete pod -l app.kubernetes.io/name=zigbee2mqtt` — which republishes discovery and `bridge/state: online`. Do not restart Home Assistant.
+          labels:
+            severity: critical
+
+        - alert: MqttBridgeStateNotOnline
+          expr: mqtt_probe_broker_reachable == 1 and mqtt_bridge_state_online == 0
+          for: 15m
+          annotations:
+            summary: >-
+              The retained zigbee2mqtt/bridge/state payload is missing or not `online`, so every zigbee2mqtt entity in Home Assistant is unavailable regardless of the broker's health. Fix: `kubectl -n default delete pod -l app.kubernetes.io/name=zigbee2mqtt`.
+          labels:
+            severity: critical
+
+        - alert: MqttBrokerUnreachable
+          expr: mqtt_probe_broker_reachable == 0
+          for: 10m
+          annotations:
+            summary: >-
+              The MQTT probe could not subscribe to {{ $labels.instance }}. The broker itself is down or unreachable from the o11y namespace, which blinds every retained-state check in this group.
+          labels:
+            severity: critical
+
+        # A frozen textfile is otherwise silent: the probe stops writing but
+        # node-exporter keeps serving the last values forever. absent() covers the
+        # file being deleted, the age check covers it going stale.
+        - alert: MqttRetainedProbeStale
+          expr: |-
+            absent(mqtt_probe_timestamp_seconds)
+            or
+            (time() - mqtt_probe_timestamp_seconds > 1800)
+          for: 15m
+          annotations:
+            summary: >-
+              The mqtt-probe CronJob has not written metrics for over 30 minutes (three missed runs), so retained-state problems are currently invisible. Check the CronJob and that node-exporter is still scraping /textfile.
+          labels:
+            severity: critical
+
+        # Layer 2: the same failure seen from the consumer. Fires only once HA has
+        # actually lost the entities, which is why it cannot be the only rule.
+        - alert: Zigbee2MQTTBridgeUnavailable
+          expr: homeassistant_entity_available{job="home-assistant",entity="binary_sensor.zigbee2mqtt_bridge_connection_state"} == 0
+          for: 10m
+          annotations:
+            summary: >-
+              Home Assistant reports the Zigbee2MQTT bridge as unavailable, so its whole entity family is unavailable too. Fix: `kubectl -n default delete pod -l app.kubernetes.io/name=zigbee2mqtt`; do not restart Home Assistant.
+          labels:
+            severity: critical
