@@ -1574,6 +1574,35 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   `fileCount` in a kopia manifest means "files read this run", not "files in the
   snapshot"; the two diverge exactly when a backup is healthy and unchanging,
   which is the case most likely to be dismissed as harmless.
+### 2026-10-29 (later) — degoog enrolled in kopiur backups
+
+- Degoog was the only app **data** PVC in `apps/default` with no
+  `SnapshotPolicy`: `degoog-data` (5Gi, openebs-hostpath) had never been
+  snapshotted since the app landed — a `kopia.yaml` never existed for it in git,
+  and nothing records a reason. (Coverage check across the namespace: the other
+  uncovered PVCs are caches — `esphome-cache`, `litellm-models`,
+  `unmanic-cache` — or small state stores, `mosquitto` and `otbr`; each is a
+  separate judgement and none is touched here.)
+- The data is not trivially rebuildable: by design `/app/data` **is** the source
+  of truth. The engine seed was deliberately removed (`374deca7`) so the
+  installed engine set, the store repo and the server settings live only on that
+  PVC. Losing it means re-installing engines and re-entering settings through the
+  store UI, with the recommended set and the `cx`/CSE notes as the only record.
+- Enrolled via the shared component (`components/kopiur/backup`) — degoog has a
+  single PVC, so the `${PVC}` template applies directly. Two things to get right:
+  - `PVC: degoog-data`, not `degoog` — the PVC is pinned with `forceRename`, and
+    the component hardcodes `pvc.name: ${PVC}`.
+  - mover stays at the component default `1000:1000`. The pod starts as root
+    (it needs `CHOWN`/`SETUID` in order to drop), but `PUID`/`PGID` are `1000`
+    and the app writes `/app/data` as 1000 with `fsGroup: 1000`, so a 1000 mover
+    can read it — unlike HA, which needed the same uid but for the opposite
+    reason (its `.storage` is mode 0700).
+- `KOPIUR_CRON: "H 13 * * *"` — the only free hour left; 1-9, 11 and 12 are taken
+  by the other movers.
+- The first snapshot at 13:xx is the read-access test: an EACCES would show up as
+  a failed `Snapshot`, not as a silent empty backup, because `verification` runs
+  with a `successExpr` that requires a non-empty snapshot (as of the 2026-10-30
+  fix: `stats.bytes > 0` for the quick tier).
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
