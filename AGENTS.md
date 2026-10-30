@@ -224,6 +224,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **Local LLM gateway (LiteLLM + Ollama + Speaches)**: `docs/local-llm.md`
 - **Cluster logging (VictoriaLogs + Fluent Bit)**: `docs/logging.md`
 - **Cluster alerting + the agent alert feed (Alertmanager routing, Teletran's wake-up)**: `docs/alerting.md`
+- **Hermes agent itself (managed scope, approval scope per surface, RBAC, the PR loop)**: `docs/hermes-agent.md`
 - **MQTT broker (Mosquitto) + HA discovery**: `docs/mosquitto.md`
 - **Shared family calendar (Radicale + CalDAV, read-only Remind feed)**: `docs/calendar.md`
 - **RSS/feed reader (FreshRSS, Google Reader + Fever APIs)**: `docs/freshrss.md`
