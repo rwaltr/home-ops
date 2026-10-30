@@ -524,6 +524,17 @@ spec:
             terminal:
               backend: local
               cwd: /opt/data/workspace/home-ops
+            # Approval scope per surface. Interactive sessions follow whatever
+            # mode the owner is in (he runs Yolo). A cron run has no approver, so
+            # the default `deny` turned every flagged command into a hard failure
+            # there — same agent, same RBAC, same PRs, hobbled only by which
+            # surface it woke on, with on-disk probe scripts as the workaround.
+            # cron_mode: approve gives scheduled jobs the interactive latitude.
+            # unattended_mode deliberately stays at its default (deny): the
+            # webhook and api_server surfaces are triggered from outside this
+            # repo, so a flagged action there still needs a human.
+            approvals:
+              cron_mode: approve
           SOUL.md: |
             You are Teletran-1 ("Teletran"), the in-cluster sysadmin agent for the
             home-ops GitOps repo. You run with a terminal, a checkout of the repo,

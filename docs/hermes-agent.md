@@ -73,6 +73,28 @@ them.
   package-manager lock that blocks all config mutation; setting it would break
   the agent.
 
+## Approval scope per surface (2026-10-30)
+
+Hermes decides whether a flagged command needs an approver **per surface**, not
+globally: `approvals.mode` covers interactive sessions, `approvals.cron_mode`
+covers cron runs, `approvals.unattended_mode` covers webhook/api-server
+sessions. Each defaults to `deny`.
+
+- **`approvals.cron_mode: approve`** (pinned in this ConfigMap). A cron run has
+  no approver at all, so the default turned every flagged command into a hard
+  failure inside scheduled work: the alert triage job hit it on its first firing,
+  where plain-http in-cluster URLs, inline interpreters and heredocs were refused
+  with nobody to ask. It worked around the scanner by writing probe scripts to
+  disk and running them by path — a tax on the same agent doing the same work.
+  The surface now runs with the latitude the interactive sessions have.
+- **`approvals.unattended_mode` stays at its default (`deny`).** Webhook and
+  api-server sessions are triggered by things outside this repo's control, so a
+  flagged action there still needs a human.
+- **What still bounds a cron run:** the RBAC below (read-only plus two
+  controller-object deletes), branch protection (the bot cannot approve or merge
+  its own PR), and the rule that secrets are rwaltr's. The switch changes what
+  the agent may _run_, not what it may _change_.
+
 ## Decisions (2026-09-25)
 
 1. **Phone channel: Discord.** rwaltr already uses Discord; the adapter uses
@@ -96,7 +118,10 @@ them.
    finish can be cleared. See the RBAC note below — these are operational levers,
    not a configuration path.
 6. **Autonomy: approve destructive commands.** Reads and builds run freely;
-   destructive/irreversible ops require an explicit in-chat approval.
+   destructive/irreversible ops require an explicit in-chat approval. Amended
+   2026-10-30: this describes the interactive surfaces. A cron run has no
+   approver to ask, so it runs with `approvals.cron_mode: approve` — see the
+   approval-scope section above.
 7. **Exposure: Tailscale is the intended answer but not yet established.**
    Discord needs none, so external reachability is not on the critical path.
    The Tailscale operator (`envoy.yaml` already references it as future) stays
