@@ -1,0 +1,36 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/monitoring.coreos.com/prometheusrule_v1.json
+#
+# The one rule salvaged from `o11y/mqtt-probe`, deleted 2026-10-31.
+#
+# The probe watched the broker's retained store from inside the cluster and
+# exported `mqtt_probe_*` textfile metrics. It read `mosquitto_sub -W`'s designed
+# timeout exit (27) as a failed subscribe, so it reported `reachable == 0` for a
+# broker that was answering it, paged a critical `MqttBrokerUnreachable` against a
+# healthy broker, and could never fire the empty-store alert it was written for
+# (that rule required `reachable == 1`). Removed rather than fixed: hand-rolled
+# textfile plumbing on a hostPath is not worth a rewrite to detect something we
+# were not detecting anyway. See REFACTOR_PLANS.md and docs/mosquitto.md.
+#
+# What is left is the consumer-side half of that pair and nothing else. It reads
+# Home Assistant's own availability metric for the bridge entity, so it fires
+# **after** HA has lost the entities — i.e. after the restart the probe was meant
+# to precede. It is a backstop, not an advance warning.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: home-assistant-rules
+spec:
+  groups:
+    - name: home-assistant.rules
+      rules:
+        - alert: Zigbee2MQTTBridgeUnavailable
+          expr: homeassistant_entity_available{job="home-assistant",entity="binary_sensor.zigbee2mqtt_bridge_connection_state"} == 0
+          for: 10m
+          annotations:
+            summary: >-
+              Home Assistant reports the Zigbee2MQTT bridge as unavailable, so its whole entity family is unavailable too. Fix: `kubectl -n default delete pod -l app.kubernetes.io/name=zigbee2mqtt`; do not restart Home Assistant.
+          labels:
+            # AlertmanagerConfig routes only severity=critical to Pushover, and its
+            # inhibitRule makes a critical suppress its warning counterpart.
+            severity: critical

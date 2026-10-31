@@ -1643,6 +1643,44 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   body shape, auth scheme — before designing the integration around what the
   receiver prefers, or the design ends up needing a signing proxy nobody asked for.
 
+### 2026-10-31 — mqtt-probe deleted, not fixed
+
+`o11y/mqtt-probe` is gone: CronJob, ConfigMap, PrometheusRule, Kustomization, and
+its line in the o11y group kustomization. The fix for it (branch
+`hermes/fix-mqtt-probe-exit-code`, opened 2026-10-30) was closed in favour of
+removal — the reasoning below is the whole point of this entry.
+
+- **What it was:** a `mosquitto_sub` subscriber on a 10-minute CronJob, writing
+  `mqtt_probe_*` metrics as node-exporter textfile, to detect an **empty retained
+  discovery store** — the 2026-10-02 failure mode, where the store empties, HA
+  keeps serving entities from memory for weeks, and every zigbee2mqtt entity goes
+  `unavailable` at the next HA restart with nothing having alerted in between.
+- **Why it was deleted rather than repaired:** it read `mosquitto_sub -W`'s
+  designed timeout end-of-run (`MOSQ_ERR_TIMEOUT`, 27) as a failed subscribe, so
+  `mqtt_probe_broker_reachable` was permanently 0. That produced a false critical
+  `MqttBrokerUnreachable` (13h of pages for a broker answering the probe) while
+  `MqttRetainedDiscoveryMissing`, gated on `reachable == 1`, could never fire. The
+  one-line fix was correct, but the artifact it fixed is a hand-rolled subscriber
+  plus textfile plumbing on a root-owned hostPath, whose entire product was a
+  signal nobody had ever received. Removing it costs one detector that has never
+  fired legitimately; keeping it costs a rewrite and an ongoing page budget.
+- **What survives it:** `Zigbee2MQTTBridgeUnavailable`, the consumer-side half,
+  relocated to `default/home-assistant/app/prometheusrule.yaml` —
+  `homeassistant_entity_available{entity="binary_sensor.zigbee2mqtt_bridge_connection_state"} == 0`.
+  It reads HA's own view, so it fires **after** the restart, not before it. It
+  confirms the outage; it does not warn of it.
+- **Accepted trade, recorded so it is not rediscovered as a surprise:** the
+  retained store is no longer watched. `docs/mosquitto.md` says so where the
+  probe used to be documented, and points at the better shape if this is ever
+  rebuilt — mosquitto's own `$SYS/broker/messages/retained/count`, exported, with
+  no probe process at all.
+- **Lesson:** a probe is a liability until it has a consumer. This one ran for
+  weeks paging falsely about a healthy broker while silently failing the check it
+  existed for, because nobody had verified it had ever returned the *true* answer
+  — only that it returned. Before trusting a hand-rolled probe, make it prove its
+  known-good state at least once: a healthy system that reads as broken is a
+  louder failure than no probe, and it hides the real one behind it.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
