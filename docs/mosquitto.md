@@ -69,25 +69,31 @@ the failure only surfaces at the next HA restart. That is what happened on
 memory for 26 days, and the next restart took every zigbee2mqtt entity
 `unavailable` at once with nothing alerted in between.
 
-`o11y/mqtt-probe` closes that gap. A CronJob subscribes to `homeassistant/#` and
-`zigbee2mqtt/bridge/state` every 10 minutes and writes the result as node-exporter
-textfile metrics:
+**Nothing watches the retained store directly today.** `o11y/mqtt-probe` — a
+CronJob that subscribed to `homeassistant/#` and `zigbee2mqtt/bridge/state` every
+10 minutes and exported `mqtt_probe_*` textfile metrics into node-exporter — was
+deleted on 2026-10-31. It had been reading `mosquitto_sub -W`'s designed timeout
+exit (27) as a failed subscribe, so it reported the broker unreachable while
+receiving retained payloads from it: a critical `MqttBrokerUnreachable` paged the
+phone for thirteen hours, and `MqttRetainedDiscoveryMissing`, which was gated on
+`reachable == 1`, could never fire at all. It was removed rather than fixed —
+hand-rolled textfile plumbing over a hostPath is not worth a rewrite to detect
+something it never actually detected (`REFACTOR_PLANS.md`).
 
-| Metric                             | Meaning                                            |
-| ---------------------------------- | -------------------------------------------------- |
-| `mqtt_probe_broker_reachable`      | could the probe subscribe at all                   |
-| `mqtt_retained_discovery_messages` | retained `homeassistant/.../config` payloads found |
-| `mqtt_bridge_state_online`         | retained `bridge/state` reads `online`             |
-| `mqtt_probe_timestamp_seconds`     | when the probe last completed                      |
+The trade is stated plainly: **an empty retained store is no longer detected
+while Home Assistant is still working.** What remains is the consumer-side
+backstop, `Zigbee2MQTTBridgeUnavailable` in
+`default/home-assistant/app/prometheusrule.yaml`. It reads HA's own
+`homeassistant_entity_available` for `binary_sensor.zigbee2mqtt_bridge_connection_state`,
+so it fires only _after_ HA has lost the entities — after the restart. It
+confirms the outage; it cannot warn you before it.
 
-Its rules (`prometheusrule.yaml` in the same app) alert on an empty store or an
-offline bridge _while Home Assistant is still working_ — that is the point of
-reading the broker rather than HA. `Zigbee2MQTTBridgeUnavailable` watches HA's own
-`homeassistant_entity_available` for the bridge entity as a second layer, which
-fires only once the outage is already visible.
-
-The probe counts retained payloads plus anything published during its 8-second
-window, so the number is a lower bound; only a value of zero is meaningful.
+So the procedure above is the detection method again: after any broker rollout,
+grep the HA log and look at the MQTT-backed entities rather than waiting for a
+page. If someone later finds a broker-side signal worth exporting (mosquitto's
+own `$SYS/broker/messages/retained/count` would be the obvious candidate, and it
+needs no probe at all), that is the shape to build — not another subscriber with
+an exit code.
 
 ## Operational note
 
