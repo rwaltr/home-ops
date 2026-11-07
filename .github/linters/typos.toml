@@ -8,3 +8,4 @@ nothink = "nothink"     # LiteLLM/Ollama model suffix
 ot = "ot"               # OpenThread
 fre = "fre"             # ISO 639-2 French
 mis = "mis"             # "mis-tag" in the Jellyfin language docs
+nd = "nd"               # Navidrome env-var prefix (ND_*)
