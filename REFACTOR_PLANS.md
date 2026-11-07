@@ -1705,6 +1705,19 @@ Three changes came out of it.
   unmanic, sabnzbd, wyoming-whisper, immich-server, rustfs, hermes. They borrow
   above their request and borrowing has never evicted anything here; raising
   them would spend the headroom this change just bought.
+- **Reloader, missed by the sweep above and fixed the same evening** (#974 → PR
+  `hermes/reloader-memory-ceiling`). It was the one manifest the review did not
+  reach, and the batch rollout of the review itself is what broke it:
+  OOMKilled at 18:24:37Z, ~20 seconds after #973 merged. Measured afterwards,
+  `container_memory_working_set_bytes` put its 30d p95 at 62-63Mi and its 30d
+  max at **63.9Mi against a 64Mi limit** — the ceiling sat 0.1Mi above the
+  observed peak, and its 32Mi request was fiction for a container that had never
+  run below ~58Mi. Now 64Mi request / 128Mi limit.
+- **Lesson from that one: the sweep has to include the system components.** A
+  `watchGlobally: true` reloader is watching 13+ annotated workloads, so a mass
+  rollout is its peak load, not its idle. A ceiling drawn from a quiet moment
+  holds only until the first batch merge — and the batch merge that reveals it
+  is the one doing the right-sizing.
 - **Single-node HA**: the cert-manager and external-secrets webhooks drop from
   2 replicas to 1. Both replicas land on
   `mouse`, so there was no failure domain — only churn. Their PDBs go with them:
