@@ -16,4 +16,6 @@ spec:
     grafanaDashboard:
       enabled: true
     webhook:
-      replicaCount: 2
+      # Single node: the second replica lands on the same host. The separate
+      # PDB (pdb.yaml, minAvailable 1) is removed with it.
+      replicaCount: 1
