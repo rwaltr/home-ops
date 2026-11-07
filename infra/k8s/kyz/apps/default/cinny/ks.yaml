@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+# Cinny — alternative Matrix web client.
+#
+# NOT WIRED IN: the entry for this file is commented out in
+# apps/default/kustomization.yaml, so Flux never sees it. Kept so the shape is
+# reviewable and so enabling it is one uncomment.
+#
+# dependsOn names `matrix` because the HelmRelease here references the `matrix`
+# OCIRepository, which the matrix Kustomization owns.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cinny
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/cinny/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  dependsOn:
+    - name: matrix
+  wait: false

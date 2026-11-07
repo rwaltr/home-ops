@@ -1,0 +1,136 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# mautrix-gmessages — Google Messages (RCS/SMS) bridge. PART OF THE MATRIX DEMO,
+# DELIBERATELY NOT ENABLED (its ks.yaml is commented out in
+# apps/default/kustomization.yaml).
+#
+# The one that makes the demo feel like Beeper rather than "another chat app":
+# it pairs with Google Messages on the phone, so SMS/RCS lands in the same client
+# as the other networks and the agent.
+#
+# See helmrelease-signal.yaml for the shared shape and docs/comms-demos.md for the
+# reasoning and the enablement steps. Same two secrets are required — this one
+# reads mautrix-gmessages-config:
+#
+#   mautrix-gmessages-config
+#     registration.yaml  appservice registration: as_token / hs_token / id
+#     config.yaml        bridge config: homeserver URL, database, permissions
+#
+# The appservice port (29348) is a value you set, not an image default: it must
+# equal `appservice.address` in config.yaml and `url` in registration.yaml.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mautrix-gmessages
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: matrix
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: mautrix-gmessages
+    controllers:
+      mautrix-gmessages:
+        strategy: Recreate
+        initContainers:
+          # openebs-hostpath ignores fsGroup, so hand the data dir to the
+          # unprivileged bridge user or SQLite cannot write (same fix as tuwunel).
+          permissions:
+            image:
+              repository: docker.io/library/alpine
+              tag: 3.21@sha256:ee16d92f96db08d9d2d07da48555a27f3a69d8f0759021dbc601195ed0d2b5bd
+            command:
+              - /bin/sh
+              - -c
+              - |
+                chown -R 1000:1000 /data
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+                add:
+                  - CHOWN
+                  - FOWNER
+                  - DAC_OVERRIDE
+        containers:
+          app:
+            image:
+              repository: dock.mau.dev/mautrix/gmessages
+              # mautrix publishes no semver tags; the digest is what is pinned.
+              tag: latest@sha256:4bd9384ea144923cf0dbac79b32214c647b66a4efd82dba17937159883059d46
+            env:
+              TZ: America/Chicago
+            probes:
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 29348
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 10m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    service:
+      app:
+        controller: mautrix-gmessages
+        ports:
+          appservice:
+            port: 29348
+    persistence:
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        forceRename: mautrix-gmessages-data
+        globalMounts:
+          - path: /data
+      config:
+        type: secret
+        name: mautrix-gmessages-config
+        globalMounts:
+          - path: /data/config.yaml
+            subPath: config.yaml
+            readOnly: true
+      registration:
+        type: secret
+        name: mautrix-gmessages-config
+        globalMounts:
+          - path: /data/registration.yaml
+            subPath: registration.yaml
+            readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
