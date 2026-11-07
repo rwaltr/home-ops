@@ -1681,6 +1681,70 @@ removal — the reasoning below is the whole point of this entry.
   known-good state at least once: a healthy system that reads as broken is a
   louder failure than no probe, and it hides the real one behind it.
 
+### 2026-11-07 (later) — IPv6 egress is a silent blackhole; stop installing the v6 default route
+
+Cost of doing nothing, measured: **7 alerts across 4 pushover groups were
+cancelled** on 2026-10-30 rather than delivered, every one with the same error —
+`dial tcp [2606:4700:10::6814:9ec]:443: connect: connection timed out`. Alertmanager
+sends to pushover.net, which publishes AAAA records, and the dial picks v6.
+
+- **Not a DNS problem and not a receiver problem.** From inside the cluster: two
+  direct dials to Cloudflare's v6 address returned `http=000` after a full 12s
+  timeout each, while `https://api.github.com` over v4 answered 200 in 0.15s.
+  The v6 connect does not refuse, it **hangs** — packets leave and nothing comes
+  back.
+- **Why:** `mouse` accepts an RA on the management interface
+  (`20-mouse-static.network`), and that RA installs a v6 default route via the
+  LAN router. The router advertises a ULA prefix (`fdad:207a:f1ab:10::/64`) and
+  itself as gateway but has **no IPv6 transit**, so every v6 packet is silently
+  dropped at the next hop. Pods inherit it: Cilium hands each pod a v6 ULA and a
+  default route that lands on `cilium_host`, and the node then routes v6 into the
+  same dead gateway.
+- **Why it costs pages instead of erroring:** a timeout is the one failure mode
+  dual-stack fallback cannot save. ENETUNREACH would turn the same dial into an
+  immediate v4 retry; a blackhole holds the connection until the client's own
+  deadline expires, and the pushover send is already given up by then.
+
+**Fix (git, applies at next install):** keep the SLAAC address, refuse the
+RA-advertised gateway.
+
+```
+[IPv6AcceptRA]
+UseGateway=no
+```
+
+`systemd-networkd` has supported `UseGateway=` in `[IPv6AcceptRA]` since
+systemd 250; the host runs 257.9 (noted at line 335 of this file). With no v6
+default route the same dial fails instantly with ENETUNREACH, and dual-stack
+clients fall back to v4 in one round trip.
+
+**This does not take effect on the running host.** Ignition runs only on first
+boot, so the butane change is recorded for the next (re)install. The stop-gap on
+the live host is one command, and it is the same change at runtime:
+
+```bash
+# on mouse
+ip -6 route del default  # does not survive a reboot; the butane change does
+```
+
+Verified as far as this pod can: `mise run flatcar:build` compiles the butane
+strict, and the emitted ignition data URL was decoded to confirm the
+`[IPv6AcceptRA]` section lands in `20-mouse-static.network`. **Not** verified by
+booting a Flatcar VM — the VM's virtio MAC does not match the static profile, so
+the VM path (DHCP, `25-primary.network`) never exercises this file. A VM boot
+proves boot health, not this stanza.
+
+**Rejected alternative:** turning dual-stack off in k0s/Cilium. Same outcome,
+much larger blast radius — pod and service CIDRs, every macvlan NAD, and the v6
+addresses pods already hold. Refusing one route is the smaller change.
+
+**Lesson: a blackhole is worse than a refusal.** Everywhere else in this repo
+"unreachable" means a fast error and a fallback; a route that accepts packets and
+drops them converts a clean failure into a timeout, and a timeout in a
+notification path is lost pages. When a dual-stack host is handed a v6 default
+route by a network with no v6 transit, the correct configuration is to keep the
+address and refuse the gateway.
+
 ### 2026-11-07 — efficiency review: memory requests, single-node HA, logging gone
 
 Driver: a full cluster review of `mouse`. Headline number — the node committed

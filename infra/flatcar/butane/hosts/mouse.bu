@@ -61,7 +61,11 @@ storage:
           [Network]
           Address=10.10.0.10/24
           Address=fdad:207a:f1ab:10::10/64
-          # SLAAC alongside the static address — RA also provides the v6 default route
+          # SLAAC alongside the static address. RA also advertises the router as
+          # the v6 default gateway, and that route is a blackhole: there is no
+          # IPv6 transit upstream, so packets are silently dropped rather than
+          # refused. Accept the RA for the address, refuse the gateway — see the
+          # 2026-11-07 IPv6 egress entry in REFACTOR_PLANS.md.
           IPv6AcceptRA=yes
           Gateway=10.10.0.1
           DNS=10.10.0.1
@@ -72,6 +76,16 @@ storage:
           VLAN=enp88s0.20
           VLAN=enp88s0.30
           VLAN=enp88s0.40
+
+          # Keep the SLAAC address, drop the advertised default route. Without
+          # this, v6 traffic is routed to a gateway with no v6 transit and
+          # blackholes: an outbound connect to an AAAA-only destination hangs
+          # until its own timeout instead of failing fast, which is what cost
+          # Alertmanager pages on 2026-11-07 (IPv6 egress, REFACTOR_PLANS.md).
+          # A missing default route makes the same dial fail immediately with
+          # ENETUNREACH, so dual-stack clients fall back to v4 in one round trip.
+          [IPv6AcceptRA]
+          UseGateway=no
 
     # VLAN subinterfaces for macvlan masters (multus): 20-clients, 30-iot,
     # 40-cameras. ether4-study is a trunk (PVID 10, tagged 10/20/30/40/60).
