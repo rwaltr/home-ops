@@ -110,9 +110,21 @@ A bridge is not a container you can just run — it is a new participant in the
 homeserver's trust model, and it cannot work without a registration the
 homeserver accepts:
 
-1. **Confirm the homeserver supports appservices at all.** Tuwunel should, as the
-   successor to conduwuit, but this is unverified here and is the first thing to
-   check.
+1. **Appservice support is confirmed in Tuwunel.** It implements the Application
+   Service API: `docs/appservices.md` upstream, the `src/admin/appservice/*` and
+   `src/api/client/appservice/*` modules, and tests for transactions,
+   re-registration, user joins, media and unix sockets. Three registration
+   methods coexist and are all loaded at startup:
+
+   - **Admin room** — the right method here: send `!admin appservices register`
+     with the registration YAML in a fenced code block. It persists in the
+     database, survives restarts, needs no restart of the server, and keeps every
+     secret out of git.
+   - **`tuwunel.toml`** — inline `[global.appservice.<id>]`, reloaded on each
+     restart, and not removable with `!admin appservices unregister`.
+   - **`appservice_dir`** — a directory of YAML registrations loaded at startup;
+     adding or removing a file needs a restart.
+
 2. **Generate `config.yaml` and `registration.yaml` with the bridge image.**
    `registration.yaml` holds the appservice credentials (`as_token`, `hs_token`);
    run the image interactively to emit both, then `-g` to regenerate the
@@ -124,9 +136,20 @@ homeserver accepts:
 4. **Store both files in 1Password** (one item per bridge) and project them with
    an ExternalSecret into the Secret the HelmRelease mounts
    (`mautrix-<bridge>-config`). Neither file may enter git.
-5. **Register the appservice with Tuwunel** (admin API or command — check the
-   mechanism for the version in use), then uncomment the kustomization entry and
-   pair from the room the bridge creates.
+5. **Register the appservice with Tuwunel** — `!admin appservices register` in the
+   admin room — then uncomment the kustomization entry and pair from the room the
+   bridge creates.
+
+### Two things to know before enabling
+
+- **Unix sockets beat TCP here.** Tuwunel accepts `unix:///path.sock` as a
+  registration URL and its docs give the matching mautrix-go settings
+  (`appservice.hostname` and `appservice.address`). That keeps the bridge off the
+  network entirely, at the cost of a shared volume between tuwunel and the bridge.
+  The manifests use a TCP Service because it is simpler and stays in-cluster.
+- **E2EE bridges have a known rough edge.** Tuwunel issue #327: mautrix bridges
+  can fail to upload device keys via MSC4190 because MSC3202 device masquerading
+  is incomplete. E2EE in bridge rooms may not work until that lands.
 
 ### Cost and risk
 
@@ -158,10 +181,25 @@ open registration is not enabled.
 
 ## Wiring an agent in (later)
 
-Nothing is wired. The shape mirrors how the Discord adapter already works in
-`apps/default/hermes/`: `DISCORD_*` env inline on the HelmRelease, secrets from
-the `hermes` ExternalSecret projected into `hermes-secret`, which the container
-consumes with `envFrom`, and the 1Password items in vault `home-ops`.
+Nothing is wired. There are two paths, and they are not the same amount of work.
+
+**Hermes** already has a native Matrix adapter, so this is configuration only. The
+shape mirrors how its Discord adapter works in `apps/default/hermes/`: `DISCORD_*`
+env inline on the HelmRelease, secrets from the `hermes` ExternalSecret projected
+into `hermes-secret`, which the container consumes with `envFrom`, and the
+1Password items in vault `home-ops`.
+
+**A `pi-durable` agent** (TeleVect) has no Matrix adapter, because `pi-durable` is
+a conversation runtime and not a chat client: it commits turns, tools and
+documents and offers `submit()` in and `viewState()`/`watch()` out, but nothing
+that speaks Matrix. Matrix would be a _surface_ to build, beside the web, hook,
+email and notification surfaces its spec already defines — its open item O13 is
+exactly "whether a chat channel (Matrix/Signal) replaces email as the phone
+surface". Two properties make that smaller than it sounds: one room maps to one
+conversation, and a chat message is an anticipated input shape (the runtime
+documents `chat.mention` entries and treats a mid-run message as a follow-up or a
+steer). The access token belongs to the surface, in the host process, never to
+the executor or the model's reach.
 
 1. Register a dedicated `@hermes:matrix.waltr.tech` account. Registration is
    token-gated, so this is a manual step.
