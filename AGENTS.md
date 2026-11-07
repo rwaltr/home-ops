@@ -222,7 +222,7 @@ prototype against the VM cluster). Do NOT add host-level containers/quadlets.
 - **SOPS config**: `.sops.yaml`
 - **Jellyfin ↔ Sonarr metadata (TVDB plugin, library providers)**: `docs/jellyfin-metadata.md`
 - **Local LLM gateway (LiteLLM + Ollama + Speaches)**: `docs/local-llm.md`
-- **Cluster logging (VictoriaLogs + Fluent Bit)**: `docs/logging.md`
+- **Cluster logging (decommissioned 2026-11-07)**: `docs/logging.md`
 - **Cluster alerting + the agent alert feed (Alertmanager routing, Teletran's wake-up)**: `docs/alerting.md`
 - **MQTT broker (Mosquitto) + HA discovery**: `docs/mosquitto.md`
 - **Shared family calendar (Radicale + CalDAV, read-only Remind feed)**: `docs/calendar.md`

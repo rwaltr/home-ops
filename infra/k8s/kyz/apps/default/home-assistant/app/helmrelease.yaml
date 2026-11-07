@@ -64,6 +64,8 @@ spec:
             resources:
               requests:
                 cpu: 10m
+                # 30d p95 744Mi, peak 808Mi. Was implicitly 2Gi (limit-only).
+                memory: 1Gi
               limits:
                 memory: 2Gi
     defaultPodOptions:

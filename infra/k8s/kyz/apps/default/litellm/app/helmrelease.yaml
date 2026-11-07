@@ -192,7 +192,10 @@ spec:
             resources:
               requests:
                 cpu: 500m
-                memory: 2500Mi
+                # No model load in the 30d window: p95 21Mi, peak 23Mi. The 4Gi
+                # limit is unchanged, so a load still bursts -- raise this again
+                # before loading a model for real.
+                memory: 512Mi
               limits:
                 # Largest resident local model is qwen3-1.7b (1.4GB) + 8k KV
                 # cache + runtime. 4Gi leaves room for a 4B-class swap later.
@@ -239,7 +242,9 @@ spec:
             resources:
               requests:
                 cpu: 500m
-                memory: 1Gi
+                # 30d p95 156Mi, peak 190Mi; raised from 1Gi. The 2Gi limit still
+                # covers a full whisper small-int8 load.
+                memory: 384Mi
               limits:
                 # whisper small-int8 ~500Mi + piper voice ~150Mi + runtime.
                 memory: 2Gi

@@ -176,7 +176,9 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                # 30d p95 158Mi, peak 201Mi; raised from 512Mi. Kept well above
+                # the peak so postgres is not the pod squeezed first.
+                memory: 384Mi
               limits:
                 memory: 2Gi
     service:

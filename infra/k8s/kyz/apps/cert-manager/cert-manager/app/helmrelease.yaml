@@ -19,6 +19,9 @@ spec:
       servicemonitor:
         enabled: true
     webhook:
-      replicaCount: 2
+      # Single node: a second replica lands on the same host, so it buys no
+      # failure domain. The PDB goes with it -- minAvailable 1 against 1 replica
+      # would leave 0 allowed disruptions and block every future node drain.
+      replicaCount: 1
       podDisruptionBudget:
-        enabled: true
+        enabled: false

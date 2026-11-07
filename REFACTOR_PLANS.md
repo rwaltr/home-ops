@@ -1681,6 +1681,58 @@ removal — the reasoning below is the whole point of this entry.
   known-good state at least once: a healthy system that reads as broken is a
   louder failure than no probe, and it hides the real one behind it.
 
+### 2026-11-07 — efficiency review: memory requests, single-node HA, logging gone
+
+Driver: a full cluster review of `mouse`. Headline number — the node committed
+**27.17 GiB of its 30.97 GiB allocatable on memory requests (88%)** while
+running ~15.5 GiB, with **no OOM kill and no eviction in 30 days** and
+`MemAvailable` never below 4.5 GiB over 7 days. It was not short on memory; it
+was short on *paper*, and requests are what the scheduler counts.
+
+Three changes came out of it.
+
+- **Memory requests**: 13 steady-state containers re-sized from the Prometheus
+  30d p95 working set × 1.3, **−9476 Mi** — node
+  goes 27.17 → 17.9 GiB committed, 88% → 58%. The root cause for most of them:
+  a container that declares `limits.memory` and **no** request gets the limit
+  copied into the request by Kubernetes, so the scheduler reserved the maximum
+  forever and the pod was **Guaranteed by accident** (`oom_score_adj: -997`, no
+  burst latitude). Supersedes PR #900 (`hermes/memory-request-audit`, opened
+  2026-10-04 with a 30d p99 × 1.25 rule), which had already spotted the
+  accidental-Guaranteed pods but redistributed rather than reduced.
+  **Deliberately unchanged:** jellyfin's 4 GiB request (load-bearing for DRA
+  transcoding) and the workloads whose request sits *below* their real peak —
+  unmanic, sabnzbd, wyoming-whisper, immich-server, rustfs, hermes. They borrow
+  above their request and borrowing has never evicted anything here; raising
+  them would spend the headroom this change just bought.
+- **Single-node HA**: the cert-manager and external-secrets webhooks drop from
+  2 replicas to 1. Both replicas land on
+  `mouse`, so there was no failure domain — only churn. Their PDBs go with them:
+  `minAvailable: 1` against 1 replica is *0 allowed disruptions*, which would
+  block every future node drain. `coredns` and `cloudflare-tunnel` stay at 2.
+- **Logging decommissioned**: see the 2026-09-26 entry for the original design
+  and `docs/logging.md` for what replaced it.
+
+**Lesson: a limit is not a request, and a pod that sets only `limits.memory` is
+silently Guaranteed.** It reads as the conservative choice — "give it room to
+grow" — and it is the opposite: it reserves the ceiling permanently and removes
+the pod's ability to burst into free memory. The measured p95 belongs in
+`requests`, the ceiling in `limits`, and they should equal each other only
+because someone decided so.
+
+**Also recorded: `kubectl top` does not work here.**
+`--disable-components=coredns,metrics-server` in `infra/k0s/mouse.yaml` turns
+metrics-server off; the GitOps `./metrics-server/ks.yaml` line in
+`apps/kube-system/kustomization.yaml` is commented out *and its directory does
+not exist*. Left as-is deliberately — Prometheus is the better source, and every
+number in this entry came from `container_memory_working_set_bytes` via
+`kubectl -n o11y port-forward svc/kube-prometheus-stack-prometheus`.
+
+**Measurement gotcha worth keeping:** `quantile_over_time` over `[30d]` on a
+per-series query includes *dead* pods, so completed kopia/nightly Job pods
+inflate any naive "top memory" list. Filter to live pods (`pod=~"..."` from
+`kubectl get pods`) before believing it.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

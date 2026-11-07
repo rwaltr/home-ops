@@ -101,6 +101,8 @@ spec:
             resources:
               requests:
                 cpu: 10m
+                # 30d p95 7Mi, peak 8Mi. Was implicitly 256Mi (limit-only).
+                memory: 128Mi
               limits:
                 memory: 256Mi
             probes:
