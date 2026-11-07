@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Lint GitHub Actions workflows (actionlint + shellcheck)"
-set -euo pipefail
-
-actionlint -shellcheck=shellcheck .github/workflows/*.yml

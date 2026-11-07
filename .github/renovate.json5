@@ -6,12 +6,11 @@
   extends: [
     "github>home-operations/renovate-presets#8.1.0",
     ":timezone(America/Chicago)",
-    ":enablePreCommit",
     "github>rwaltr/home-ops//.github/renovate/autoMerge",
     "github>rwaltr/home-ops//.github/renovate/labels",
   ],
   suppressNotifications: ["prIgnoreNotification"],
-  // keep PRs current so lint:fmt (whole-repo oxfmt check) always sees the
+  // keep PRs current so the whole-repo oxfmt check always sees the
   // formatted tree; auto-rebases stale PRs instead of only conflicted ones
   rebaseWhen: "behind-base-branch",
 }

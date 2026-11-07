@@ -99,6 +99,11 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - **Adding cloud resources**: add a Terraform workspace/`.tf` under `infra/terraform/`
   (or a Terragrunt layer); `mise run tf:plan <workspace>` before `tf:apply`.
 - **Finding configuration**: start from `infra/` and `docs/`.
+- **Setting up a dev env**: `mise install`, then install the git hooks. On a machine
+  you own, do it once globally: `hk install --global --mise` (no-ops in repos without
+  an `hk.pkl`). In a container or throwaway clone, use `mise run setup` instead.
+  Hooks are defined in `hk.pkl`; `mise run lint` / `mise run fmt` wrap `hk check --all`
+  / `hk fix --all`, so there is one place to add a linter.
 
 ## ⚠️ Important Considerations
 

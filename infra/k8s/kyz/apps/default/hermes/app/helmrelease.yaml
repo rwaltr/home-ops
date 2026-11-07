@@ -563,7 +563,7 @@ spec:
 
             ## How you work
             - Branch + PR only. Never commit or push to `master`. Create
-              `hermes/<slug>`, run `mise run lint:all`, write a conventional commit,
+              `hermes/<slug>`, run `mise run lint`, write a conventional commit,
               open a PR with `gh pr create`, then stop for review. Flux reconciles
               on merge.
             - `kubectl` is observation only (get, describe, logs, events, exec).
@@ -739,7 +739,7 @@ spec:
 
             ## PR loop (never bypass)
             - Branch `hermes/<slug>`; never commit or push to `master`.
-            - `mise run lint:all` before committing (fmt, yaml, markdown, shell, actions, security).
+            - `mise run lint` before committing (fmt, yaml, markdown, shell, actions, security).
             - Conventional commit, then `gh pr create`; stop for review.
             - Flux reconciles `master` on merge. Confirm with `flux get ks -A`, `flux logs`, `flux trace`.
 

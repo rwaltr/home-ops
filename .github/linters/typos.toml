@@ -1,0 +1,10 @@
+# False positives: product names, abbreviations and language codes used in this repo.
+[default.extend-words]
+mosquitto = "mosquitto" # MQTT broker
+speaches = "speaches"   # TTS server
+routeros = "routeros"   # MikroTik RouterOS
+hass = "hass"           # Home Assistant
+nothink = "nothink"     # LiteLLM/Ollama model suffix
+ot = "ot"               # OpenThread
+fre = "fre"             # ISO 639-2 French
+mis = "mis"             # "mis-tag" in the Jellyfin language docs

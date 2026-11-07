@@ -1,0 +1,90 @@
+amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
+
+// Single source of truth for linting. mise tasks and CI both call hk:
+//   mise run lint -> hk check --all
+//   mise run fmt  -> hk fix --all
+//   git hook      -> hk run pre-commit (fast steps only)
+
+// Fast, per-file steps. Safe to run on every commit.
+local fast = new Mapping<String, Step> {
+    // Whitespace/encoding rules live in .editorconfig (editors honour it too).
+    ["editorconfig-checker"] = (Builtins.editorconfig_checker) {
+        check = "editorconfig-checker {{files}}"
+        fix = "editorconfig-checker -fix {{files}}"
+    }
+    ["check-added-large-files"] = Builtins.check_added_large_files
+    ["check-merge-conflict"] = Builtins.check_merge_conflict
+    ["detect-private-key"] = Builtins.detect_private_key
+    ["fix-smartquotes"] = Builtins.fix_smart_quotes
+    ["oxfmt"] {
+        glob = List("**/*.yaml", "**/*.yml", "**/*.json", "**/*.md", "**/*.markdown")
+        check = "oxfmt -c .github/linters/oxfmt.json --check {{files}}"
+        fix = "oxfmt -c .github/linters/oxfmt.json {{files}}"
+    }
+    ["yamllint"] = (Builtins.yamllint) {
+        check = "yamllint -c .github/linters/yamllint.yaml {{files}}"
+    }
+    ["markdownlint"] {
+        glob = List("**/*.md", "**/*.markdown")
+        batch = true
+        check = "markdownlint-cli2 --config .github/linters/markdownlint.yaml {{files}}"
+        fix = "markdownlint-cli2 --config .github/linters/markdownlint.yaml --fix {{files}}"
+    }
+    ["actionlint"] = (Builtins.actionlint) {
+        check = "actionlint -shellcheck=shellcheck {{files}}"
+    }
+    ["typos"] = (Builtins.typos) {
+        check_diff = """
+            output=$(typos -c .github/linters/typos.toml --force-exclude --diff {{files}})
+            [ -z "$output" ] && exit 0
+            printf "%s" "$output"
+            exit 1
+            """
+        fix = "typos -c .github/linters/typos.toml --force-exclude --write-changes {{files}}"
+    }
+    // mise task scripts are extensionless, so match them by path.
+    ["shellcheck"] {
+        glob = Regex(#"^(\.mise/(tasks|lib)/.+|.+\.(sh|bash))$"#)
+        batch = true
+        check = "shellcheck -x {{files}}"
+    }
+}
+
+// Slower repo-wide analysis. Runs in `mise run lint` and CI, not on commit.
+local slow = new Mapping<String, Step> {
+    ["zizmor"] = Builtins.zizmor
+    // tflint works per module, not per file.
+    ["tflint"] {
+        glob = "**/*.tf"
+        batch = true
+        check = "for d in $(dirname {{files}} | sort -u); do tflint --chdir \"$d\" || exit 1; done"
+    }
+    // trivy scans IaC trees, so it always runs repo-wide.
+    ["trivy"] {
+        check = "trivy config --quiet --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .vm --ignorefile .github/linters/trivyignore.yaml ."
+    }
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "git"
+        steps {
+            ...fast
+        }
+    }
+    ["check"] {
+        steps {
+            ...fast
+            ...slow
+        }
+    }
+    ["fix"] {
+        fix = true
+        steps {
+            ...fast
+            ...slow
+        }
+    }
+}

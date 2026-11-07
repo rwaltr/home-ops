@@ -1,14 +1,3 @@
-ignore: |
-  .yamllint.yml
-  .github/
-  .secrets/
-  *.encrypted.yaml
-  *.sops.yaml
-  *.sops.yml
-  *-crds.yaml
-  /gitops/argo/cluster-init/
-  /legacy/
-
 extends: default
 rules:
   truthy:

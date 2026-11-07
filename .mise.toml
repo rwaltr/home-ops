@@ -38,9 +38,23 @@ actionlint = "latest"
 zizmor = "latest"
 oxfmt = "0.71.0"
 shellcheck = "latest"
+editorconfig-checker = "latest"
 "npm:markdownlint-cli2" = "latest"
 "pipx:yamllint" = "latest"
-"pipx:pre-commit" = "latest"
+typos = "latest"
+
+# Security & IaC analysis — hk.pkl `slow` steps and CI
+tflint = "latest"
+trivy = "latest"
+
+# Dev loop: `mise watch` runs tasks under watchexec, `mise daemons` under pitchfork
+watchexec = "latest"
+pitchfork = "latest"
+
+# Git hooks (hk.pkl) — hk needs pkl to evaluate its config.
+# hk is pinned to match the version hk.pkl amends; bump both together.
+hk = "1.45.0"
+pkl = "latest"
 
 # Tasks are file-based tasks in .mise/tasks/ — `mise tasks` is the index.
 # Shared shell helpers live in .mise/lib/common.sh.

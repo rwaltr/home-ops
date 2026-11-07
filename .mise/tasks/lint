@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run all linters (hk check --all)"
+set -euo pipefail
+
+hk check --all

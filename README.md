@@ -7,7 +7,7 @@
 ### _Flatcar · k0s · Cilium — GitOps homelab, cloud-managed with Terraform_
 
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
+[![hk](https://img.shields.io/badge/hk-enabled-brightgreen?style=for-the-badge)](https://github.com/jdx/hk)
 [![last-commit](https://img.shields.io/github/last-commit/rwaltr/home-ops?style=for-the-badge&logo=git&logoColor=white)](https://github.com/rwaltr/home-ops/commits/master)
 [![stars](https://img.shields.io/github/stars/rwaltr/home-ops?style=for-the-badge&logo=github)](https://github.com/rwaltr/home-ops/stargazers)
 [![k0s](https://img.shields.io/badge/k0s-v1.36-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://k0sproject.io/)
@@ -211,22 +211,36 @@ offsite leg (mirror to Backblaze B2) is planned via kopiur's
 
 ## 🧰 Tools
 
-| Tool       | Use                           | Status     |
-| ---------- | ----------------------------- | ---------- |
-| Flatcar    | Operating System              | ✅         |
-| k0s        | Kubernetes (single-node)      | ✅         |
-| Cilium     | CNI (kube-proxy replacement)  | ✅         |
-| Flux       | GitOps                        | ✅         |
-| OpenEBS    | Hostpath local storage        | ✅         |
-| kopiur     | PVC backups (kopia-native)    | ✅         |
-| RustFS     | S3-compatible Storage         | ✅         |
-| 1Password  | Secrets (Connect + ESO)       | ✅         |
-| ZFS        | Storage & Snapshots           | ✅         |
-| fnox       | Secret Resolution (1Password) | ✅         |
-| Terraform  | Cloud Resource Management     | ✅         |
-| Netdata    | System Monitoring             | 🚧 planned |
-| mise       | Task Runner & Tool Mgmt       | ✅         |
-| Pre-commit | Code Quality Automation       | ✅         |
+| Tool      | Use                           | Status     |
+| --------- | ----------------------------- | ---------- |
+| Flatcar   | Operating System              | ✅         |
+| k0s       | Kubernetes (single-node)      | ✅         |
+| Cilium    | CNI (kube-proxy replacement)  | ✅         |
+| Flux      | GitOps                        | ✅         |
+| OpenEBS   | Hostpath local storage        | ✅         |
+| kopiur    | PVC backups (kopia-native)    | ✅         |
+| RustFS    | S3-compatible Storage         | ✅         |
+| 1Password | Secrets (Connect + ESO)       | ✅         |
+| ZFS       | Storage & Snapshots           | ✅         |
+| fnox      | Secret Resolution (1Password) | ✅         |
+| Terraform | Cloud Resource Management     | ✅         |
+| Netdata   | System Monitoring             | 🚧 planned |
+| mise      | Task Runner & Tool Mgmt       | ✅         |
+| hk        | Git Hooks & Linting           | ✅         |
+
+## 🛠️ Development
+
+Linting and formatting are defined once in `hk.pkl` and run through mise:
+
+```sh
+mise install
+hk install --global --mise   # once per machine; no-ops in repos without hk.pkl
+# or, for a single clone / container:
+mise run setup
+
+mise run lint   # hk check --all
+mise run fmt    # hk fix --all
+```
 
 ## 🖊️ TODOs
 
