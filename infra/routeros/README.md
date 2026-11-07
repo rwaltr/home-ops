@@ -290,6 +290,46 @@ mgmt`) allow — only the k8s VIP block. The OTBR is a plain mgmt host, so every
   controller-to-OTBR flow needs an explicit, narrowly-scoped accept like the
   ones above.
 
+## IPv6 egress: no transit upstream, so AAAA answers are a trap
+
+`mouse` and every pod are dual-stack, and the router advertises itself as the v6
+default gateway while the ISP path has **no IPv6 transit**. A client that resolves
+an AAAA record and prefers v6 therefore hangs instead of failing. First observed
+as lost pages: Alertmanager → `api.pushover.net`, which returns
+`2606:4700:10::6814:9ec`, and the send error names exactly that address —
+`dial tcp [2606:4700:10::6814:9ec]:443: connect: connection timed out`.
+
+Evidence, from inside a pod: a direct dial to that v6 address stalls the full 12s
+(`http=000`) while `https://api.github.com` over v4 answers 200 in 0.15s. Pods
+resolve through CoreDNS → the node's resolver → this router (`DNS=10.10.0.1` in
+`20-mouse-static.network`), so a filter here reaches the cluster as well as every
+LAN client.
+
+**Decision (2026-11-07, rwaltr): fix it at the router's DNS, not on the host** —
+one place, every LAN client, applied at runtime, no host reinstall. Supersedes the
+host-side `[IPv6AcceptRA] UseGateway=no` in PR #976, closed.
+
+```routeros
+/ip/dns/static
+add comment="no v6 transit: refuse AAAA for the page path (README > IPv6 egress)" \
+    name=pushover.net type=AAAA address=::ffff match-subdomain=yes
+```
+
+**RouterOS has no global AAAA filter**, and adlist blocks whole domains rather than
+record types. The supported mechanism is a static `AAAA` entry pointing at an
+unusable address (`::ffff`) — the workaround MikroTik's own DNS page describes —
+which makes the filter per-name. Keep it to the names that matter; `pushover.net`
+covers `api.pushover.net`. Rejected: one entry for `com`, which would blank AAAA
+for every .com destination in the zone.
+
+**Not covered by this filter:** anything resolving outside this router — Android
+Private DNS, browser DoH, iCloud Private Relay — never sees it and will still
+blackhole. The universal fix is to stop advertising a v6 default route the router
+cannot serve (`ra-lifetime=none` on the LAN interface's `/ipv6/nd` entry, or
+`/ip settings disable-ipv6` for the whole system), at the cost of LAN v6
+addressing. Not done; noted here so the next v6-preferring client that misbehaves
+in a way DNS filtering cannot reach has somewhere to start.
+
 ## Verify
 
 ```routeros

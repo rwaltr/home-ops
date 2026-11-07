@@ -1746,6 +1746,46 @@ per-series query includes *dead* pods, so completed kopia/nightly Job pods
 inflate any naive "top memory" list. Filter to live pods (`pod=~"..."` from
 `kubectl get pods`) before believing it.
 
+### 2026-11-07 (later) — IPv6 egress: filtered at the router's DNS, not with a host route
+
+Cost: **7 alerts across 4 pushover groups cancelled** on 2026-10-30 rather than
+delivered, each with `dial tcp [2606:4700:10::6814:9ec]:443: connect: connection
+timed out`. `api.pushover.net` resolves to that AAAA, the cluster is dual-stack,
+and the ISP path has no IPv6 transit — so the connect hangs instead of failing,
+which is the one failure mode dual-stack fallback cannot rescue.
+
+Measured from a pod: a direct dial to that v6 address stalls the full 12s
+(`http=000`), v4 answers in 0.15s. Pods resolve through CoreDNS → the node's
+resolver → the router, so a router-side filter reaches the cluster too.
+
+**Decision (rwaltr): filter at the router's DNS, not the host.** One place, every
+LAN client, applied at runtime, no reinstall — where a host-side
+`[IPv6AcceptRA] UseGateway=no` (PR #976, closed) would have fixed only `mouse`,
+and would have needed a reinstall to take effect at all, since Ignition runs on
+first boot.
+
+**The platform cannot express "filter AAAA" as one rule.** RouterOS has no global
+AAAA filter, and adlist matches domains rather than record types; the supported
+mechanism is a static `AAAA` entry pointing at an unusable address (`::ffff`) —
+MikroTik's own documented workaround — so the filter is per name.
+`name=pushover.net type=AAAA address=::ffff` (with `match-subdomain=yes`) covers
+`api.pushover.net` and is the whole change. Blanket `name=com` was rejected: it
+would blank AAAA for every .com destination in the zone.
+
+**Known hole:** clients that resolve outside this router — Android Private DNS,
+browser DoH, iCloud Private Relay — never see the filter and still blackhole. The
+universal fix is to stop advertising a v6 default route the router cannot serve
+(`ra-lifetime=none` on the LAN interface, or `/ip settings disable-ipv6`), which
+also removes LAN v6 addressing. Not done; recorded in `infra/routeros/README.md`
+with the rest of this.
+
+**Lesson: choose the layer that covers the clients, then check the platform can
+actually express the fix.** "Filter AAAA on the DNS provider" is one line of
+intent and a per-name list of implementation on RouterOS — worth knowing before
+the approach is written into a runbook, not after. And a deliberate blackhole
+beats a silent one: an unreachable route fails fast and falls back, a route that
+swallows packets turns a lost alert into a 12-second stall and a lost page.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
