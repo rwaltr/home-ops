@@ -11,6 +11,6 @@ resources:
   - ./smartctl-exporter/ks.yaml
   - ./zfs-vdev-exporter/ks.yaml
   #  - ./mqtt-probe/ks.yaml   # removed 2026-10-31 — see docs/mosquitto.md
-  #  - ./victoria-logs/ks.yaml
-  #  - ./fluent-bit/ks.yaml
+  # Cluster logging (victoria-logs + fluent-bit) was decommissioned 2026-11-07
+  # and its manifests deleted — see docs/logging.md.
   - ./grafana-operator/instance/ks.yaml
