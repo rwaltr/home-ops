@@ -23,25 +23,23 @@ local fast = new Mapping<String, Step> {
         fix = "oxfmt -c .github/linters/oxfmt.json {{files}}"
     }
     ["yamllint"] = (Builtins.yamllint) {
+        batch = true
         check = "yamllint -c .github/linters/yamllint.yaml {{files}}"
     }
     ["markdownlint"] {
         glob = List("**/*.md", "**/*.markdown")
-        batch = true
         check = "markdownlint-cli2 --config .github/linters/markdownlint.yaml {{files}}"
         fix = "markdownlint-cli2 --config .github/linters/markdownlint.yaml --fix {{files}}"
     }
     ["actionlint"] = (Builtins.actionlint) {
         check = "actionlint -shellcheck=shellcheck {{files}}"
     }
-    ["typos"] = (Builtins.typos) {
-        check_diff = """
-            output=$(typos -c .github/linters/typos.toml --force-exclude --diff {{files}})
-            [ -z "$output" ] && exit 0
-            printf "%s" "$output"
-            exit 1
-            """
-        fix = "typos -c .github/linters/typos.toml --force-exclude --write-changes {{files}}"
+    // Repo-wide scan: passing ~430 paths costs ~1.6s, a directory walk ~30ms.
+    // --hidden is required or typos skips .github/, .mise/ and .pi/; it also
+    // pulls in .git, so exclude that explicitly.
+    ["typos"] {
+        check = "typos -c .github/linters/typos.toml --force-exclude --hidden --exclude .git"
+        fix = "typos -c .github/linters/typos.toml --force-exclude --hidden --exclude .git --write-changes"
     }
     // mise task scripts are extensionless, so match them by path.
     ["shellcheck"] {
@@ -54,10 +52,10 @@ local fast = new Mapping<String, Step> {
 // Slower repo-wide analysis. Runs in `mise run lint` and CI, not on commit.
 local slow = new Mapping<String, Step> {
     ["zizmor"] = Builtins.zizmor
-    // tflint works per module, not per file.
+    // tflint works per module, not per file. No `batch`: hk would split the
+    // files across parallel invocations and lint the same module repeatedly.
     ["tflint"] {
         glob = "**/*.tf"
-        batch = true
         check = "for d in $(dirname {{files}} | sort -u); do tflint --chdir \"$d\" || exit 1; done"
     }
     // trivy scans IaC trees, so it always runs repo-wide.
