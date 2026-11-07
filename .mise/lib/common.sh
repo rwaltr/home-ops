@@ -114,5 +114,3 @@ vm_user() {
     *) die "Unknown flatcar host '$1' (add it to vm_user in .mise/lib/common.sh)" ;;
   esac
 }
-
-

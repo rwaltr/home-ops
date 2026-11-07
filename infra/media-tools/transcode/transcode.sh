@@ -40,7 +40,6 @@ while IFS= read -r SRC; do
 
   sinc=$(stat -c %s "$SRC")
   sdur=$("$FP" -v error -show_entries format=duration -of default=nw=1:nk=1 "$SRC" 2>/dev/null)
-  base="${SRC%.*}"
   TMP="$WORK/.enc-$$.mkv"
   t0=$(date +%s)
   log "ENC  $(basename "$SRC")"

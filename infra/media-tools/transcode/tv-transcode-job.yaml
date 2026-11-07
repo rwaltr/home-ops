@@ -33,12 +33,16 @@ spec:
             requests:
               cpu: "3"
               memory: 3Gi
+          securityContext:
+            readOnlyRootFilesystem: true
           volumeMounts:
             - name: media-tv
               mountPath: /media/tv
             - name: config
               mountPath: /config
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: media-tv
           hostPath:
@@ -46,3 +50,5 @@ spec:
         - name: config
           configMap:
             name: tv-transcode
+        - name: tmp
+          emptyDir: {}

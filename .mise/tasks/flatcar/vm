@@ -58,8 +58,8 @@ log "Starting ${HOST} VM (SSH ${SSH_USER}@127.0.0.1:${SSH_PORT}, API 127.0.0.1:$
     -device virtio-net-pci,netdev=n0 \
     -fw_cfg "name=opt/org.flatcar-linux/config,file=${IGN_PATH}" \
     -display none \
-    -chardev "socket,id=ser0,path=${VM_DIR}/${HOST}-serial.sock,server=on,wait=off,logfile=${VM_DIR}/${HOST}-console.log" \
-    -serial chardev:ser0 \
+    -chardev "socket,id=serial0,path=${VM_DIR}/${HOST}-serial.sock,server=on,wait=off,logfile=${VM_DIR}/${HOST}-console.log" \
+    -serial chardev:serial0 \
     -daemonize \
     -pidfile "${PIDFILE}" \
     -monitor "unix:${MONITOR},server,nowait"

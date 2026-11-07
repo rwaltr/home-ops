@@ -129,4 +129,4 @@ spec:
                 value: --feature-gates=CancelHealthCheckOnNewRevision=true
             target:
               kind: Deployment
-              name: kustomize-controlle
+              name: kustomize-controller

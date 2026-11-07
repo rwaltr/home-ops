@@ -27,4 +27,3 @@ resource "porkbun_domain_nameservers" "domain" {
   domain      = each.key
   nameservers = each.value.name_servers
 }
-
