@@ -7,13 +7,13 @@ homelab infrastructure monorepo.
 
 A single-user homelab infrastructure monorepo. The host (**mouse**) runs Flatcar
 Container Linux with a single-node k0s + Cilium cluster managed by Flux GitOps;
-cloud resources are managed with Terraform/Terragrunt.
+cloud resources are managed with Terraform.
 
 It manages:
 
 - **Host Configuration**: Flatcar Container Linux (`mouse`) via Butane/Ignition — ZFS storage node + single-node k0s
 - **Kubernetes**: k0s v1.36 + Cilium (kube-proxy replacement), Flux GitOps rooted at `infra/k8s/kyz`
-- **Cloud Resources**: Terraform for Cloudflare DNS and Terraform Cloud (plus Terragrunt for layering)
+- **Cloud Resources**: Terraform for Cloudflare DNS and Terraform Cloud
 - **Services**: run **in the k0s cluster**
 - **Secrets**: 1Password — fnox for local/CI tooling, Connect + External Secrets in-cluster
 
@@ -53,7 +53,7 @@ It manages:
 - **Storage**: OpenEBS `openebs-hostpath` (NVMe); the ZFS `tank` pool stays outside the PVC lifecycle
 - **Backups**: kopiur + kopia → in-cluster RustFS on `tank/backup/k8s`
 - **Secrets**: 1Password Connect + External Secrets in-cluster; fnox (1Password-backed) for local and CI tooling — no secrets in git
-- **IaC**: Terraform + Terragrunt (Pulumi was abandoned; OpenTofu is the intended direction — no active migration)
+- **IaC**: Terraform (Pulumi was abandoned; OpenTofu is the intended direction — no active migration)
 - **ZFS**: `tank` pool (raidz1×2, `/var/tank`) — created by hand, imported by Ignition
 - **mise**: task runner and dev environment
 
@@ -72,7 +72,7 @@ It manages:
 
 - **`flatcar-vm`** — build/boot/verify/teardown Flatcar VMs, mise task reference,
   manual Butane compilation, adding a new host.
-- **`home-ops-troubleshooting`** — mise, Flatcar/Butane, fnox/1Password, Terraform/Terragrunt failures.
+- **`home-ops-troubleshooting`** — mise, Flatcar/Butane, fnox/1Password, Terraform failures.
 - **`verify-change`** — the verification loop to follow before declaring work done.
 
 Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-load it.
@@ -96,8 +96,8 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - **Adding a new service**: add to the Flux GitOps layout under `infra/k8s/kyz/apps/`.
   See the service docs under `docs/`.
 - **Adding a new Flatcar host**: see the `flatcar-vm` skill.
-- **Adding cloud resources**: add a Terraform workspace/`.tf` under `infra/terraform/`
-  (or a Terragrunt layer); `mise run tf:plan <workspace>` before `tf:apply`.
+- **Adding cloud resources**: add a Terraform workspace/`.tf` under `infra/terraform/`,
+  then `mise run tf:plan <workspace>` before `tf:apply`.
 - **Finding configuration**: start from `infra/` and `docs/`.
 - **Setting up a dev env**: `mise install`, then install the git hooks. On a machine
   you own, do it once globally: `hk install --global --mise` (no-ops in repos without

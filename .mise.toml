@@ -15,9 +15,7 @@ task.timings = true
 # installing and running flux 2.10.0 with mise 2026.10.21.
 "github:fluxcd/flux2" = "latest"
 kubectl = "latest"
-sops = "latest"
 terraform = "latest"
-terragrunt = "latest"
 "github:derailed/k9s" = "latest"
 "github:k0sproject/k0sctl" = "latest"
 

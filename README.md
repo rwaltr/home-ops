@@ -16,7 +16,7 @@
 
 ## 📖 Overview
 
-Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform + Terragrunt. In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
+Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform. In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
 
 > 🗺️ Migration plan, decisions log, and lessons: **[REFACTOR_PLANS.md](REFACTOR_PLANS.md)**
 
@@ -65,7 +65,7 @@ Key platform apps:
 
 ### 🌐 Terraform
 
-Cloud resources, managed with Terraform + Terragrunt:
+Cloud resources, managed with Terraform:
 
 - **Cloudflare** — DNS, zones and zone settings (`infra/terraform/cloudflare/`)
 - **Porkbun** — registrar nameserver delegation, in the same workspace (`porkbun.tf`)

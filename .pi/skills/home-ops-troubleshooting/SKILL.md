@@ -1,6 +1,6 @@
 ---
 name: home-ops-troubleshooting
-description: "Troubleshoot common home-ops failures: mise task errors, Flatcar/Butane build and boot failures, fnox/1Password secret resolution, and Terraform/Terragrunt state. Use when a mise task, build, or apply fails in the home-ops repo."
+description: "Troubleshoot common home-ops failures: mise task errors, Flatcar/Butane build and boot failures, fnox/1Password secret resolution, and Terraform state. Use when a mise task, build, or apply fails in the home-ops repo."
 ---
 
 # home-ops troubleshooting
@@ -46,4 +46,4 @@ description: "Troubleshoot common home-ops failures: mise task errors, Flatcar/B
   `local.zone_settings` in `zone_settings.tf`). If a plan reports "no schema
   available for cloudflare_zone_settings_override", the v4 resource is still in
   state — remove it with `terraform state rm` while the v4 provider is installed
-- Use the mise `tf:*` tasks rather than raw `terraform`/`terragrunt` where a task exists
+- Use the mise `tf:*` tasks rather than raw `terraform` where a task exists
