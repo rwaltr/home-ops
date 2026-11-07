@@ -20,6 +20,9 @@ spec:
           resources:
             requests:
               cpu: 100m
+              # 30d p95 76Mi (external) / 84Mi (internal), peak 101Mi. Was
+              # implicitly 512Mi (limit-only).
+              memory: 192Mi
             limits:
               memory: 512Mi
       envoyService:

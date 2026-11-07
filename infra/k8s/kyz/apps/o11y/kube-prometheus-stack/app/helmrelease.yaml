@@ -68,6 +68,11 @@ spec:
         resources:
           requests:
             cpu: 100m
+            # 30d p95 working set 846Mi, peak 999Mi (the pod cgroup, which also
+            # carries the config-reloader, peaks ~1.0Gi). Was implicitly 4Gi:
+            # limit-only, so the scheduler reserved the limit and the pod was
+            # Guaranteed by accident. 1536Mi leaves the 4Gi limit as the ceiling.
+            memory: 1536Mi
           limits:
             memory: 4Gi
         storageSpec:
