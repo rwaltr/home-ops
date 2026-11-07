@@ -46,10 +46,20 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 32Mi
-          limits:
-            # Bounded like every other system component here — the node has no
-            # disk swap (see the 2026-09-24 memory audit in REFACTOR_PLANS.md).
+            # Measured, not guessed: 30d p95 62-63Mi, 30d max 63.9Mi across all
+            # container series. The old 32Mi request was fiction — steady state
+            # has been above it the whole time (#896/#973 did not reach this
+            # manifest; #974).
             memory: 64Mi
+          limits:
+            # 2x the observed peak, which is where the old ceiling actually was:
+            # the previous 64Mi limit sat 0.1Mi above the 30d max, and the
+            # cluster-wide rollout of #973 (2026-11-07 18:24Z) pushed reloader
+            # past it — OOMKilled, one container restart, one critical page.
+            # watchGlobally + 13+ annotated workloads makes a batch merge its
+            # peak-load moment, so the ceiling has to clear a mass rollout, not
+            # steady state. Bounded like every other system component here — the
+            # node has no disk swap (2026-09-24 memory audit, REFACTOR_PLANS.md).
+            memory: 128Mi
       podMonitor:
         enabled: true
