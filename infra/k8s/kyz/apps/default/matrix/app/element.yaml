@@ -85,6 +85,13 @@ spec:
             port: 80
     route:
       app:
+        annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Element
+          gethomepage.dev/description: Matrix web client
+          gethomepage.dev/group: Comms
+          gethomepage.dev/icon: element.png
         hostnames:
           - element.waltr.tech
         parentRefs:

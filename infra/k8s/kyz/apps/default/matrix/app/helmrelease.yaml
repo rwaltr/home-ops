@@ -131,6 +131,13 @@ spec:
             port: 8008
     route:
       app:
+        annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Matrix
+          gethomepage.dev/description: Matrix homeserver (tuwunel)
+          gethomepage.dev/group: Comms
+          gethomepage.dev/icon: matrix.png
         hostnames:
           - matrix.waltr.tech
         parentRefs:

@@ -400,6 +400,13 @@ spec:
             port: *apiPort
     route:
       app:
+        annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Hermes
+          gethomepage.dev/description: Agent dashboard (basic auth)
+          gethomepage.dev/group: AI
+          gethomepage.dev/icon: hermes.png
         hostnames:
           - hermes.waltr.tech
         parentRefs:

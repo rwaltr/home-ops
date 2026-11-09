@@ -62,6 +62,13 @@ spec:
                 claimName: grafana-pvc
   httpRoute:
     spec:
+      annotations:
+        # Listed on the Homepage dashboard — see docs/homepage.md.
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/name: Grafana
+        gethomepage.dev/description: Dashboards
+        gethomepage.dev/group: Monitoring
+        gethomepage.dev/icon: grafana.png
       hostnames:
         - grafana.waltr.tech
       parentRefs:
