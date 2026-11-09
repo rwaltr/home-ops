@@ -59,12 +59,12 @@ spec:
               # HomeBox builds absolute URLs against the request scheme it sees
               # (http), which breaks any absolute link the UI generates.
               HBOX_OPTIONS_TRUST_PROXY: "true"
-              # Open for the first account, then flip to "false": the signup
-              # form is available to anyone who can reach the route, and the
-              # route is internal-only but unauthenticated. Deliberately spelled
-              # out (rather than relying on the upstream default) so the flip is
-              # a one-line diff — see docs/homebox.md.
-              HBOX_OPTIONS_ALLOW_REGISTRATION: "true"
+              # Closed now that the owner account exists. This does NOT stop you
+              # adding users: HandleUserRegistration() only refuses when there is
+              # also no group token — `!allowRegistration && GroupToken == ""` —
+              # so the Collection → Invites flow keeps working with signup shut.
+              # See docs/homebox.md → Accounts.
+              HBOX_OPTIONS_ALLOW_REGISTRATION: "false"
             envFrom:
               - secretRef:
                   name: homebox-secret

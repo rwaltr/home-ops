@@ -69,14 +69,15 @@ spec:
               # Built-in MCP endpoint at /mcp. uwsgi's [web] route explicitly
               # excludes /mcp from the SPA static-map, so it proxies to Flask.
               KITCHENOWL_MCP_ENABLED: "true"
-              # OPEN_REGISTRATION gates whether the signup ROUTE IS REGISTERED AT
-              # ALL (backend/app/controller/auth/auth_controller.py:
-              # `if OPEN_REGISTRATION and not DISABLE_USERNAME_PASSWORD_LOGIN`),
-              # and there is no CLI/management command that creates a user. So it
-              # must be true for the first account and flipped back to "false"
-              # immediately after — see docs/kitchenowl.md. Nothing else can
-              # create the household owner.
-              OPEN_REGISTRATION: "true"
+              # Closed now that the household owner exists. This gates whether
+              # the signup ROUTE IS REGISTERED AT ALL
+              # (auth_controller.py: `if OPEN_REGISTRATION and not
+              # DISABLE_USERNAME_PASSWORD_LOGIN`), so it is not a "no new users"
+              # switch either: `POST /api/user/new` is @server_admin_required()
+              # and membership is granted by
+              # `POST /api/household/{id}/member/{user_id}`. See
+              # docs/kitchenowl.md → Accounts.
+              OPEN_REGISTRATION: "false"
             envFrom:
               - secretRef:
                   name: kitchenowl-secret

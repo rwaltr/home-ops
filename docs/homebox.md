@@ -69,13 +69,39 @@ op item create --vault home-ops --category "API Credential" \
 **Never rotate it.** The pepper is HMAC'd into every stored API-key hash, so
 changing it silently invalidates every issued key with no error to point at.
 
-## First run
+## Accounts and invitations
 
-1. Open `https://homebox.waltr.tech` and register — this creates the owner
-   account. Self-registration is open purely for this step.
-2. Flip `HBOX_OPTIONS_ALLOW_REGISTRATION` to `"false"` in the HelmRelease and
-   commit. `stakater/reloader` is watching the ConfigMap-derived env, so the pod
-   rolls itself.
+The owner account was created through open self-registration, and
+`HBOX_OPTIONS_ALLOW_REGISTRATION` is now **`"false"`** — the signup form is no
+longer served.
+
+That is not a "no more users" switch, and HomeBox has no admin "add user" form.
+What it has is **collection invites**, which sit outside the account system:
+
+> **Collection → Invites** tab → create invite → share the token.
+
+Invite creation is `POST /groups/invitations` (owner-only) and takes two fields:
+
+| Field       | Notes                                                          |
+| ----------- | -------------------------------------------------------------- |
+| `uses`      | 1–100, enforced by the modal (`invite_create_modal` toast).    |
+| `expiresAt` | Defaults to **24h** when unset; expired rows are hidden in UI. |
+
+An already-registered person joins with `POST /groups/invitations/{id}`; a new
+person registers **with the invite's group token**. Invites keep working with
+signup closed, and that is deliberate rather than a gap in the flag:
+
+```go
+// backend/app/api/handlers/v1/v1_ctrl_user.go
+if !ctrl.allowRegistration && regData.GroupToken == "" {
+```
+
+Registration is refused only when there is _also_ no group token, so the invite
+is the intended exception to the closed door.
+
+Group roles: `PUT /groups` and `DELETE /groups/members/{id}` are **owner-only**,
+the read endpoints are member-accessible. Everyone in a group shares one
+inventory — two groups are two separate inventories, not two views of one.
 
 ## API keys are the integration surface
 

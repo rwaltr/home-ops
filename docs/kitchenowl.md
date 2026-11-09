@@ -84,23 +84,32 @@ key every deployment in the world shares. Refresh tokens are valid 30 days
 formality. The ExternalSecret also maps the LiteLLM master key to
 `OPENAI_API_KEY`.
 
-## First run — the registration flip
+## Accounts
 
-KitchenOwl gates signup at the **route-registration** level, not with a flag
-inside the handler:
+`OPEN_REGISTRATION` is now **`"false"`**. It gates whether the signup route is
+registered _at all_ — there is no flag inside the handler, so a closed instance
+has no `/signup` endpoint to call, and `manage.py` has no create-user command
+either (`--run-jobs`, mail, `--import-files` only).
 
 ```python
+# backend/app/controller/auth/auth_controller.py
 if OPEN_REGISTRATION and not DISABLE_USERNAME_PASSWORD_LOGIN:
     @auth.route("/signup", ...)
 ```
 
-With `OPEN_REGISTRATION=false` the endpoint does not exist, and there is no
-management command that creates a user (`manage.py` only does jobs and mail). So:
+The owner account was created while it was `true`. Reopening it is **not** how
+the next user is added — these admin-only endpoints are:
 
-1. `OPEN_REGISTRATION` ships as `"true"`. Open
-   `https://kitchenowl.waltr.tech`, sign up, and create the household.
-2. Flip it to `"false"` in the HelmRelease and commit. The pod rolls itself and
-   the signup route disappears again.
+| Step                 | Call                                                  |
+| -------------------- | ----------------------------------------------------- |
+| Create the account   | `POST /api/user/new` — `@server_admin_required()`     |
+| Find it              | `GET /api/user/search`, `GET /api/user/all`           |
+| Add to the household | `POST /api/household/{household_id}/member/{user_id}` |
+| Grant server admin   | `POST /api/user/{id}` with `{"admin": true}`          |
+
+Household membership is granted **by user id**, not by an invite code, so the
+account has to exist before it can be added. That ordering is why account
+creation is the admin step above instead of a self-service signup.
 
 Until step 2 the signup form is reachable by anyone on the LAN.
 
