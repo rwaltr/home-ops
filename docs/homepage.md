@@ -202,6 +202,26 @@ Adding another number is one more `customapi` entry with a new `requestBody`; to
 add per-pod memory you would query cadvisor metrics, which kube-prometheus-stack
 already scrapes from the kubelet.
 
+### The same missing API also breaks per-service stats
+
+The other half of this problem is not in `widgets.yaml` and cannot be fixed there.
+Kubernetes discovery sets `app` and `namespace` on **every** service it finds
+(`constructedServiceFromResource()` in `resource-helpers.js`), and a service card
+renders a Kubernetes stats block whenever `service.app` is set. There is nothing
+to configure and no annotation to opt out:
+
+- `app` falls back to the HTTPRoute's name when the annotation is empty, so it
+  cannot be blanked — `gethomepage.dev/app: ""` is falsy and gets replaced.
+- The block is collapsed and **not rendered** until the stats button on a card is
+  clicked, so it is silent by default. Clicking a discovered service's stats
+  button will show the metrics-server error.
+- Setting `showStats: true` in `settings.yaml` would expand it for every service
+  and make that error permanent.
+
+So the choices for per-service stats are a metrics-server, or replacing discovery
+with static `services.yaml` entries (which carry no `app`/`namespace` and so
+request nothing). Neither is worth doing for a CPU number on a homelab card.
+
 ## Gotchas
 
 - **A missing ConfigMap key is a startup error, not a blank page.** Homepage
