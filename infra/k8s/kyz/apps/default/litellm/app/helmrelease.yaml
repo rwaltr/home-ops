@@ -234,7 +234,14 @@ spec:
                   mode: audio_transcription
               - model_name: piper
                 litellm_params:
-                  model: openai/rhasspy/piper-voices
+                  # speaches addresses TTS by voice repo, and the model has to
+                  # be installed once (`POST /v1/models/speaches-ai%2Fpiper-...`)
+                  # before it serves — it then lives on the models PVC, so this
+                  # survives pod restarts. Catalog: huggingface.co/speaches-ai/
+                  # piper-*. GLaDOS is not in it, so HA keeps wyoming-piper for
+                  # that voice. Clients must still send a `voice` field: speaches
+                  # requires the key even though the voice repo picks the voice.
+                  model: openai/speaches-ai/piper-en_US-amy-medium
                   api_base: http://127.0.0.1:8000/v1
                   api_key: speaches # required by the openai provider; unused
                 model_info:
