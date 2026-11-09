@@ -81,7 +81,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 
 - `REFACTOR_PLANS.md` — historical decisions and lessons
 - `docs/jellyfin-metadata.md`, `docs/jellyfin-direct-play.md`, `docs/jellyfin-language-filtering.md`
-- `docs/local-llm.md` — LiteLLM + Ollama + Speaches
+- `docs/local-llm.md` — LiteLLM gateway: OpenRouter chat + speaches audio (no local LLM)
 - `docs/logging.md` — decommissioned 2026-11-07 (VictoriaLogs + Fluent Bit removed)
 - `docs/alerting.md` — Alertmanager routing + the agent alert feed
 - `docs/mosquitto.md` — MQTT broker + HA discovery

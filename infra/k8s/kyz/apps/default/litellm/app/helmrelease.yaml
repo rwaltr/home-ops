@@ -1,35 +1,35 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# LiteLLM proxy + Ollama backend — one OpenAI-compatible endpoint for local
-# models, fronting ollama (and future backends) with key auth, spend tracking
-# and model aliasing. Hermes reaches it as a custom provider:
+# LiteLLM proxy — one OpenAI-compatible endpoint for cloud models and audio,
+# with key auth, spend tracking and model aliasing. Hermes reaches it as a
+# custom provider:
 #   http://litellm.default.svc.cluster.local:4000/v1
 #
-# Single pod, two containers: litellm talks to ollama over pod localhost.
-# Ollama auto-unloads idle models (KEEP_ALIVE=10m) and holds at most one
-# loaded model — this node has no disk swap, only 4Gi zram (2026-09-24 audit).
+# Single pod, two containers: litellm plus the speaches audio sidecar.
 #
-# Models (all local-only; OpenRouter rides along for cloud):
-#   qwen3-1.7b-nothink  — responsive general chat (~34 tok/s here). Qwen3
-#     thinks by default and ollama's OpenAI endpoint DROPS the `think` param
-#     (verified: only the native /api/chat honours it), so the model is
-#     rebuilt with the nothink generation prompt baked into its template.
+# No local LLM is served here any more. The ollama sidecar held exactly one
+# model (qwen3-1.7b-nothink) and everything that used it is gone as of
+# 2026-11-09: as a chat model it was fine, but it could not do the one job the
+# cluster had for it — classify text. Measured: it returned variable names
+# instead of secret values, missed 6 of 9 credentials in a 1.9k-token context
+# (biased to the head), scored P=1.000 on placeholders like ${API_TOKEN} and
+# <REDACTED> while scoring a real AKIA key at P=0.146, echoed the input when
+# asked to redact, and lost to a 7-pattern regex as a line classifier (F1 0.632
+# vs 0.875). See docs/local-llm.md.
 #
-# Tried and dropped:
-#   MiniCPM5-2B — reasoning preamble over every reply (~30 tok/s) made chat
-#     feel broken; weak tool calling. Weights still on the PVC.
-#   acon96/Home-FunctionGemma-270m — HA-control specialist, but on ollama it
-#     loops the same function call endlessly (no usable stop at
-#     <end_function_call>; 270M is too small to recover). PRUNED 2026-09-24.
-# Weights are re-downloadable artifacts — no kopia backup.
+# A local model belongs in its own sidecar, not bolted back onto this pod:
+# Cactus Needle 3 (8-29MB, tool calls + structured extraction) runs on the
+# cactus-compute runtime and ships no GGUF, so ollama could never host it.
 #
-# SemIf-style decision scoring works through the proxy: chat completion with
-# max_tokens=1, logprobs=true, top_logprobs=20, read option-token odds off the
-# first token. Always set top_logprobs explicitly (litellm#21932).
+# Tried and dropped, for the record: MiniCPM5-2B (reasoning preamble on every
+# reply, weak tool calls), acon96/Home-FunctionGemma-270m (loops its function
+# call — no usable stop token).
 #
-# SemIf-style decision scoring works through the proxy: chat completion with
-# max_tokens=1, logprobs=true, top_logprobs=20, read option-token odds off the
-# first token. Always set top_logprobs explicitly (litellm#21932).
+# Decision scoring (SemIf-style) still works through the proxy for any backend
+# that returns logprobs: max_tokens=1, logprobs=true, top_logprobs=20, read the
+# option odds off the first token. Always set top_logprobs explicitly
+# (litellm#21932).
+
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -54,43 +54,6 @@ spec:
         strategy: Recreate # single RWO models PVC
         annotations:
           reloader.stakater.com/auto: "true"
-        initContainers:
-          # Registry-model bootstrap (the ollama image is minimal, but `ollama
-          # pull` needs no extras). GGUF imports would need a curl download
-          # container alongside this one — none are in play after FunctionGemma
-          # was dropped.
-          model-import:
-            image:
-              repository: docker.io/ollama/ollama
-              tag: 0.34.4@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
-            command:
-              - /bin/sh
-              - -ec
-              - |
-                export OLLAMA_MODELS=/models OLLAMA_HOST=127.0.0.1:11434
-                ollama serve &
-                pid=$!
-                trap 'kill $pid 2>/dev/null || true' EXIT
-                until ollama list >/dev/null 2>&1; do sleep 1; done
-                # qwen3:1.7b comes from the ollama registry (`pull` is a no-op
-                # when current).
-                ollama pull qwen3:1.7b
-                # Bake the nothink variant: ollama only honours `think` on its
-                # native API, so force the empty-think generation prompt into
-                # the template. The model's own nothink branch always emits
-                # ' thinking\n\n</think>\n\n' after <|im_start|>assistant.
-                if ! ollama list | awk '{print $1}' | grep -qx 'qwen3-1.7b-nothink:latest'; then
-                  ollama show qwen3:1.7b --modelfile > /tmp/mf
-                  sed 's/if and \$\.IsThinkSet (not \$\.Think) -/if true -/' /tmp/mf > /tmp/mf-nothink
-                  ollama create qwen3-1.7b-nothink -f /tmp/mf-nothink
-                fi
-                ollama list
-            resources:
-              requests:
-                cpu: 100m
-                memory: 256Mi
-              limits:
-                memory: 512Mi
         containers:
           app:
             image:
@@ -156,54 +119,6 @@ spec:
                 memory: 512Mi
               limits:
                 memory: 1Gi
-          ollama:
-            image:
-              repository: docker.io/ollama/ollama
-              tag: 0.34.4@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
-            env:
-              TZ: America/Chicago
-              OLLAMA_MODELS: /models
-              OLLAMA_HOST: 0.0.0.0:11434
-              # Memory discipline for a swap-less node: unload after 10m idle,
-              # never hold two models, no parallel request batching.
-              OLLAMA_KEEP_ALIVE: 10m
-              OLLAMA_MAX_LOADED_MODELS: "1"
-              OLLAMA_NUM_PARALLEL: "1"
-              # Default per-model context (overridable per-request). Bounds
-              # the KV cache; bump only with ARC-capped headroom in mind.
-              OLLAMA_CONTEXT_LENGTH: "8192"
-            probes:
-              liveness:
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /
-                    port: &ollamaPort 11434
-                  periodSeconds: 30
-                  timeoutSeconds: 5
-                  failureThreshold: 5
-              readiness:
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /
-                    port: *ollamaPort
-                  periodSeconds: 10
-                  timeoutSeconds: 5
-                  failureThreshold: 5
-            resources:
-              requests:
-                cpu: 500m
-                # No model load in the 30d window: p95 21Mi, peak 23Mi. The 4Gi
-                # limit is unchanged, so a load still bursts -- raise this again
-                # before loading a model for real.
-                memory: 512Mi
-              limits:
-                # Largest resident local model is qwen3-1.7b (1.4GB) + 8k KV
-                # cache + runtime. 4Gi leaves room for a 4B-class swap later.
-                memory: 4Gi
           # OpenAI-compatible STT/TTS (faster-whisper + piper) so LiteLLM can
           # front audio models too. The wyoming protocol has no OpenAI shim,
           # so this is a SECOND copy of whisper/piper alongside the wyoming-*
@@ -258,9 +173,6 @@ spec:
         ports:
           http:
             port: 4000
-          # Exposed for direct ollama access (debug, future SemIf-side pulls).
-          ollama:
-            port: 11434
           # Direct speaches access (debug, voice/model probing).
           audio:
             port: 8000
@@ -284,10 +196,6 @@ spec:
         forceRename: litellm-models
         advancedMounts:
           litellm:
-            ollama:
-              - path: /models
-            model-import:
-              - path: /models
             speaches:
               # HF cache shares the weights PVC (whisper/piper download on
               # first use — first transcription request will be slow).
@@ -305,13 +213,6 @@ spec:
         data:
           config.yaml: |
             model_list:
-              - model_name: qwen3-1.7b-nothink
-                litellm_params:
-                  # Generic OpenAI-compatible route (not ollama_chat) so
-                  # logprobs/top_logprobs pass through spec-faithfully.
-                  model: openai/qwen3-1.7b-nothink
-                  api_base: http://127.0.0.1:11434/v1
-                  api_key: ollama # required by the openai provider; unused
               # OpenRouter cloud models ride the same proxy/key — one
               # endpoint for local + cloud. Key comes from hermes-secret.
               - model_name: deepseek-v4.1-flash
