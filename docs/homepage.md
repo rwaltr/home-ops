@@ -47,9 +47,59 @@ Annotating in git next to the route is the whole point: a service cannot appear
 on the dashboard without someone deciding it should, and the review happens in
 the same commit as the service.
 
-**Currently annotated:** Jellyfin, Navidrome, FreshRSS, HomeBox, KitchenOwl.
-Everything else is one annotation block away — `services.yaml` is the wrong place
-for a cluster service.
+**Currently annotated:** everything user-facing, grouped by what the thing is
+rather than where it runs — Media (Jellyfin, Navidrome, Seerr), Media Ops (Radarr,
+Sonarr, Prowlarr, Bazarr, SABnzbd, Unmanic, slskd), Smart Home (Home Assistant,
+Zigbee2MQTT, Z-Wave JS UI, ESPHome, go2rtc), Household (HomeBox, KitchenOwl,
+Radicale), Photos (Immich), Reading (FreshRSS), AI (LiteLLM, Hermes), Comms
+(Matrix, Element), Monitoring (Grafana, Prometheus, Alertmanager), Tools
+(degoog).
+
+Three of those are annotated in git but **inert**, because their apps are
+commented out of `apps/default/kustomization.yaml` and so have no HTTPRoute to be
+discovered: `slskd`, `go2rtc`, and `music-assistant` (off since 2026-10-11). They
+appear the moment those `ks.yaml` lines are uncommented. Three others are
+deliberately **not** annotated and should not be: `tesla.waltr.tech` (a static
+`.well-known` key file for Tesla's Fleet verifier), `flux-receiver.waltr.tech`
+(a webhook POST endpoint) and `konflate`. Homepage does not list itself.
+
+### Verifying what was actually discovered
+
+Do not trust the manifest — ask Homepage what it resolved, from inside the pod:
+
+```bash
+kubectl exec -n default deploy/homepage -c app -- \
+  wget -qO- http://localhost:3000/api/services | jq -r '.[] | "\(.name): \([.services[].name] | join(", "))"'
+```
+
+It returns **groups**, not services — `.[]` is a group. Two failure modes look
+perfectly fine in git and only show up here:
+
+- **A route something else generates for you.** Grafana's HTTPRoute is created by
+  the Grafana operator, and the CRD embeds the route's _spec_ but not its metadata.
+  The annotations therefore live somewhere else, and putting them beside the spec
+  is rejected outright:
+
+  ```yaml
+  httpRoute:
+    metadata: # NOT spec.annotations — the CRD declares no such field
+      annotations:
+        gethomepage.dev/enabled: "true"
+    spec:
+      hostnames:
+        - grafana.waltr.tech
+  ```
+
+  This surfaces as a server-side dry-run failure on the `grafana-instance`
+  Kustomization — which is a _separate_ Kustomization from `grafana-operator`, so
+  most of o11y keeps reporting Ready while that one is stuck, and the existing
+  Grafana object stays up because a failed apply never prunes.
+
+- **An app that is disabled.** Annotating a route in git accomplishes nothing if
+  the app is commented out of the parent `kustomization.yaml`; there is no
+  HTTPRoute in the cluster to discover. `slskd`, `go2rtc` and `music-assistant`
+  are in exactly this state, so their groups will look thinner than the git diff
+  suggests.
 
 ## The RBAC prerequisite upstream does not mention
 
