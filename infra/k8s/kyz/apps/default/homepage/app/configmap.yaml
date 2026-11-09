@@ -1,8 +1,8 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
-# Every file Homepage looks for in /app/config is listed here, including the
-# three it does not need yet (custom.css, custom.js, docker.yaml) as empty
-# strings. That is not tidiness: Homepage copies a default into place for any
+# Every file Homepage looks for in /app/config is listed here — all nine from
+# upstream's src/skeleton — with the five it does not need yet (custom.css,
+# custom.js, docker.yaml, proxmox.yaml, settings.yaml) as empty strings. That is not tidiness: Homepage copies a default into place for any
 # config file it cannot find, and /app/config is a read-only ConfigMap, so a
 # missing key becomes a failed write at startup. The upstream manifest mounts
 # exactly this set.
@@ -96,7 +96,14 @@ data:
         target: _blank
 
   # --- unused, but must exist (see header) --------------------------------
+  # This set is not a judgement call: it is upstream's src/skeleton listing.
+  # Leaving any one out produced a startup error rather than a missing feature —
+  # Homepage tried to copy that file's default into /app/config and got EROFS,
+  # because a ConfigMap is read-only:
+  #   Failed to initialize required config: /app/config/proxmox.yaml
+  #   Reason: EROFS: read-only file system, copyfile '/app/src/skeleton/proxmox.yaml'
   settings.yaml: ""
   docker.yaml: ""
+  proxmox.yaml: ""
   custom.css: ""
   custom.js: ""

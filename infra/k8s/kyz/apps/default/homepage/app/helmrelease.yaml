@@ -98,10 +98,11 @@ spec:
             securityContext:
               allowPrivilegeEscalation: false
               # Safe because every config file is supplied and logs go to an
-              # emptyDir. Homepage copies a default config file into place for
-              # any it cannot find, so a missing ConfigMap key would turn this
-              # into a crashloop rather than a blank dashboard — see the
-              # ConfigMap header.
+              # emptyDir. Homepage copies a default into place for any config
+              # file it cannot find, and /app/config is a read-only ConfigMap —
+              # so a missing key is a startup error, not a blank dashboard. Every
+              # one of upstream's nine src/skeleton files is therefore both a
+              # ConfigMap key AND a mount below. See the ConfigMap header.
               readOnlyRootFilesystem: true
               capabilities: { drop: ["ALL"] }
             resources:
@@ -161,6 +162,8 @@ spec:
             subPath: settings.yaml
           - path: /app/config/docker.yaml
             subPath: docker.yaml
+          - path: /app/config/proxmox.yaml
+            subPath: proxmox.yaml
           - path: /app/config/custom.css
             subPath: custom.css
           - path: /app/config/custom.js

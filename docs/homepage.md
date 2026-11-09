@@ -164,9 +164,18 @@ least 32 characters whenever Homepage auth is off, which it currently is.
 
 ## Gotchas
 
-- **A missing ConfigMap key is a crashloop, not a blank page.** Homepage copies a
-  default into place for any config file it cannot find, and `/app/config` is
-  read-only. That is why the ConfigMap lists all eight files, three of them empty.
+- **A missing ConfigMap key is a startup error, not a blank page.** Homepage
+  copies a default into place for any config file it cannot find, and
+  `/app/config` is read-only, so the copy fails with
+  `EROFS: read-only file system, copyfile '/app/src/skeleton/<file>'`.
+
+  The file list is not something to reason about — it is upstream's
+  `src/skeleton` directory, and it is **nine** files: `kubernetes.yaml`,
+  `services.yaml`, `widgets.yaml`, `bookmarks.yaml`, `settings.yaml`,
+  `docker.yaml`, `proxmox.yaml`, `custom.css`, `custom.js`. Each one must be
+  both a ConfigMap key _and_ a mount. `proxmox.yaml` is the easy one to miss
+  because nothing here uses Proxmox.
+
 - **Discovered services render above `services.yaml` ones**, with no rigid
   ordering between discovered groups. `weight` is the only lever.
 - **One widget per discovered service.** Multiple widgets are documented as
