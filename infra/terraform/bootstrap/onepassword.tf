@@ -19,3 +19,30 @@ resource "onepassword_item" "tailscale_operator" {
   username = tailscale_oauth_client.operator.id  # OAuth client ID
   password = tailscale_oauth_client.operator.key # OAuth client secret
 }
+
+# external-dns and cert-manager get a token each, so revoking one cannot break
+# the other. Each lands in its own item rather than in the existing `cloudflare`
+# item, which also holds the tunnel token and the account token — adopting that
+# item here would put fields nobody reviewed under Terraform's control.
+#
+# The token sits in the login's password field for the same reason as above, and
+# the ExternalSecrets read `{{ .password }}` once flipped (docs/secrets.md).
+resource "onepassword_item" "cloudflare_external_dns" {
+  vault    = data.onepassword_vault.secrets.uuid
+  title    = "cloudflare-external-dns"
+  category = "login"
+  url      = "https://dash.cloudflare.com/profile/api-tokens"
+
+  username = cloudflare_account_token.external_dns.id # token id, for revoking in the dashboard
+  password = cloudflare_account_token.external_dns.value
+}
+
+resource "onepassword_item" "cloudflare_cert_manager" {
+  vault    = data.onepassword_vault.secrets.uuid
+  title    = "cloudflare-cert-manager"
+  category = "login"
+  url      = "https://dash.cloudflare.com/profile/api-tokens"
+
+  username = cloudflare_account_token.cert_manager.id
+  password = cloudflare_account_token.cert_manager.value
+}

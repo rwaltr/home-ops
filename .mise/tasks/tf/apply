@@ -27,12 +27,14 @@ tailscale)
   export TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET
   ;;
 bootstrap)
-  # The hand-made trust credential, plus the keychain-held service-account token
-  # that is what lets this workspace write to 1Password at all.
+  # The hand-made trust credential, the keychain-held service-account token that
+  # is what lets this workspace write to 1Password at all, and the Cloudflare
+  # account token it mints the cluster's DNS tokens from.
   TAILSCALE_OAUTH_CLIENT_ID=$(fnox get TAILSCALE_OAUTH_CLIENT_ID)
   TAILSCALE_OAUTH_CLIENT_SECRET=$(fnox get TAILSCALE_OAUTH_CLIENT_SECRET)
   OP_SERVICE_ACCOUNT_TOKEN=$(fnox get OP_SERVICE_ACCOUNT_TOKEN)
-  export TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET OP_SERVICE_ACCOUNT_TOKEN
+  CLOUDFLARE_API_TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
+  export TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET OP_SERVICE_ACCOUNT_TOKEN CLOUDFLARE_API_TOKEN
   ;;
 tf-cloud) ;;
 esac

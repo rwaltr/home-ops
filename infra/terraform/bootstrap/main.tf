@@ -33,6 +33,13 @@ terraform {
       source  = "1password/onepassword"
       version = "3.4.1"
     }
+    # Cloudflare, to mint the DNS tokens the cluster uses instead of pasting
+    # never-expiring user tokens from the dashboard. Same version as the
+    # cloudflare workspace so the two agree about the provider's shape.
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "5.28.1"
+    }
   }
 }
 
@@ -40,9 +47,13 @@ terraform {
 #   TAILSCALE_OAUTH_CLIENT_ID / _SECRET  the hand-made trust credential above
 #   OP_SERVICE_ACCOUNT_TOKEN             from the OS keychain (fnox's keychain
 #     provider), so writing to 1Password needs no 1Password item to exist first
+#   CLOUDFLARE_API_TOKEN                 the account-scoped `home-ops-terraform`
+#     token, which needs Account API Tokens Write to mint the ones below
 provider "tailscale" {}
 
 provider "onepassword" {}
+
+provider "cloudflare" {}
 
 variable "onepassword_vault" {
   description = "1Password vault holding this cluster's secrets. Same vault fnox's `op` provider reads."

@@ -83,6 +83,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/jellyfin-metadata.md`, `docs/jellyfin-direct-play.md`, `docs/jellyfin-language-filtering.md`
 - `docs/local-llm.md` — LiteLLM gateway: OpenRouter chat + speaches audio (no local LLM)
 - `docs/tailscale.md` — Tailnet: Terraform-owned policy/DNS/settings, the Kubernetes operator credential, and the manual bootstrap step
+- `docs/secrets.md` — 1Password → External Secrets: who writes what, `mise run secrets:verify`, and the staged Cloudflare DNS token switch
 - `docs/logging.md` — decommissioned 2026-11-07 (VictoriaLogs + Fluent Bit removed)
 - `docs/alerting.md` — Alertmanager routing + the agent alert feed
 - `docs/mosquitto.md` — MQTT broker + HA discovery
