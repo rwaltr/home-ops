@@ -94,8 +94,18 @@ Two non-obvious requirements, both commented inline:
 - **`automountServiceAccountToken: true`.** Every other app here sets `false`.
   `mode: cluster` reads that token; without it Homepage cannot list anything.
 - **The pod IP must be in `HOMEPAGE_ALLOWED_HOSTS`.** The kubelet probe reaches
-  `:3000` by pod IP and the Host check runs on every request, so the env value is
-  `"$(MY_POD_IP):3000,homepage.waltr.tech"`.
+  `:3000` by pod IP and the Host check runs on every request, so the value is
+  `"$(MY_POD_IP):3000,homepage.waltr.tech"`. That `$(...)` reference needs
+  `dependsOn: MY_POD_IP` on the same env entry, and the reason is not obvious:
+  app-template renders an env **map** in alphabetical order, so
+  `HOMEPAGE_ALLOWED_HOSTS` (H) renders before `MY_POD_IP` (M), the reference never
+  expands, and the probe fails host validation with a 400 while the site itself
+  works perfectly in a browser. `dependsOn` triggers the chart's Kahn sort.
+
+  The symptom is worth memorising, because it is easy to misread as a routing
+  fault: `Startup probe failed: HTTP probe failed with statuscode: 400` in the
+  events, `Host validation failed for: 10.244.x.x:3000` in the logs, and
+  `curl https://homepage.waltr.tech` returning a healthy 200 the whole time.
 
 ## Adding things that are not in the cluster
 

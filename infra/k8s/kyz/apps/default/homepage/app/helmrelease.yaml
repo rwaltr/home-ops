@@ -51,16 +51,23 @@ spec:
               tag: v2.7.0@sha256:19c5c09184458a41b7b5915e71463a39f36cd33540f41bdbed008791b8182d5f
             env:
               TZ: America/Chicago
-              # Upstream requires the pod's own IP in this list, because the
-              # kubelet probe reaches :3000 by pod IP and the Host check runs on
-              # every request. The docs are explicit that the value before the
-              # comma is what makes the probe work; the second entry is the
-              # browser's.
               MY_POD_IP:
                 valueFrom:
                   fieldRef:
                     fieldPath: status.podIP
-              HOMEPAGE_ALLOWED_HOSTS: "$(MY_POD_IP):3000,homepage.waltr.tech"
+              # The pod's own IP has to be in this list because the kubelet probe
+              # reaches :3000 by pod IP and the Host check runs on every request;
+              # the second entry is the browser's.
+              #
+              # `dependsOn` is load-bearing, not decoration. app-template renders
+              # an env *map* in alphabetical order (Helm sorts dict keys), so
+              # without it HOMEPAGE_ALLOWED_HOSTS renders BEFORE MY_POD_IP,
+              # $(MY_POD_IP) never expands, the value stays literal, and the
+              # probe fails host validation with a 400 — the pod then never goes
+              # Ready. dependsOn invokes the chart's Kahn sort to force the order.
+              HOMEPAGE_ALLOWED_HOSTS:
+                dependsOn: MY_POD_IP
+                value: "$(MY_POD_IP):3000,homepage.waltr.tech"
               # Default writes to stdout AND a file. File is pointless here and
               # is why there is an emptyDir at /app/config/logs — kubectl logs
               # is where a homelab reads them.
