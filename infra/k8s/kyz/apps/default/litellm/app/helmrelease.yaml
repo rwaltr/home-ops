@@ -197,9 +197,12 @@ spec:
         advancedMounts:
           litellm:
             speaches:
-              # HF cache shares the weights PVC (whisper/piper download on
-              # first use — first transcription request will be slow).
-              - path: /home/ubuntu/.cache/huggingface
+              # Mount the PVC AT the hub cache path, not one level above it.
+              # Mounting over ~/.cache/huggingface hides the image's
+              # pre-created `hub/` dir, so huggingface_hub.scan_cache_dir()
+              # raises CacheNotFound and every /v1/models, STT and TTS request
+              # in this container 500s (found 2026-11-09 via litellm's piper).
+              - path: /home/ubuntu/.cache/huggingface/hub
       config:
         type: configMap
         name: litellm-config
