@@ -100,6 +100,10 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 
 - **Adding a new service**: add to the Flux GitOps layout under `infra/k8s/kyz/apps/`.
   See the service docs under `docs/`.
+- **Checking the cluster's secrets exist**: `mise run secrets:verify` walks every
+  ExternalSecret and checks each 1Password item/field it references (labels only,
+  never values). It reads the manifests, so it cannot drift from them. It does not
+  own or create the items — see `infra/terraform/bootstrap/`.
 - **Adding a new Flatcar host**: see the `flatcar-vm` skill.
 - **Adding cloud resources**: add a Terraform workspace/`.tf` under `infra/terraform/`,
   then `mise run tf:plan <workspace>` before `tf:apply`.
