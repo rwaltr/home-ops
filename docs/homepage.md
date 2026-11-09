@@ -162,6 +162,46 @@ service credential** and, with writes enabled, control of `custom.js`, which run
 in every browser that loads the dashboard. It requires `HOMEPAGE_MCP_TOKEN` of at
 least 32 characters whenever Homepage auth is off, which it currently is.
 
+## The top strip comes from Prometheus, not from Kubernetes
+
+Homepage's built-in `kubernetes` and `resources` info widgets read the
+`metrics.k8s.io` API. **This cluster has no metrics-server** — the only metrics
+workload is `kube-state-metrics`, which feeds Prometheus, not that API — so those
+widgets rendered `API Error` on every refresh: three failing blocks, ~14 log
+lines per 45 seconds, while `kubectl top nodes` failed for the same reason.
+
+Rather than add a metrics-server for a dashboard ornament, the strip queries the
+Prometheus that is already here (the same source Grafana reads):
+
+```yaml
+- customapi:
+    url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+    method: POST
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    requestBody: 'query=1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))'
+    mappings:
+      - field: data.result.0.value.1
+        label: used
+        format: percent
+```
+
+Three details make this work, and all three are easy to get wrong:
+
+- **POST with a form body.** PromQL in a GET query string has to be
+  percent-encoded and stops being reviewable in git. The generic proxy sends a
+  _string_ `requestBody` verbatim — but an **object** `requestBody` is
+  `JSON.stringify`'d, which Prometheus rejects. It has to be a string.
+- **`data.result.0.value.1`.** shvl splits on `[.[\]]+`, so numeric path segments
+  index the Prometheus response's arrays. That is the only reason a vector
+  response is readable at all.
+- **`format: percent` multiplies by 100** (Intl percent style), so the queries
+  return a 0–1 ratio and must _not_ include `* 100`. Adding it renders 1080%.
+
+Adding another number is one more `customapi` entry with a new `requestBody`; to
+add per-pod memory you would query cadvisor metrics, which kube-prometheus-stack
+already scrapes from the kubelet.
+
 ## Gotchas
 
 - **A missing ConfigMap key is a startup error, not a blank page.** Homepage

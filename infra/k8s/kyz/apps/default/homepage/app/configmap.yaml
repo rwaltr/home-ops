@@ -70,27 +70,52 @@ data:
               href: https://my.1password.com/
 
   # --- top strip ---------------------------------------------------------
-  # Straight from the upstream install docs: cluster aggregate, then a
-  # per-pod resource breakdown, then the search bar.
+  # Cluster stats come from PROMETHEUS, not from the built-in `kubernetes` and
+  # `resources` widgets. Those read the metrics.k8s.io API, this cluster has no
+  # metrics-server, and so they rendered "API Error" on every refresh — three
+  # failing blocks, ~14 log lines per 45s. Prometheus and node-exporter are
+  # already here, so the numbers come from the same source Grafana uses.
+  #
+  # POST with a form body rather than a GET query string: PromQL in a URL has to
+  # be percent-encoded and stops being reviewable in git. The generic proxy
+  # sends a *string* requestBody through verbatim, so the query stays legible.
+  # (An object requestBody would be JSON.stringify'd, which Prometheus rejects.)
+  #
+  # `format: percent` is Intl percent style, i.e. it multiplies by 100 — so the
+  # queries return a 0-1 RATIO and deliberately do not include `* 100`.
   widgets.yaml: |
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-          label: "cluster"
-        nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-    - resources:
-        backend: resources
-        expanded: true
-        cpu: true
-        memory: true
-        network: default
+    - customapi:
+        label: Cluster CPU
+        icon: mdi-cpu-64-bit
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # PromQL: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
+        requestBody: 'query=1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))'
+        mappings:
+          - field: data.result.0.value.1
+            label: used
+            format: percent
+
+    - customapi:
+        label: Cluster RAM
+        icon: mdi-memory
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # PromQL: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+        requestBody: 'query=1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes'
+        mappings:
+          - field: data.result.0.value.1
+            label: used
+            format: percent
+
     - search:
         provider: duckduckgo
         target: _blank
