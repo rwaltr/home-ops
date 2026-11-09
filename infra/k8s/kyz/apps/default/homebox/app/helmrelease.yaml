@@ -136,6 +136,13 @@ spec:
         annotations:
           gatus.home-operations.com/endpoint: |-
             conditions: ["[STATUS] == 200"]
+          # Discovered by Homepage: it lists HTTPRoutes carrying this annotation
+          # and derives href from the hostname below — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: HomeBox
+          gethomepage.dev/description: Home inventory
+          gethomepage.dev/group: Household
+          gethomepage.dev/icon: homebox.png
         hostnames:
           - homebox.waltr.tech
         parentRefs:

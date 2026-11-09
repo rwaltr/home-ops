@@ -1,0 +1,102 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+# Every file Homepage looks for in /app/config is listed here, including the
+# three it does not need yet (custom.css, custom.js, docker.yaml) as empty
+# strings. That is not tidiness: Homepage copies a default into place for any
+# config file it cannot find, and /app/config is a read-only ConfigMap, so a
+# missing key becomes a failed write at startup. The upstream manifest mounts
+# exactly this set.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+data:
+  # --- cluster discovery -------------------------------------------------
+  # The discovery connection itself. `cluster` means "use the mounted service
+  # account token", which is why the HelmRelease sets
+  # automountServiceAccountToken: true (the repo default elsewhere is false).
+  kubernetes.yaml: |
+    mode: cluster
+    # Everything in this cluster publishes an HTTPRoute, so the default ingress
+    # watcher has nothing to read. Gateway API is the sole discovery source.
+    ingress: false
+    gateway: true
+
+  # --- static entries ----------------------------------------------------
+  # Filled in for the things that are NOT in the cluster. Anything that is in
+  # the cluster arrives by annotation on its HTTPRoute instead — see
+  # docs/homepage.md. Discovered entries render above these.
+  services.yaml: |
+    - External:
+        - Cloudflare:
+            icon: cloudflare.png
+            href: https://dash.cloudflare.com/
+            description: DNS, tunnel, Zero Trust
+
+        - Terraform Cloud:
+            icon: terraform.png
+            href: https://app.terraform.io/
+            description: Remote state + workspaces
+
+        - GitHub:
+            icon: github.png
+            href: https://github.com/rwaltr
+            description: rwaltr
+
+    - Network:
+        # The MikroTik router, the one piece of this estate that is definitively
+        # not in the cluster. Uncomment and set the real address. Note that
+        # siteMonitor makes an unauthenticated HEAD/GET, so it reports the login
+        # page's status, not the router's health.
+        # - RouterOS:
+        #     icon: mikrotik.png
+        #     href: http://mikrotik/
+        #     description: Edge router
+        #     siteMonitor: http://mikrotik/
+        #     ping: 10.10.0.1
+        - RouterOS:
+            icon: mikrotik.png
+            href: http://10.10.0.1/
+            description: Edge router (set the real address)
+            ping: 10.10.0.1
+
+  bookmarks.yaml: |
+    - Reference:
+        - Homepage config:
+            - abbr: HC
+              href: https://gethomepage.dev/configs/services/
+        - 1Password:
+            - abbr: 1P
+              href: https://my.1password.com/
+
+  # --- top strip ---------------------------------------------------------
+  # Straight from the upstream install docs: cluster aggregate, then a
+  # per-pod resource breakdown, then the search bar.
+  widgets.yaml: |
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: "cluster"
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+    - resources:
+        backend: resources
+        expanded: true
+        cpu: true
+        memory: true
+        network: default
+    - search:
+        provider: duckduckgo
+        target: _blank
+
+  # --- unused, but must exist (see header) --------------------------------
+  settings.yaml: ""
+  docker.yaml: ""
+  custom.css: ""
+  custom.js: ""

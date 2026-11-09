@@ -119,6 +119,13 @@ spec:
         annotations:
           gatus.home-operations.com/endpoint: |-
             conditions: ["[STATUS] == 200"]
+          # Discovered by Homepage: it lists HTTPRoutes carrying this annotation
+          # and derives href from the hostname below — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: FreshRSS
+          gethomepage.dev/description: Feed reader
+          gethomepage.dev/group: Reading
+          gethomepage.dev/icon: freshrss.png
         hostnames:
           - feeds.waltr.tech
         parentRefs:
