@@ -37,5 +37,7 @@ resources:
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
   - ./navidrome/ks.yaml
+  - ./homebox/ks.yaml
+  - ./kitchenowl/ks.yaml
   # Matrix comms-channel demo for the self-hosted agent (internal-only; see docs/comms-demos.md)
   - ./matrix/ks.yaml
