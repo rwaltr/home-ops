@@ -1,5 +1,12 @@
 # Comms-channel demo: Matrix
 
+> **Retired 2026-11-09.** The `matrix` Kustomization is commented out of
+> `apps/default/kustomization.yaml`, which pruned `tuwunel`, `element-web` and the
+> 5Gi `tuwunel-data` PVC. Nothing is served at either hostname any more and the
+> hand-made accounts are gone. The manifests are still in git, so re-enabling is
+> one uncomment plus a fresh PVC and first-run accounts — but treat the notes
+> below as a record of what was tried, not as a live runbook.
+
 A self-hosted communication stack stood up **internal-only** on 2026-11-01 to
 evaluate it as a channel for the self-hosted agent (Hermes / whatever
 pi-durable-based agent replaces it). It is demo-grade: single namespace, no
@@ -8,7 +15,7 @@ than declared in git.
 
 |                | Matrix                                    |
 | -------------- | ----------------------------------------- |
-| Web UI         | <https://element.waltr.tech> (deployed)   |
+| Web UI         | <https://element.waltr.tech> (retired)    |
 | API host       | <https://matrix.waltr.tech>               |
 | Server         | Tuwunel v1.9.4 (Rust)                     |
 | Storage        | `tuwunel-data` (5Gi, RocksDB)             |
