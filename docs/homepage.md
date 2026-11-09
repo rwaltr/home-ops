@@ -242,6 +242,12 @@ Three details make this work, and all three are easy to get wrong:
   percent-encoded and stops being reviewable in git. The generic proxy sends a
   _string_ `requestBody` verbatim — but an **object** `requestBody` is
   `JSON.stringify`'d, which Prometheus rejects. It has to be a string.
+- **A `+` in the query must be written `%2B`.** The body is form-encoded, so a
+  bare `+` decodes to a space and Prometheus rejects the mangled query with
+  `parse error: unexpected identifier "rate" in aggregation`. Homepage reports
+  that as a bare `400`/`"HTTP Error"` and logs nothing useful, so it presents as
+  a widget that silently 400s. Any PromQL containing `+`, `%` or `&` needs
+  encoding; the queries shown here keep the natural form in a comment next to it.
 - **`data.result.0.value.1`.** shvl splits on `[.[\]]+`, so numeric path segments
   index the Prometheus response's arrays. That is the only reason a vector
   response is readable at all.

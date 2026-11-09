@@ -131,8 +131,14 @@ data:
         headers:
           Content-Type: application/x-www-form-urlencoded
         refreshInterval: 30000
+        # The + is %2B deliberately. This body is form-encoded, so a bare + means
+        # a SPACE: Prometheus receives "...[5m])   rate(..." and rejects it with
+        # `parse error: unexpected identifier "rate" in aggregation`. Homepage
+        # turns that into a bare 400 "HTTP Error" and logs nothing useful — which
+        # is why the CPU and RAM queries, having no +, were fine and this failed.
+        # Same trap for any PromQL containing +, % or &.
         # PromQL: sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))
-        requestBody: 'query=sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))'
+        requestBody: 'query=sum(rate(node_disk_reads_completed_total[5m]) %2B rate(node_disk_writes_completed_total[5m]))'
         mappings:
           - field: data.result.0.value.1
             label: iops
