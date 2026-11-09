@@ -1,0 +1,43 @@
+// The tailnet policy file, managed by Terraform (infra/terraform/tailscale).
+//
+// HuJSON, so these comments survive the round trip through the API.
+//
+// The admin console's policy editor is switched off for this tailnet by
+// tailscale_tailnet_settings.acls_externally_managed_on, so an edit made in the
+// console cannot silently diverge from git.
+//
+// This file must reproduce the tailnet's *effective* access, not some idealised
+// version of it: the tailscale_acl resource refuses to touch an existing policy
+// file without an explicit import (see acl.tf), and that guard exists because
+// applying a policy that omits existing rules is a silent lockout.
+{
+  "tagOwners": {
+    // The Kubernetes operator's identity, plus the tag it hands to the proxy
+    // devices it creates. tag:k8s-operator MUST own tag:k8s, otherwise the
+    // operator cannot create those devices — and it fails at device creation
+    // rather than at install, so the install looks healthy until the first
+    // service you expose.
+    "tag:k8s-operator": ["autogroup:admin"],
+    "tag:k8s": ["tag:k8s-operator"]
+  },
+
+  // Grants rather than the legacy `acls` syntax: Tailscale's syntax reference
+  // recommends grants for new policy files and states that acls will not receive
+  // new features. This reproduces the tailnet's existing default (members reach
+  // everything), so it is not a change in behaviour.
+  "grants": [
+    {
+      "src": ["autogroup:member"],
+      "dst": ["*"],
+      "ip": ["*"]
+    }
+  ],
+
+  // Lets the operator approve its own tailnet services, so exposing a service
+  // does not need a manual approval per route.
+  "autoApprovers": {
+    "services": {
+      "tag:k8s": ["tag:k8s"]
+    }
+  }
+}

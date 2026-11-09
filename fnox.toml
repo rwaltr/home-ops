@@ -11,6 +11,19 @@ provider = "op"
 value = "cloudflare/CLOUDFLARE_ACCOUNT_TOKEN"
 description = "Scoped Cloudflare API token for Terraform"
 
+# The trust credential the tailscale and bootstrap workspaces log in with. Made
+# by hand once in the Tailscale admin console — Terraform cannot create the
+# credential it authenticates as — then stored in 1Password like everything else.
+[secrets.TAILSCALE_OAUTH_CLIENT_ID]
+provider = "op"
+value = "tailscale-bootstrap/client_id"
+description = "Tailscale OAuth client ID for Terraform"
+
+[secrets.TAILSCALE_OAUTH_CLIENT_SECRET]
+provider = "op"
+value = "tailscale-bootstrap/client_secret"
+description = "Tailscale OAuth client secret for Terraform"
+
 [secrets.PORKBUN_API_KEY]
 provider = "op"
 value = "porkbun/apikey"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="Run Terraform plan for a workspace"
 #USAGE arg "<dir>" help="Terraform workspace" {
-#USAGE   choices "cloudflare" "tf-cloud"
+#USAGE   choices "bootstrap" "cloudflare" "tailscale" "tf-cloud"
 #USAGE }
 #USAGE arg "[tf-args]" varargs help="Extra args passed to terraform (e.g. -target=x)"
 
@@ -10,10 +10,31 @@ set -euo pipefail
 # Export only the credentials terraform needs rather than `fnox exec`-ing the
 # whole environment: provider plugins are third-party binaries and can read every
 # variable they are handed. `fnox get` fails (and set -e aborts) if unavailable.
-CLOUDFLARE_API_TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
-PORKBUN_API_KEY=$(fnox get PORKBUN_API_KEY)
-PORKBUN_SECRET_KEY=$(fnox get PORKBUN_SECRET_KEY)
-export CLOUDFLARE_API_TOKEN PORKBUN_API_KEY PORKBUN_SECRET_KEY
+#
+# Per workspace, so a run is never handed another workspace's secrets. tf-cloud
+# authenticates through ~/.terraform.d/credentials.tfrc.json and needs none.
+case "${usage_dir?}" in
+cloudflare)
+  CLOUDFLARE_API_TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
+  PORKBUN_API_KEY=$(fnox get PORKBUN_API_KEY)
+  PORKBUN_SECRET_KEY=$(fnox get PORKBUN_SECRET_KEY)
+  export CLOUDFLARE_API_TOKEN PORKBUN_API_KEY PORKBUN_SECRET_KEY
+  ;;
+tailscale)
+  TAILSCALE_OAUTH_CLIENT_ID=$(fnox get TAILSCALE_OAUTH_CLIENT_ID)
+  TAILSCALE_OAUTH_CLIENT_SECRET=$(fnox get TAILSCALE_OAUTH_CLIENT_SECRET)
+  export TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET
+  ;;
+bootstrap)
+  # The hand-made trust credential, plus the keychain-held service-account token
+  # that is what lets this workspace write to 1Password at all.
+  TAILSCALE_OAUTH_CLIENT_ID=$(fnox get TAILSCALE_OAUTH_CLIENT_ID)
+  TAILSCALE_OAUTH_CLIENT_SECRET=$(fnox get TAILSCALE_OAUTH_CLIENT_SECRET)
+  OP_SERVICE_ACCOUNT_TOKEN=$(fnox get OP_SERVICE_ACCOUNT_TOKEN)
+  export TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET OP_SERVICE_ACCOUNT_TOKEN
+  ;;
+tf-cloud) ;;
+esac
 
 # shellcheck disable=SC2086
 terraform -chdir="${MISE_PROJECT_ROOT}/infra/terraform/${usage_dir?}" plan ${usage_tf_args:-}

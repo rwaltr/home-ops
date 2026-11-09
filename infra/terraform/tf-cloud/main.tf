@@ -25,3 +25,18 @@ resource "tfe_workspace" "cloudflare" {
   organization   = data.tfe_organization.rwaltr.name
   execution_mode = "local"
 }
+
+# The tailnet, and the project that turns cloud credentials into 1Password items.
+# Both run locally too: credentials come from fnox, state stays in Terraform
+# Cloud.
+resource "tfe_workspace" "tailscale" {
+  name           = "tailscale-provisioner"
+  organization   = data.tfe_organization.rwaltr.name
+  execution_mode = "local"
+}
+
+resource "tfe_workspace" "bootstrap" {
+  name           = "bootstrap-provisioner"
+  organization   = data.tfe_organization.rwaltr.name
+  execution_mode = "local"
+}
