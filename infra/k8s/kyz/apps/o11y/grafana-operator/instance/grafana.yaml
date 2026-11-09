@@ -61,7 +61,10 @@ spec:
               persistentVolumeClaim:
                 claimName: grafana-pvc
   httpRoute:
-    spec:
+    # Annotations go on the generated HTTPRoute's METADATA, not in its spec —
+    # the CRD has no `spec.httpRoute.spec.annotations` and the apply is rejected
+    # outright if you put them there.
+    metadata:
       annotations:
         # Listed on the Homepage dashboard — see docs/homepage.md.
         gethomepage.dev/enabled: "true"
@@ -69,6 +72,7 @@ spec:
         gethomepage.dev/description: Dashboards
         gethomepage.dev/group: Monitoring
         gethomepage.dev/icon: grafana.png
+    spec:
       hostnames:
         - grafana.waltr.tech
       parentRefs:
