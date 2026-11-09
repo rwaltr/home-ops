@@ -16,6 +16,7 @@ resources:
   - ./otbr/ks.yaml
   # - ./go2rtc/ks.yaml
   - ./tesla-key/ks.yaml
+  - ./parakeet/ks.yaml
   - ./wyoming-piper/ks.yaml
   - ./wyoming-whisper/ks.yaml
   - ./wyoming-openwakeword/ks.yaml
