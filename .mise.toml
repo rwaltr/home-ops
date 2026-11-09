@@ -44,6 +44,7 @@ typos = "latest"
 # Security & IaC analysis — hk.pkl `slow` steps and CI
 tflint = "latest"
 trivy = "latest"
+gitleaks = "latest"
 
 # Dev loop: `mise watch` runs tasks under watchexec, `mise daemons` under pitchfork
 watchexec = "latest"

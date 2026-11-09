@@ -16,6 +16,13 @@ local fast = new Mapping<String, Step> {
     ["check-added-large-files"] = Builtins.check_added_large_files
     ["check-merge-conflict"] = Builtins.check_merge_conflict
     ["detect-private-key"] = Builtins.detect_private_key
+    // Secret scanning on the index: catches a secret in the commit you are
+    // about to make. Scans via git, not the filesystem, so untracked local
+    // junk (.vm/ kubeconfigs and console logs) is never in scope — a `dir`
+    // scan flags those on every machine that has a test VM built.
+    ["gitleaks-staged"] {
+        check = "gitleaks git --staged --redact --no-banner -c .github/linters/gitleaks.toml"
+    }
     ["fix-smartquotes"] = Builtins.fix_smart_quotes
     ["oxfmt"] {
         glob = List("**/*.yaml", "**/*.yml", "**/*.json", "**/*.md", "**/*.markdown")
@@ -61,6 +68,12 @@ local slow = new Mapping<String, Step> {
     // trivy scans IaC trees, so it always runs repo-wide.
     ["trivy"] {
         check = "trivy config --quiet --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .vm --ignorefile .github/linters/trivyignore.yaml ."
+    }
+    // Full git history (~3k commits, <1s), which the staged scan cannot see:
+    // secrets committed before this hook existed are still live secrets.
+    // Findings predate the hook by design — review them, don't expect a pass.
+    ["gitleaks"] {
+        check = "gitleaks git --redact --no-banner -c .github/linters/gitleaks.toml"
     }
 }
 
