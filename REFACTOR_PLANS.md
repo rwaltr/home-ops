@@ -626,6 +626,23 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 
 ## Session log
 
+### 2026-11-09 — litellm proxy memory ceiling raised from its measured peak
+
+- **litellm's `app` container OOMKilled under concurrent chat load** (2026-11-09
+  03:02 UTC), restarting twice in 32h. `container_memory_working_set_bytes` over
+  30d read p95 **507Mi** and peak **511Mi** against a **512Mi** limit — the
+  ceiling sat ~1MiB above the observed peak, so a request burst tripped it. This
+  is the same shape as the reloader page (#974/#975): a limit authored as a
+  round number, never re-measured against the workload's own demand.
+- **Fix**: request 256Mi -> **512Mi** (the p95), limit 512Mi -> **1Gi** (2x the
+  peak). `docs/local-llm.md` carries the numbers; the manifest comment records
+  them where the next digest bump will read them.
+- **The 512Mi cap already had a history**: the 2026-10-12 `main-stable` digest
+  (`c169fb3`) OOMKilled at startup against it; the pinned `625981c` survived
+  start-up but not steady-state load. A future digest bump must re-measure, not
+  assume the old headroom.
+- Routine alert review; one pushover send in the window, within the 3/day target.
+
 ### 2026-09-11 — Tesla key host, Matter VLAN presence, VIP firewall fix, Frigate
 
 - **Tesla Fleet integration live**: keypair (EC P-256) in 1P `tesla-fleet` +

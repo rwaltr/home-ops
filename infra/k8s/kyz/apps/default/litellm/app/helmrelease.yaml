@@ -149,9 +149,13 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 256Mi
-              limits:
+                # 30d p95 507Mi, peak 511Mi -- the old 512Mi limit sat within
+                # ~1MiB of the peak, so a concurrent-request burst OOMKilled the
+                # container (2026-11-09) and paged. Request from the p95, limit
+                # at 2x the peak.
                 memory: 512Mi
+              limits:
+                memory: 1Gi
           ollama:
             image:
               repository: docker.io/ollama/ollama

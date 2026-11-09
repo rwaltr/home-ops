@@ -95,13 +95,15 @@ The node has **no disk swap**, only 4Gi zram, so:
 - `OLLAMA_KEEP_ALIVE=10m`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`
   — one model resident, unloaded when idle.
 - `OLLAMA_CONTEXT_LENGTH=8192` bounds the KV cache. Overridable per request.
-- ollama is capped at 4Gi, speaches 2Gi, litellm 512Mi. Largest local model is
+- ollama is capped at 4Gi, speaches 2Gi, litellm 1Gi. Largest local model is
   1.4GB; 4Gi leaves room for a 4B-class swap.
-- **The litellm cap is tight and a newer `main-stable` digest exceeded it.** The
-  2026-10-12 digest (`c169fb3`) OOMKills the `app` container at startup against
-  512Mi, before it emits any log output; the digest pinned here (`625981c`) runs
-  clean at the same cap. Re-bumping requires raising the cap first — a digest
-  bump alone will crashloop.
+- **The litellm cap was 512Mi and the proxy outgrew it.** The 2026-10-12 digest
+  (`c169fb3`) OOMKilled the `app` container at startup against 512Mi before it
+  emitted any log output; the digest pinned here (`625981c`) ran clean at that
+  cap at first, then OOMKilled under concurrent chat load on 2026-11-09 with a
+  30d `container_memory_working_set_bytes` p95 of 507Mi and peak of 511Mi —
+  ~1MiB under the limit. Raised to 1Gi (request 512Mi) the same day. Any future
+  digest bump still needs the headroom re-checked, not assumed.
 - Model weights are re-downloadable artifacts and are deliberately **not**
   kopia-backed.
 
