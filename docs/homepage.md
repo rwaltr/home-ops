@@ -248,9 +248,22 @@ Three details make this work, and all three are easy to get wrong:
 - **`format: percent` multiplies by 100** (Intl percent style), so the queries
   return a 0–1 ratio and must _not_ include `* 100`. Adding it renders 1080%.
 
-Adding another number is one more `customapi` entry with a new `requestBody`; to
-add per-pod memory you would query cadvisor metrics, which kube-prometheus-stack
-already scrapes from the kubelet.
+A third widget does the same for disk IOPS:
+
+```promql
+sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))
+```
+
+It sums every block device, to match the cluster-wide CPU and RAM above, and uses
+`format: number` because IOPS is a count rather than a ratio. Knowing the split
+matters before reading anything into the number: the Kingston NVMe behind
+`openebs-hostpath` does ~150 IOPS where the entire 6-disk `tank` pool does ~24, so
+"cluster" IOPS is mostly an NVMe number. For the pool alone, filter the devices:
+`{device=~"sd[a-f]"}`.
+
+Adding a fourth is one more `customapi` entry with a new `requestBody`; per-pod
+memory would mean querying cadvisor metrics, which kube-prometheus-stack already
+scrapes from the kubelet.
 
 ### The same missing API also breaks per-service stats
 

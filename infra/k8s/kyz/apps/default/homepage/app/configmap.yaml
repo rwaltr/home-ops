@@ -116,6 +116,28 @@ data:
             label: used
             format: percent
 
+    # Total disk IOPS on the host. Summed across every block device, which is
+    # what "cluster" means for the CPU and RAM widgets above; dm-* is left in
+    # because it currently contributes ~0 and excluding it made the number no
+    # easier to reason about. The split is worth knowing: the Kingston NVMe
+    # (openebs-hostpath) does ~150 IOPS where the whole 6-disk tank pool does
+    # ~24, so this number is really an NVMe number wearing a cluster costume.
+    - customapi:
+        label: Cluster IOPS
+        icon: mdi-harddisk
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # PromQL: sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))
+        requestBody: 'query=sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))'
+        mappings:
+          - field: data.result.0.value.1
+            label: iops
+            format: number
+
     - search:
         provider: duckduckgo
         target: _blank
