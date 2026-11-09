@@ -37,10 +37,5 @@ resources:
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
   - ./navidrome/ks.yaml
-  # Comms-channel demos for the self-hosted agent (internal-only; see docs/comms-demos.md)
+  # Matrix comms-channel demo for the self-hosted agent (internal-only; see docs/comms-demos.md)
   - ./matrix/ks.yaml
-  # Beeper-style bridges for the Matrix demo (Signal, Discord, Google Messages).
-  # Manifests only: not reconciled, and each needs two secrets before it works.
-  # - ./matrix-bridges/ks.yaml
-  # Cinny — alternative Matrix web client. Manifests only, not reconciled.
-  # - ./cinny/ks.yaml

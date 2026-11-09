@@ -89,7 +89,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/freshrss.md` — FreshRSS
 - `docs/navidrome.md` — Navidrome (Subsonic/OpenSubsonic)
 - `docs/hermes-agent.md` — Hermes agent
-- `docs/comms-demos.md` — Matrix comms-channel demo (bridges + Cinny not wired in)
+- `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)
 - TODOs: `git grep "TODO:"`
 
 ## 🔍 Common Tasks
