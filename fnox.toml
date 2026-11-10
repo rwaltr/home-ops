@@ -48,3 +48,11 @@ description = "Sonarr API key (mcp-arr-server)"
 provider = "op"
 value = "grafana/GRAFANA_TOKEN"
 description = "Grafana service account token (mcp-grafana)"
+
+# `mise run paperless:seed`. Paperless keeps document types, tags, custom
+# fields and workflows in its database, not Git, so the seed is re-applied
+# through the API rather than depending on remembered clicks.
+[secrets.PAPERLESS_API_TOKEN]
+provider = "op"
+value = "paperless/api_token"
+description = "Paperless-ngx API token (paperless:seed)"
