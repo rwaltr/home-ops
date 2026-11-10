@@ -34,10 +34,11 @@ needs the API you need it for. So this exists by hand, once:
      `POST /tailnet/:tailnet/acl`), **DNS** (`tailscale_dns_preferences`),
      **Networking Settings** (the HTTPS-certificates setting, for `https_enabled`)
      and **OAuth Keys** (where `bootstrap` mints the operator's client);
-   - what that minted client is created _with_: **Devices: Core**, **Keys: Auth
-     Keys** and **General: Services**. A credential cannot grant a scope it does
-     not itself hold, so omitting these fails at apply with
-     `actor cannot set scopes: [auth_keys devices:core services] (403)`.
+   - what that minted client is created _with_: **Devices: Core** (write, which
+     Tailscale only grants to a credential that carries a tag — hence
+     `tag:k8s-operator`) and **Keys: Auth Keys**. A credential cannot grant a
+     scope it does not itself hold, so omitting either fails at apply with
+     `actor cannot set scopes: [devices:core …]` naming it.
 
    Keep the tag `tag:k8s-operator`: the operator's own client has to be created
    _carrying_ it, and Tailscale tags limit what a credential may assign. If the tag
@@ -99,13 +100,26 @@ The tailnet policy file is also readable as a whole:
 terraform -chdir=infra/terraform/tailscale plan   # must not want to change policy
 ```
 
+## The operator
+
+`apps/network/tailscale-operator/` deploys the upstream chart from a
+HelmRepository — app-template cannot express the cluster-scoped CRDs it ships
+(`Connector`, `ProxyClass`, `ProxyGroup`, `Recorder`, `Tailnet`, `DNSConfig`,
+`PeerRelay`) or their RBAC — into the `network` namespace rather than the
+`tailscale` namespace its docs use.
+
+Its OAuth credential is the `tailscale-operator` item written by `bootstrap`. The
+chart mounts a Secret named `<fullname>-oauth` and reads `client_id` and
+`client_secret` out of it as files, so the ExternalSecret's `target.name` and
+those two keys are a contract: rename one and the operator installs, runs, and
+never authenticates. The chart's own `oauth` block is left empty so no client
+secret passes through a HelmRelease.
+
+Credential changes are read once, at startup, so the operator carries
+`reloader.stakater.com/auto`.
+
 ## Not yet built
 
-- **The Kubernetes operator itself.** It needs a HelmRepository
-  (`https://pkgs.tailscale.com/helmcharts`) plus a HelmRelease in a `tailscale`
-  namespace, consuming the `tailscale-operator` item via ExternalSecret. It
-  creates the `tailscale` IngressClass and the `ProxyClass`/`ProxyGroup`/
-  `Connector`/`DNSConfig`/`Tailnet` CRDs.
 - **Exposing the gateway on the tailnet.** Two shapes, and the choice depends on
   how Envoy Gateway manages its Service: annotate the generated Service so the
   LAN VIP and a tailnet address both work, or create per-app `Ingress` objects

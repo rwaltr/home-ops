@@ -1,0 +1,65 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# The Tailscale Kubernetes operator. Upstream chart rather than app-template: it
+# ships cluster-scoped CRDs (Connector, ProxyClass, ProxyGroup, ProxyGroupPolicy,
+# Recorder, Tailnet, DNSConfig, PeerRelay) plus the RBAC those controllers need,
+# none of which app-template models.
+#
+# Namespace is `network`, with the rest of this plane, rather than the `tailscale`
+# namespace the upstream docs use. Nothing depends on the name.
+#
+# Its OAuth client is the `tailscale-operator` 1Password item, created by
+# infra/terraform/bootstrap/ and mounted via the ExternalSecret beside this file.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tailscale-operator
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: tailscale-operator
+      version: 1.104.4
+      sourceRef:
+        kind: HelmRepository
+        name: tailscale-operator
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    # Pins the name of the Secret the chart mounts: `<fullname>-oauth`, which is
+    # what the ExternalSecret writes. The chart's own `oauth` block stays empty on
+    # purpose, so nothing here carries a client secret.
+    fullnameOverride: tailscale-operator
+    # The chart templates its CRDs instead of using Helm's crds/ directory, which
+    # is the only way they can be upgraded in place later.
+    installCRDs: true
+    operatorConfig:
+      # Read once at startup, so a rotated OAuth secret needs a restart to take
+      # effect. reloader watches the mounted Secret.
+      annotations:
+        reloader.stakater.com/auto: "true"
+      # The tag the operator's own node carries. It must be owned by
+      # autogroup:admin, and must in turn own the proxies' tag, in
+      # infra/terraform/tailscale/policy.hujson.
+      defaultTags:
+        - tag:k8s-operator
+      # No measured profile for this yet: it is a control loop that holds one
+      # device connection, so these are a floor, not a finding. Revisit once
+      # there is a week of data, the way the other apps' numbers were set.
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+    proxyConfig:
+      # Applied to proxies the operator creates (Ingress, Connector, Egress).
+      # tag:k8s-operator owns tag:k8s in the policy file, which is what lets the
+      # operator tag those devices at all.
+      defaultTags: tag:k8s
