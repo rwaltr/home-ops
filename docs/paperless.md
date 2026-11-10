@@ -89,36 +89,70 @@ Off-LAN access is over the tailnet; there is deliberately no `envoy-external`
 parentRef (email and personal documents should not be internet-reachable).
 Adding that parentRef is the whole publish step if it is ever wanted.
 
-## Automatic classification (invoices/receipts)
+## Tags and automatic classification
 
 The archive is **keep-everything, permanent**: no retention field, no expiry,
-no scheduled deletes. And there is deliberately **no `inbox` triage pass** —
-nothing asks "is this important?". Documents are found by full-text search.
+no scheduled deletes. Tags are a **provenance trail** — what happened to a
+document — split across two namespaces:
 
-What _is_ automated is enough structure for the Beancount bridge to find
-financial documents. Paperless stores this config in its **database**, not Git,
-so a wipe loses it. `mise run paperless:seed` re-applies it through the REST API
-(idempotent, by name):
+| Tag                      | Set by                     | Cleared by                  | Meaning                               |
+| ------------------------ | -------------------------- | --------------------------- | ------------------------------------- |
+| `status/inbox`           | Paperless (`is_inbox_tag`) | the classification workflow | transient; visible only if one failed |
+| `status/ai-enriched`     | the AI workflow            | never                       | classified by the LLM, not by a rule  |
+| `accounting/unlinked`    | the Beancount bridge       | the bridge, on a match      | financial, not yet matched            |
+| `accounting/beancounted` | the Beancount bridge       | never                       | matched to a transaction              |
 
-| Object         | Value                                                             |
-| -------------- | ----------------------------------------------------------------- |
-| Document types | `Invoice`, `Receipt`                                              |
-| Tags           | `accounting/inbox` (bridge handoff), `accounting/attached` (done) |
-| Custom fields  | `Invoice Number`, `Total` (monetary), `Date Paid`, `Currency`     |
-| Workflows      | `auto-classify: invoice`, `auto-classify: receipt`                |
+`status/inbox` is stamped on every new document and removed by whichever
+classification workflow handles it, in the same consume. It is deliberately
+transient: a document keeps it only when a workflow failed, so it is an error
+signal, not a to-do list. There is no retry; a stuck document is handled by hand.
 
-Both workflows trigger on **Document Added**, match the OCR text by regex, and
-assign the document type plus the `accounting/inbox` tag — no manual step, no
-inbox. Invoice runs first, receipt second, so a store receipt that also says
-"invoice" lands as `Receipt` (later assignment wins).
+Paperless stores this config in its **database**, not Git, so a wipe loses it.
+`mise run paperless:seed` re-applies it through the REST API (idempotent, by
+name):
+
+- **Document types:** `Invoice`, `Receipt`, `Statement`, `Contract`, `Manual`,
+  `Policy`, `Medical`, `Correspondence`, `Other`
+- **Tags:** `status/inbox`, `status/ai-enriched`, `accounting/unlinked`,
+  `accounting/beancounted`
+- **Custom fields:** `Invoice Number`, `Total` (monetary), `Date Paid`, `Currency`
+- **Workflows:** `auto-classify: invoice`, `auto-classify: receipt`,
+  `auto-classify: ai`
+
+All three workflows trigger on **Document Added**:
+
+1. `invoice` and `receipt` regex-match the OCR text and assign the document type.
+   Invoice runs first, receipt second, so a store receipt that also says
+   "invoice" lands as `Receipt` (a later assignment wins).
+2. `ai` runs on documents the rules left **untyped** and applies AI suggestions
+   (title, correspondent, document type) plus `status/ai-enriched`. It may create
+   correspondents; a document it cannot type becomes `Other`.
+
+Because the rules only catch invoices and receipts, the AI is effectively the
+primary classifier — expect `status/ai-enriched` on most documents. If the LLM
+is unreachable the workflow fails and the document keeps `status/inbox`.
+
+The two `accounting/*` tags belong to the Beancount bridge (issue #988), never
+to Paperless classification, so the ledger has a single owner.
 
 Limits worth knowing:
 
-- Custom fields are **not** auto-filled — the Apply AI Suggestions action only
-  covers title/tags/correspondent/type/storage path/created. `Total` and
+- Custom fields are **not** auto-filled — the Apply AI Suggestions action covers
+  title/correspondent/type/storage path/created only. `Total` and
   `Invoice Number` are filled by the bridge (issue #988) or by hand.
+- There is no "was OCRed" tag: Paperless stores no such flag. Adding one would
+  need a post-consume script comparing the original against the OCR'd archive.
 - Mail rules are _not_ seeded (they need an IMAP account) — the content
   workflows cover mail-ingested documents anyway.
+- `ai_create_missing` is global, so the AI can invent a document type as well as
+  a correspondent. With nine types pre-seeded it usually picks one, but not
+  always — a test manual came back typed `User Manual` rather than `Manual`.
+  Merge the strays when they appear.
+- AI classification lands **asynchronously**: the action queues
+  `apply_ai_suggestions`, which runs seconds after consumption. `status/ai-enriched`
+  is set when the workflow dispatches it, so a document can carry the tag with no
+  type for a few seconds. If that task fails, the document keeps `ai-enriched` and
+  no type — that shape is the failure signature.
 - Re-run `mise run paperless:seed` after changing the definitions, and after any
   Paperless config wipe.
 
