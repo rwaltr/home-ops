@@ -30,6 +30,13 @@ spec:
                   name: cloudflare-tunnel-secret
             args:
               - tunnel
+              # HTTP/2 to the edge. The QUIC leg intermittently stalls: the edge
+              # stops granting MAX_DATA flow-control credit while still routing
+              # requests to that connection, so large/streaming responses
+              # (Immich video, thumbnails) hang until the client gives up
+              # (cloudflared#1767, #1519).
+              - --protocol
+              - http2
               - run
             probes:
               liveness: &probes
