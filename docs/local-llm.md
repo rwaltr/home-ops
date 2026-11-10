@@ -42,14 +42,23 @@ never have hosted it. Community OpenAI-compatible wrappers exist
 
 ## Live models
 
-| Model                 | Backend       | Notes                                                                   |
-| --------------------- | ------------- | ----------------------------------------------------------------------- |
-| `deepseek-v4.1-flash` | OpenRouter    | Cloud; key reused from `hermes-secret`.                                 |
-| `nvidia-llama`        | Dan's gateway | Self-hosted **Qwen3-32B** (vLLM, nvfp4). 151k context. Best local pick. |
-| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware. 229k context.                      |
-| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`. 114k context.                            |
-| `whisper`             | speaches      | `audio_transcription` (faster-whisper small-int8).                      |
-| `piper`               | speaches      | `audio_speech`. Pass `voice` through, e.g. `en_US-glados-medium`.       |
+| Model                 | Backend       | Notes                                                                     |
+| --------------------- | ------------- | ------------------------------------------------------------------------- |
+| `deepseek-v4.1-flash` | OpenRouter    | Cloud; key reused from `hermes-secret`.                                   |
+| `nvidia-llama`        | Dan's gateway | Self-hosted **Qwen3-32B** (vLLM, nvfp4). 151k context. Best local pick.   |
+| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware. 229k context.                        |
+| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`. 114k context.                              |
+| `qwen3.8-omni-flash`  | OpenRouter    | **Vision + audio + video.** Image/audio/video input. Companion's default. |
+| `gpt-5.6-luna`        | OpenRouter    | **Vision.** Image input; no video (404s on a video part).                 |
+| `whisper`             | speaches      | `audio_transcription` (faster-whisper small-int8).                        |
+| `piper`               | speaches      | `audio_speech`. Pass `voice` through, e.g. `en_US-glados-medium`.         |
+
+The two vision aliases exist for photo/video intake (homebox-companion and the
+walkthrough-to-CSV route). Both read image barcodes well enough to be useful but
+not perfectly: on a 49-frame test, each produced one ISBN-13 whose check digit
+did **not** validate, while the same library read in a single native-video pass
+validated 3/3. Validate the check digit before trusting a barcode, and prefer a
+video pass to supply ISBNs — rationale and numbers in `REFACTOR_PLANS.md`.
 
 ## Dan Manners' gateway
 
