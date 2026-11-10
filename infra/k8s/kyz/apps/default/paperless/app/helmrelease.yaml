@@ -1,0 +1,269 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Paperless-ngx — scan, OCR, index and archive documents. Stack: app (web +
+# Celery worker + consumer) + valkey broker + gotenberg + tika.
+#
+# Tika + Gotenberg are NOT optional here: they are required to ingest email
+# (.eml), which is one of the three primary inputs (email, PDF, images). PDFs
+# and images alone would work without them.
+#
+# SQLite on purpose. Single-user metadata fits it and it avoids adding a
+# database service to keep, back up and reconcile — the same call as FreshRSS
+# (see REFACTOR_PLANS.md). Moving to Postgres later is a documented
+# document_exporter/document_importer migration, not a rebuild.
+#
+# Storage split: `media` (the documents) lives on the tank hostPath so ZFS
+# raidz1 covers it, like immich's library; `data` (SQLite DB + search index)
+# lives on a PVC that gets nightly kopia snapshots. `consume` is a tank dropbox.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: paperless
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: paperless
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: paperless
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        # The app image's s6 init runs as root, remaps the internal `paperless`
+        # user to USERMAP_UID and chowns data/media/consume; that root start is
+        # required. gotenberg/valkey override this per container below.
+        runAsNonRoot: false
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    controllers:
+      app:
+        # SQLite + one writer: never run two pods against data/ at once.
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/paperless-ngx/paperless-ngx
+              tag: 3.4.2@sha256:d704e84f88300eb6ab001ab15720a2330ff99169cf9f94d6b8fcc44b63a84c84
+            env:
+              TZ: America/Chicago
+              PAPERLESS_TIME_ZONE: America/Chicago
+              # Keep files on the tank owned by 1000:1000, not the image's
+              # baked-in paperless uid.
+              USERMAP_UID: "1000"
+              USERMAP_GID: "1000"
+              # PAPERLESS_URL seeds ALLOWED_HOSTS, CORS and CSRF origins. Without
+              # it the login POST fails CSRF verification behind the gateway.
+              PAPERLESS_URL: https://paperless.waltr.tech
+              PAPERLESS_USE_X_FORWARD_HOST: "true"
+              PAPERLESS_USE_X_FORWARD_PORT: "true"
+              PAPERLESS_PROXY_SSL_HEADER: '["HTTP_X_FORWARDED_PROTO", "https"]'
+              PAPERLESS_REDIS: redis://paperless-broker:6379
+              PAPERLESS_ADMIN_USER: rwaltr
+              PAPERLESS_OCR_LANGUAGE: eng
+              # Both endpoints live under the Tika namespace — there is no
+              # PAPERLESS_GOTENBERG_ENDPOINT. Wrong name fails silently.
+              PAPERLESS_TIKA_ENABLED: "1"
+              PAPERLESS_TIKA_ENDPOINT: http://paperless-tika:9998
+              PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://paperless-gotenberg:3000
+              PAPERLESS_EMAIL_PARSE_DEFAULT_LAYOUT: "2" # HTML then text
+            envFrom:
+              - secretRef:
+                  name: paperless-secret
+            probes:
+              # `/` answers 302 (login redirect) once Django is serving; the
+              # kubelet probe treats any 2xx-3xx as success.
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &port 8000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: *port
+                  # First boot runs Django migrations + index build before the
+                  # port opens; give it up to 5 minutes.
+                  failureThreshold: 30
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              # s6 rewrites files under /run and /etc and chowns the mounts, so
+              # the root FS stays writable (same call as freshrss).
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop: ["ALL"]
+                add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"]
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 4Gi
+      broker:
+        strategy: Recreate
+        containers:
+          broker:
+            image:
+              repository: docker.io/valkey/valkey
+              tag: 9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1000
+              runAsGroup: 1000
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+      gotenberg:
+        strategy: Recreate
+        containers:
+          gotenberg:
+            image:
+              repository: docker.io/gotenberg/gotenberg
+              tag: 8.38@sha256:aa552cc115db488e0f0bcb07446aac13071ad51505b642c84bb894500907b42b
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
+              runAsGroup: 1001
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              # LibreOffice/Chromium are spawned per conversion, so leave room
+              # for a spike above the ~10Mi idle footprint.
+              limits:
+                memory: 1Gi
+      tika:
+        strategy: Recreate
+        containers:
+          tika:
+            image:
+              repository: docker.io/apache/tika
+              tag: 3.3.3.0-full@sha256:6ef30abd65df4b6c478907904099d0245bdb0e0686f94fb9bc7493558442bb74
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                # The JVM sizes its heap from the container limit; ~370Mi peak
+                # observed upstream, so keep headroom for large documents.
+                memory: 512Mi
+              limits:
+                memory: 1536Mi
+    service:
+      app:
+        controller: app
+        ports:
+          http:
+            port: *port
+      broker:
+        controller: broker
+        ports:
+          redis:
+            port: 6379
+      gotenberg:
+        controller: gotenberg
+        ports:
+          http:
+            port: 3000
+      tika:
+        controller: tika
+        ports:
+          http:
+            port: 9998
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+          # Discovered by Homepage — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Paperless
+          gethomepage.dev/description: Document archive
+          gethomepage.dev/group: Documents
+          gethomepage.dev/icon: paperless-ngx.png
+        hostnames:
+          - paperless.waltr.tech
+        parentRefs:
+          # Internal only: email, scans and personal documents have no business
+          # being internet-reachable. Reach it off-LAN over the tailnet. Adding
+          # the envoy-external parentRef is the whole publish step if wanted.
+          - name: envoy-internal
+            namespace: network
+        rules:
+          - backendRefs:
+              - identifier: app
+                port: http
+    persistence:
+      # Writable scratch for gotenberg/tika (and paperless) despite
+      # readOnlyRootFilesystem; paperless's own scratch lives under here too.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+      # SQLite DB + search index + matcher model.
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC exists,
+        # and the kopiur policy refers to this exact name.
+        forceRename: paperless-data
+        advancedMounts:
+          app:
+            app:
+              - path: /usr/src/paperless/data
+      # The archived documents. Tank (ZFS raidz1), not kopia — same tradeoff as
+      # immich's photo library. DirectoryOrCreate so the root entrypoint makes
+      # and chowns it to 1000:1000; no manual host step.
+      media:
+        type: hostPath
+        hostPath: /var/tank/nas/paperless/media
+        hostPathType: DirectoryOrCreate
+        advancedMounts:
+          app:
+            app:
+              - path: /usr/src/paperless/media
+      # Dropbox for files to ingest (scanner shares, manual drops, email relays).
+      consume:
+        type: hostPath
+        hostPath: /var/tank/nas/paperless/consume
+        hostPathType: DirectoryOrCreate
+        advancedMounts:
+          app:
+            app:
+              - path: /usr/src/paperless/consume
