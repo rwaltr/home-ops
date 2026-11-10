@@ -828,6 +828,17 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   reverted back to the slim stack. Revisit later (try a fresh node/containerd
   or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
+- **Video playback hung for external users** (2026-11-10): the cloudflared
+  connector used the default QUIC edge protocol, whose connection-level
+  flow-control credit (`MAX_DATA`) intermittently stalls while the edge keeps
+  routing requests to that connection, so cloudflared cannot send response data
+  — large/streaming bodies (Immich video playback and hover previews) hang until
+  the client gives up. Signature: `stream N canceled by remote with error code 0`
+  on `/api/assets/*/video/playback`, plus repeated QUIC `no recent network
+  activity` / `datagram manager` reconnects (cloudflared#1767, #1519). Fixed by
+  forcing `--protocol http2` in the cloudflare-tunnel args; verify with
+  `kubectl -n network logs deploy/cloudflare-tunnel | grep protocol=` (expect
+  `protocol=http2`). LAN traffic never touches the tunnel, so it was unaffected.
 
 ### 2026-09-22 — OTBR moved in-cluster; HA zeroconf needed per-VLAN enablement
 
