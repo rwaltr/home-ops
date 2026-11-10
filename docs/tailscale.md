@@ -28,15 +28,18 @@ Terraform cannot create the trust credential it authenticates as — creating on
 needs the API you need it for. So this exists by hand, once:
 
 1. Tailscale admin console → **Trust credentials** → **+ Credential** (OAuth).
-2. Scopes, read and write — exactly the endpoints these two workspaces call:
-   **Policy File** (`tailscale_acl` → `POST /tailnet/:tailnet/acl`), **DNS**
-   (`tailscale_dns_preferences`), **Networking Settings** (the HTTPS-certificates
-   setting, for `https_enabled`) and **OAuth Keys** (where `bootstrap` mints the
-   operator's client).
+2. Scopes, read and write. Two sets, and both are needed:
 
-   **Devices: Core is not needed** — nothing here manages devices — and that also
-   drops the requirement that such a credential carry a tag. Keep the tag
-   `tag:k8s-operator` regardless: the operator's own client has to be created
+   - what these workspaces call: **Policy File** (`tailscale_acl` →
+     `POST /tailnet/:tailnet/acl`), **DNS** (`tailscale_dns_preferences`),
+     **Networking Settings** (the HTTPS-certificates setting, for `https_enabled`)
+     and **OAuth Keys** (where `bootstrap` mints the operator's client);
+   - what that minted client is created _with_: **Devices: Core**, **Keys: Auth
+     Keys** and **General: Services**. A credential cannot grant a scope it does
+     not itself hold, so omitting these fails at apply with
+     `actor cannot set scopes: [auth_keys devices:core services] (403)`.
+
+   Keep the tag `tag:k8s-operator`: the operator's own client has to be created
    _carrying_ it, and Tailscale tags limit what a credential may assign. If the tag
    is refused, the apply says so with a 403 naming it and this line is the fix.
 

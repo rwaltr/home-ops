@@ -7,6 +7,10 @@
 # unknown scope id is rejected by the API at apply time, so a mistake here fails
 # loudly rather than silently granting less than the operator needs.
 #
+# The bootstrap credential has to hold these same three scopes: Tailscale refuses
+# to let a credential grant what it does not have, so without them this fails as
+# `actor cannot set scopes: [auth_keys devices:core services] (403)`.
+#
 # tags is not optional: Tailscale requires tags for devices:core and auth_keys,
 # and tag:k8s-operator must own tag:k8s in the policy file
 # (infra/terraform/tailscale/policy.hujson) or device creation fails later.
