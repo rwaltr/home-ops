@@ -256,6 +256,17 @@ spec:
         type: emptyDir
         globalMounts:
           - path: /tmp
+      # Valkey's RDB dump target (`dir /data`). readOnlyRootFilesystem makes the
+      # container FS read-only, so bgsave fails, stop-writes-on-bgsave-error
+      # trips, and every subsequent write is rejected "MISCONF" — which wedges
+      # the Celery broker and the app's startup migrations. Immich's valkey
+      # carries the same emptyDir; it was missed when this block was copied.
+      broker-data:
+        type: emptyDir
+        advancedMounts:
+          broker:
+            broker:
+              - path: /data
       # SQLite DB + search index + matcher model.
       data:
         type: persistentVolumeClaim
