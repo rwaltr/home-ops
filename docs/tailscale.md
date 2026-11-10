@@ -28,9 +28,18 @@ Terraform cannot create the trust credential it authenticates as — creating on
 needs the API you need it for. So this exists by hand, once:
 
 1. Tailscale admin console → **Trust credentials** → **+ Credential** (OAuth).
-2. Scopes, all read and write, and the tag `tag:k8s-operator`:
-   **Policy File**, **DNS**, **OAuth Keys**, **Devices: Core**, and the settings
-   scopes needed to write tailnet settings (Feature/Networking settings).
+2. Scopes, read and write — exactly the endpoints these two workspaces call:
+   **Policy File** (`tailscale_acl` → `POST /tailnet/:tailnet/acl`), **DNS**
+   (`tailscale_dns_preferences`), **Networking Settings** (the HTTPS-certificates
+   setting, for `https_enabled`) and **OAuth Keys** (where `bootstrap` mints the
+   operator's client).
+
+   **Devices: Core is not needed** — nothing here manages devices — and that also
+   drops the requirement that such a credential carry a tag. Keep the tag
+   `tag:k8s-operator` regardless: the operator's own client has to be created
+   _carrying_ it, and Tailscale tags limit what a credential may assign. If the tag
+   is refused, the apply says so with a 403 naming it and this line is the fix.
+
 3. Put the client ID and secret in the 1Password item **`tailscale-bootstrap`**
    as fields `client_id` and `client_secret`.
 
