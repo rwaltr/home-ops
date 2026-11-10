@@ -1,73 +1,75 @@
-// The tailnet policy file, managed by Terraform (infra/terraform/tailscale).
-//
-// HuJSON, so these comments survive the round trip through the API.
-//
-// The admin console's policy editor is switched off for this tailnet by
-// tailscale_tailnet_settings.acls_externally_managed_on, so an edit made in the
-// console cannot silently diverge from git.
-//
-// This resource replaces the ENTIRE policy file, so anything omitted here is a
-// silent lockout — the file must reproduce the tailnet's *effective* access, not
-// an idealised version of it. It began as Tailscale's default policy and keeps
-// every capability that policy granted; the only additions are the two things the
-// Kubernetes operator needs (see tagOwners and autoApprovers below). After the
-// one-time import, `terraform plan` is the check: it should show only those
-// additions and nothing else.
+// Example/default ACLs for unrestricted connections.
 {
-  // tag:k8s MUST be owned by tag:k8s-operator, because the operator creates the
-  // proxy devices that carry that tag and a tag can only be applied by one of its
-  // owners. Getting this wrong does not fail at install — it fails later, at
-  // device creation, when the first service is exposed.
-  //
-  // autogroup:admin is kept as an owner too, so a device can still be tagged by
-  // hand without going through the operator.
-  "tagOwners": {
-    "tag:k8s-operator": ["autogroup:admin"],
-    "tag:k8s": ["tag:k8s-operator", "autogroup:admin"]
-  },
+    // Declare static groups of users. Use autogroups for all users or users with a specific role.
+    // "groups": {
+    //   "group:example": ["alice@example.com", "bob@example.com"],
+    // },
 
-  // Allow-all, unchanged from the default. Deliberately left in the legacy `acls`
-  // spelling rather than converted to `grants`: equivalent access, but the point
-  // of this apply is to add the operator's tags without touching anything else.
-  // Notably `src` stays ["*"] rather than autogroup:member — narrowing it to
-  // members would stop tagged devices initiating connections.
-  "acls": [
-    {
-      "action": "accept",
-      "src": ["*"],
-      "dst": ["*:*"]
-    }
-  ],
+    // Define the tags which can be applied to devices and by which users.
+    // "tagOwners": {
+    //   "tag:example": ["autogroup:admin"],
+    // },
 
-  // Tailscale SSH, as the default had it: members may SSH into their own devices
-  // in check mode. Delete this block to take Tailscale SSH off the tailnet.
-  "ssh": [
-    {
-      "action": "check",
-      "src": ["autogroup:member"],
-      "dst": ["autogroup:self"],
-      "users": ["autogroup:nonroot", "root"]
-    }
-  ],
+    // Define access control lists for users, groups, autogroups, tags,
+    // Tailscale IP addresses, and subnet ranges.
+    "acls": [
+        // Allow all connections.
+        // Comment this section out if you want to define specific restrictions.
+        {
+            "action": "accept",
+            "src":    ["*"],
+            "dst":    ["*:*"],
+        },
+    ],
 
-  // Funnel for members, as the default had it. Funnel publishes a device's
-  // service to the public internet, so this is the first block to delete if you
-  // want that capability gone — public ingress in this homelab is Cloudflare
-  // Tunnel, not Funnel.
-  "nodeAttrs": [
-    {
-      "target": ["autogroup:member"],
-      "attr": ["funnel"]
-    }
-  ],
+    // Define users and devices that can use Tailscale SSH.
+    "ssh": [
+        // Allow all users to SSH into their own devices in check mode.
+        // Comment this section out if you want to define specific restrictions.
+        {
+            "action": "check",
+            "src":    ["autogroup:member"],
+            "dst":    ["autogroup:self"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+    ],
 
-  "disableIPv4": false,
+    "nodeAttrs": [
+        {
+            // Funnel policy, which lets tailnet members control Funnel
+            // for their own devices.
+            // Learn more at https://tailscale.com/kb/1223/tailscale-funnel/
+            "target": ["autogroup:member"],
 
-  // Lets the operator approve the tailnet services it exposes (Tailscale Ingress)
-  // by itself, instead of needing a manual approval per route.
-  "autoApprovers": {
-    "services": {
-      "tag:k8s": ["tag:k8s"]
-    }
-  }
+            "attr": ["funnel"],
+        },
+    ],
+
+    "disableIPv4": false,
+
+    "tagOwners": {
+        "tag:k8s-operator": ["autogroup:admin"],
+        // tag:k8s-operator must own tag:k8s, not just autogroup:admin: the
+        // Kubernetes operator creates the devices that carry this tag, and a tag
+        // can only be applied by one of its owners. Without it the operator
+        // installs cleanly and then fails at device creation.
+        "tag:k8s":          ["tag:k8s-operator", "autogroup:admin"],
+    },
+
+    // Lets the operator approve the tailnet services it exposes, instead of
+    // needing a manual approval for each one.
+    "autoApprovers": {
+        "services": {
+            "tag:k8s": ["tag:k8s"],
+        },
+    },
+
+    // Test access rules every time they're saved.
+    // "tests": [
+    //   {
+    //       "src": "alice@example.com",
+    //       "accept": ["tag:example"],
+    //       "deny": ["100.101.102.103:443"],
+    //   },
+    // ],
 }
