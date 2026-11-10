@@ -1780,6 +1780,47 @@ per-series query includes *dead* pods, so completed kopia/nightly Job pods
 inflate any naive "top memory" list. Filter to live pods (`pod=~"..."` from
 `kubectl get pods`) before believing it.
 
+### 2026-11-10 — Paperless-ngx deployed (paperless.waltr.tech, internal only)
+
+New document archive in `apps/default/paperless`: app + valkey broker +
+gotenberg + tika, SQLite, `media`/`consume` on tank hostPaths, `data` (SQLite
+DB + index) on a kopia-backed PVC. Internal-only on purpose — email and
+personal documents have no business being internet-reachable. Full notes in
+`docs/paperless.md`.
+
+Decisions worth recording:
+
+- **Paperless does not require Postgres.** SQLite is upstream's default and
+  Postgres is only *recommended* for multi-user/high-throughput installs.
+  Chose SQLite for the same reason as FreshRSS (2026-10-08): no database
+  service to keep, back up and reconcile.
+- **It is not a one-way door.** `document_exporter`/`document_importer` switch
+  engines; the catches are that versions must match exactly and the import
+  target must be empty. Recorded so a future CNPG move doesn't read as a
+  rebuild.
+- **Tika + Gotenberg are mandatory here, not optional.** They are what ingests
+  email (`.eml`), one of the three primary inputs (email, PDF, images). PDFs
+  and images alone would not need them. Both endpoints live under the Tika
+  namespace — `PAPERLESS_TIKA_GOTENBERG_ENDPOINT`, not
+  `PAPERLESS_GOTENBERG_ENDPOINT`; the wrong name fails silently.
+- **The CNPG/shared-postgres detour was researched and declined for now.** If a
+  second app needs Postgres, CNPG with the 1.29+ extension-image mechanism
+  (`tensorchord/vchord-scratch:pg17-v1.1.1` + a standard pg17 image, plus a
+  declarative `Database.extensions`) can host immich's vectorchord DB without a
+  custom image or superuser. That still means a 153MB pg_dump/restore and
+  moving immich's backups off the kopia PVC policy onto CNPG/Barman — not worth
+  it for one database.
+- **Gotchas:**
+  - The admin env (`PAPERLESS_ADMIN_USER`/`PAPERLESS_ADMIN_PASSWORD`) creates
+    the superuser **once** — the image skips it if any superuser exists, and it
+    does not reset the password on restart. The 1P value is a first-run record,
+    not a live credential.
+  - `PAPERLESS_URL` is required behind the gateway or the login POST fails CSRF
+    verification; it seeds ALLOWED_HOSTS, CORS and CSRF origins in one setting.
+  - hostPaths use `DirectoryOrCreate` and the root entrypoint chowns them to
+    1000:1000, so there is no manual host `mkdir` step (unlike immich's
+    library).
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
