@@ -89,6 +89,39 @@ Off-LAN access is over the tailnet; there is deliberately no `envoy-external`
 parentRef (email and personal documents should not be internet-reachable).
 Adding that parentRef is the whole publish step if it is ever wanted.
 
+## Automatic classification (invoices/receipts)
+
+The archive is **keep-everything, permanent**: no retention field, no expiry,
+no scheduled deletes. And there is deliberately **no `inbox` triage pass** —
+nothing asks "is this important?". Documents are found by full-text search.
+
+What _is_ automated is enough structure for the Beancount bridge to find
+financial documents. Paperless stores this config in its **database**, not Git,
+so a wipe loses it. `mise run paperless:seed` re-applies it through the REST API
+(idempotent, by name):
+
+| Object         | Value                                                             |
+| -------------- | ----------------------------------------------------------------- |
+| Document types | `Invoice`, `Receipt`                                              |
+| Tags           | `accounting/inbox` (bridge handoff), `accounting/attached` (done) |
+| Custom fields  | `Invoice Number`, `Total` (monetary), `Date Paid`, `Currency`     |
+| Workflows      | `auto-classify: invoice`, `auto-classify: receipt`                |
+
+Both workflows trigger on **Document Added**, match the OCR text by regex, and
+assign the document type plus the `accounting/inbox` tag — no manual step, no
+inbox. Invoice runs first, receipt second, so a store receipt that also says
+"invoice" lands as `Receipt` (later assignment wins).
+
+Limits worth knowing:
+
+- Custom fields are **not** auto-filled — the Apply AI Suggestions action only
+  covers title/tags/correspondent/type/storage path/created. `Total` and
+  `Invoice Number` are filled by the bridge (issue #988) or by hand.
+- Mail rules are _not_ seeded (they need an IMAP account) — the content
+  workflows cover mail-ingested documents anyway.
+- Re-run `mise run paperless:seed` after changing the definitions, and after any
+  Paperless config wipe.
+
 ## Storage layout
 
 Paperless puts everything under three defaults, mounted explicitly:

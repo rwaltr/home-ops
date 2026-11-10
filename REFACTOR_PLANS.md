@@ -1842,6 +1842,26 @@ Turned on Paperless' native AI (3.0+) and recorded the decisions:
   both answer). Metadata exposure was accepted; worth scoping to a virtual key
   if that ever changes.
 
+### 2026-11-11 — Paperless: keep everything, no triage, seed the accounting config
+
+Three decisions, and the seed that implements them:
+
+- **Retention = permanent.** No retention field, no expiry, no scheduled deletes.
+  The "is this one important?" burden comes from the inbox-triage pattern, not
+  from retention, so that pattern is not adopted at all — no `inbox` tag, no
+  review pass. Search is the filing system.
+- **Paperless config lives in the DB, not Git.** Document types, tags, custom
+  fields and workflows survive restarts but not a config wipe. `mise run
+  paperless:seed` (`scripts/paperless_seed.py`) re-applies them through the REST
+  API, idempotently by name — the same lesson as Sonarr's release profiles, but
+  handled instead of written down.
+- **Only invoice/receipt marking is automated**, because that is the one thing
+  the Beancount bridge needs (issue #988): two `Document Added` workflows match
+  the OCR text and assign the document type + `accounting/inbox` tag. Receipt
+  runs after invoice so a receipt that also says "invoice" lands as `Receipt`.
+  Custom fields are *not* auto-filled — the AI-suggestion action does not cover
+  them, so `Total`/`Invoice Number` come from the bridge or by hand.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
