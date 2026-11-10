@@ -6,35 +6,65 @@
 // tailscale_tailnet_settings.acls_externally_managed_on, so an edit made in the
 // console cannot silently diverge from git.
 //
-// This file must reproduce the tailnet's *effective* access, not some idealised
-// version of it: the tailscale_acl resource refuses to touch an existing policy
-// file without an explicit import (see acl.tf), and that guard exists because
-// applying a policy that omits existing rules is a silent lockout.
+// This resource replaces the ENTIRE policy file, so anything omitted here is a
+// silent lockout — the file must reproduce the tailnet's *effective* access, not
+// an idealised version of it. It began as Tailscale's default policy and keeps
+// every capability that policy granted; the only additions are the two things the
+// Kubernetes operator needs (see tagOwners and autoApprovers below). After the
+// one-time import, `terraform plan` is the check: it should show only those
+// additions and nothing else.
 {
+  // tag:k8s MUST be owned by tag:k8s-operator, because the operator creates the
+  // proxy devices that carry that tag and a tag can only be applied by one of its
+  // owners. Getting this wrong does not fail at install — it fails later, at
+  // device creation, when the first service is exposed.
+  //
+  // autogroup:admin is kept as an owner too, so a device can still be tagged by
+  // hand without going through the operator.
   "tagOwners": {
-    // The Kubernetes operator's identity, plus the tag it hands to the proxy
-    // devices it creates. tag:k8s-operator MUST own tag:k8s, otherwise the
-    // operator cannot create those devices — and it fails at device creation
-    // rather than at install, so the install looks healthy until the first
-    // service you expose.
     "tag:k8s-operator": ["autogroup:admin"],
-    "tag:k8s": ["tag:k8s-operator"]
+    "tag:k8s": ["tag:k8s-operator", "autogroup:admin"]
   },
 
-  // Grants rather than the legacy `acls` syntax: Tailscale's syntax reference
-  // recommends grants for new policy files and states that acls will not receive
-  // new features. This reproduces the tailnet's existing default (members reach
-  // everything), so it is not a change in behaviour.
-  "grants": [
+  // Allow-all, unchanged from the default. Deliberately left in the legacy `acls`
+  // spelling rather than converted to `grants`: equivalent access, but the point
+  // of this apply is to add the operator's tags without touching anything else.
+  // Notably `src` stays ["*"] rather than autogroup:member — narrowing it to
+  // members would stop tagged devices initiating connections.
+  "acls": [
     {
-      "src": ["autogroup:member"],
-      "dst": ["*"],
-      "ip": ["*"]
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["*:*"]
     }
   ],
 
-  // Lets the operator approve its own tailnet services, so exposing a service
-  // does not need a manual approval per route.
+  // Tailscale SSH, as the default had it: members may SSH into their own devices
+  // in check mode. Delete this block to take Tailscale SSH off the tailnet.
+  "ssh": [
+    {
+      "action": "check",
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:self"],
+      "users": ["autogroup:nonroot", "root"]
+    }
+  ],
+
+  // Funnel for members, as the default had it. Funnel publishes a device's
+  // service to the public internet, so this is the first block to delete if you
+  // want that capability gone — public ingress in this homelab is Cloudflare
+  // Tunnel, not Funnel.
+  "nodeAttrs": [
+    {
+      "target": ["autogroup:member"],
+      "attr": ["funnel"]
+    }
+  ],
+
+  "disableIPv4": false,
+
+  // Lets the operator approve the tailnet services it exposes (Tailscale Ingress)
+  // by itself, instead of needing a manual approval per route.
   "autoApprovers": {
     "services": {
       "tag:k8s": ["tag:k8s"]
