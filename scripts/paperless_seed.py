@@ -9,6 +9,17 @@ depending on someone remembering the clicks.
 Run it with `mise run paperless:seed`. It is safe to run repeatedly: every
 object is looked up by name and created or patched, never duplicated.
 
+The design is a provenance trail:
+
+  status/inbox        transient — stamped on every new document, removed by the
+                      classification workflow in the same consume. Visible only
+                      if a workflow failed.
+  status/ai-enriched  terminal — the document was classified by the LLM.
+  accounting/unlinked financial doc not yet matched to a ledger transaction.
+  accounting/beancounted
+                      matched. Both accounting tags are owned by the Beancount
+                      bridge, never by Paperless classification.
+
 Env:
   PAPERLESS_URL        default https://paperless.waltr.tech
   PAPERLESS_API_TOKEN  resolved from 1Password (item `paperless`, field
@@ -35,22 +46,50 @@ socket.getaddrinfo = lambda host, port, family=0, type=0, proto=0, flags=0: _ori
 BASE = os.environ.get("PAPERLESS_URL", "https://paperless.waltr.tech").rstrip("/")
 TOKEN = os.environ.get("PAPERLESS_API_TOKEN", "").strip()
 
-# Trigger/action enum values (from /api/schema/):
+# Enum values from /api/schema/:
 #   trigger type 2 = Document Added, matching algorithm 4 = Regular expression
-#   action type 1 = Assignment
+#   action types: 1 = Assignment, 2 = Removal, 8 = Apply AI suggestions
 TRIGGER_DOCUMENT_ADDED = 2
 MATCH_REGEX = 4
 ACTION_ASSIGN = 1
+ACTION_REMOVE = 2
+ACTION_AI = 8
 ALL_SOURCES = [1, 2, 3, 4]  # Consume Folder, Api Upload, Mail Fetch, Web UI
 
-DOCUMENT_TYPES = ["Invoice", "Receipt"]
-TAGS = ["accounting/inbox", "accounting/attached"]
+# status/* is document processing, accounting/* is ledger linkage.
+TAGS = [
+    ("status/inbox", {"is_inbox_tag": True}),
+    ("status/ai-enriched", {}),
+    ("accounting/unlinked", {}),
+    ("accounting/beancounted", {}),
+]
+# Superseded by the scheme above; deleted so the namespace does not drift.
+REMOVED_TAGS = ["accounting/inbox", "accounting/attached"]
+
+DOCUMENT_TYPES = [
+    "Invoice",
+    "Receipt",
+    "Statement",
+    "Contract",
+    "Manual",
+    "Policy",
+    "Medical",
+    "Correspondence",
+    "Other",
+]
+
 CUSTOM_FIELDS = [
     ("Invoice Number", "string"),
     ("Total", "monetary"),
     ("Date Paid", "date"),
     ("Currency", "string"),
 ]
+
+# The AI may title and type the document and set a correspondent; it never
+# touches tags, so the tag namespace stays hand-designed. ai_create_missing is
+# global (it also allows the AI to invent a document type), accepted so the AI
+# can create correspondents at all.
+AI_SUGGESTION_FIELDS = ["title", "correspondent", "document_type"]
 
 
 def api(method: str, path: str, body: dict | None = None):
@@ -101,6 +140,16 @@ def upsert(kind: str, path: str, desired: list[tuple[str, dict]]) -> dict[str, i
     return ids
 
 
+def delete_tags(names: list[str]) -> None:
+    existing = {obj["name"]: obj for obj in list_all("/api/tags/")}
+    for name in names:
+        current = existing.get(name)
+        if current is None:
+            continue
+        api("DELETE", f"/api/tags/{current['id']}/")
+        print(f"  - tag: {name} (deleted)")
+
+
 def upsert_workflow(payload: dict, existing: dict[str, dict]) -> int:
     """Patch in place; if the nested serializer refuses an update, recreate."""
     name = payload["name"]
@@ -118,7 +167,7 @@ def upsert_workflow(payload: dict, existing: dict[str, dict]) -> int:
     return obj["id"]
 
 
-def content_workflow(name: str, order: int, match: str, doc_type: int, tags: list[int]) -> dict:
+def rule_workflow(name: str, order: int, match: str, doc_type: int, inbox: list[int]) -> dict:
     return {
         "name": name,
         "order": order,
@@ -133,11 +182,35 @@ def content_workflow(name: str, order: int, match: str, doc_type: int, tags: lis
             },
         ],
         "actions": [
+            {"type": ACTION_ASSIGN, "assign_document_type": doc_type},
+            {"type": ACTION_REMOVE, "remove_tags": inbox},
+        ],
+    }
+
+
+def ai_workflow(untyped_type_ids: list[int], ai_enriched: list[int], inbox: list[int]) -> dict:
+    # filter_has_not_document_types with every known type == "has no type": the
+    # matcher skips the exclusion when document_type_id is null.
+    return {
+        "name": "auto-classify: ai",
+        "order": 30,
+        "enabled": True,
+        "triggers": [
             {
-                "type": ACTION_ASSIGN,
-                "assign_document_type": doc_type,
-                "assign_tags": tags,
+                "type": TRIGGER_DOCUMENT_ADDED,
+                "sources": ALL_SOURCES,
+                "filter_has_not_document_types": untyped_type_ids,
             },
+        ],
+        "actions": [
+            {
+                "type": ACTION_AI,
+                "ai_suggestion_fields": AI_SUGGESTION_FIELDS,
+                "ai_create_missing": True,
+                "ai_overwrite_existing": True,
+            },
+            {"type": ACTION_ASSIGN, "assign_tags": ai_enriched},
+            {"type": ACTION_REMOVE, "remove_tags": inbox},
         ],
     }
 
@@ -152,31 +225,40 @@ def main() -> None:
         "/api/document_types/",
         [(name, {"name": name}) for name in DOCUMENT_TYPES],
     )
-    tags = upsert("tag", "/api/tags/", [(name, {"name": name}) for name in TAGS])
+    tags = upsert(
+        "tag",
+        "/api/tags/",
+        [(name, {"name": name, **extra}) for name, extra in TAGS],
+    )
     upsert(
         "custom field",
         "/api/custom_fields/",
         [(name, {"name": name, "data_type": data_type}) for name, data_type in CUSTOM_FIELDS],
     )
+    delete_tags(REMOVED_TAGS)
 
-    inbox = [tags["accounting/inbox"]]
+    inbox = [tags["status/inbox"]]
+    ai_enriched = [tags["status/ai-enriched"]]
     workflows = [
         # Invoice before receipt: a later assignment overrides an earlier one, so a
         # store receipt that also says "invoice" ends up as Receipt.
-        content_workflow(
+        rule_workflow(
             "auto-classify: invoice",
             10,
             r"(?i)\binvoice\b|amount due|invoice (number|no\.?)|bill to",
             types["Invoice"],
             inbox,
         ),
-        content_workflow(
+        rule_workflow(
             "auto-classify: receipt",
             20,
             r"(?i)\breceipt\b|order total|thank you for your (purchase|order)|payment received",
             types["Receipt"],
             inbox,
         ),
+        # Last: only documents the rules did not type. Clears status/inbox, so a
+        # document keeps it only when this workflow fails (the error signal).
+        ai_workflow([types[name] for name in DOCUMENT_TYPES], ai_enriched, inbox),
     ]
     existing_workflows = {obj["name"]: obj for obj in list_all("/api/workflows/")}
     for workflow in workflows:

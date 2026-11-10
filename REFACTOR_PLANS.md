@@ -1861,6 +1861,41 @@ Three decisions, and the seed that implements them:
   runs after invoice so a receipt that also says "invoice" lands as `Receipt`.
   Custom fields are *not* auto-filled — the AI-suggestion action does not cover
   them, so `Total`/`Invoice Number` come from the bridge or by hand.
+
+### 2026-11-11 (later) — Paperless tags: a provenance trail, not decoration
+
+The first pass was too thin (document types plus one `accounting/inbox` tag).
+Revised to a provenance trail across two namespaces after grilling the model:
+
+- **`status/*` is processing, `accounting/*` is ledger.** `status/inbox` is a
+  real `is_inbox_tag`, stamped on every new document and removed by the
+  classification workflow _in the same consume_ — deliberately transient, so it
+  is an error signal (a workflow failed), not a to-do list.
+  `status/ai-enriched` marks documents the LLM classified.
+- **The AI is the primary classifier.** The rules only catch invoices and
+  receipts, so everything else goes to the LLM, which types it from a nine-type
+  list and creates correspondents as needed. `ai_create_missing` is global (it
+  can invent a type too) — accepted, since it is the only way to get
+  correspondents at all.
+- **The bridge owns `accounting/*`.** Workflow mutations do not re-fire
+  `document_updated`, so a follow-up "type became Invoice → tag unlinked"
+  workflow cannot catch AI-typed documents. The ledger tags are therefore set by
+  the bridge (issue #988), giving ledger state one owner.
+- **No OCR tag.** Paperless stores no "was OCRed" flag; it would need a
+  post-consume script comparing the original against the OCR'd archive.
+  Deferred.
+- **Transient inbox, no backstop.** If the LLM is down the document keeps
+  `status/inbox`; there is no retry. Accepted for now.
+- **The AI action is asynchronous.** It queues `apply_ai_suggestions`, so
+  `status/ai-enriched` is assigned when the workflow _dispatches_ the AI, not
+  when it finishes. A failed AI task leaves `ai-enriched` with no document type.
+  The task deliberately does not fire `document_updated` (`documents/tasks.py:793`,
+  "to avoid loop"), so there is no hook to tag on completion — the optimistic
+  assignment is the pragmatic choice.
+
+Still permanent retention, still no manual triage. The superseded
+`accounting/inbox`/`accounting/attached` tags are deleted by the seed.
+
 ### 2026-11-10 (later) — Homebox intake: MCP server, Companion, and which vision model to trust
 
 Homebox had an API-key integration surface and nothing using it. Added both, and
