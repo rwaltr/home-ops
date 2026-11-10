@@ -5,6 +5,10 @@
 # custom provider:
 #   http://litellm.default.svc.cluster.local:4000/v1
 #
+# Upstreams: OpenRouter (cloud chat) and Dan Manners' shared LiteLLM gateway
+# (self-hosted Qwen3-32B / Llama / gpt-oss — see the model_list below). Audio
+# stays on the in-pod speaches sidecar.
+#
 # Single pod, two containers: litellm plus the speaches audio sidecar.
 #
 # No local LLM is served here any more. The ollama sidecar held exactly one
@@ -229,6 +233,32 @@ spec:
                 litellm_params:
                   model: openrouter/deepseek/deepseek-v4.1-flash
                   api_key: os.environ/OPENROUTER_API_KEY
+              # Dan Manners' shared LiteLLM gateway — another LiteLLM proxy at
+              # https://llm.cloud.danmanners.com/v1. Only the models backed by
+              # hardware on his network are aliased here: they cost nothing and
+              # keep document text off a cloud provider.
+              #   nvidia-llama -> nvidia-qwen3-32b-nvfp4 (vLLM, 151k ctx)
+              #   intel-llama  -> llama                (vLLM, 229k ctx)
+              #   gptoss-llama -> gpt-oss-20b-f16      (114k ctx)
+              # His catalog also carries cloud-backed models (zai/glm-*, and the
+              # misleadingly-named media-analysis/decision/embed-text which
+              # resolve to OpenRouter/OpenAI) — deliberately not proxied. Outbound
+              # key: 1P item `llm.cloud.danmanners.com` / field `credential`.
+              - model_name: nvidia-llama
+                litellm_params:
+                  model: openai/nvidia-llama
+                  api_base: https://llm.cloud.danmanners.com/v1
+                  api_key: os.environ/DANMANNERS_LLM_API_KEY
+              - model_name: intel-llama
+                litellm_params:
+                  model: openai/intel-llama
+                  api_base: https://llm.cloud.danmanners.com/v1
+                  api_key: os.environ/DANMANNERS_LLM_API_KEY
+              - model_name: gptoss-llama
+                litellm_params:
+                  model: openai/gptoss-llama
+                  api_base: https://llm.cloud.danmanners.com/v1
+                  api_key: os.environ/DANMANNERS_LLM_API_KEY
               # Audio via the in-pod speaches sidecar. The request's `voice`
               # param passes straight through to piper (e.g.
               # en_US-glados-medium to match the wyoming-piper voice).
