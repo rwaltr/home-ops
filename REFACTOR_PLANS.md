@@ -1861,6 +1861,73 @@ Three decisions, and the seed that implements them:
   runs after invoice so a receipt that also says "invoice" lands as `Receipt`.
   Custom fields are *not* auto-filled — the AI-suggestion action does not cover
   them, so `Total`/`Invoice Number` come from the bridge or by hand.
+### 2026-11-10 (later) — Homebox intake: MCP server, Companion, and which vision model to trust
+
+Homebox had an API-key integration surface and nothing using it. Added both, and
+measured the models before picking one.
+
+- **homebox-mcp is not a cluster workload.** pi spawns `dgahagan/homebox-mcp`
+  (`uvx`) over stdio from `.pi/mcp.json`, with `HOMEBOX_URL` + `HOMEBOX_TOKEN`
+  from fnox (1P `homebox-mcp`/`API_KEY`). 39 tools, verified live against
+  0.27.1 — `list_locations`, `list_tags`, `inventory_stats` all answer. It can
+  also write (`create_item`, `delete_item`, `import_csv`), which is the point
+  and also the risk.
+- **A separate 1P item, not a field on `homebox`.** That item holds
+  `api_key_pepper` — the HMAC secret every issued key is hashed with. Rotating
+  it invalidates every key; adding a client credential next to it invites
+  exactly that mistake.
+- **homebox-companion runs internal-only with an emptyDir `/app/data`.** Its
+  `docs` warn that anyone who can reach the UI acts as its Homebox key's owner,
+  and it writes inventory — so no `envoy-external` parentRef, and its own
+  `hb_…` key (1P `homebox-companion`, field `credential` — it is an API
+  Credential item, and guessing `api_key` cost a `secrets:verify` round trip)
+  so revocation is independent of the MCP server's. EmptyDir because its only
+  persistent state is UI-saved model/field preferences, and those would
+  disagree with git.
+- **Measured on a real 49s walkthrough (49 frames @1fps, 720px) plus one native
+  video call**, same prompt, `qwen3.8-omni-flash` vs `gpt-5.6-luna`:
+
+  |                              | qwen3.8-omni-flash | gpt-5.6-luna |
+  | ---------------------------- | ------------------ | ------------ |
+  | frames parsed (fair budget)  | 49/49              | 49/49        |
+  | book titles vs the covers    | 3/3 exact          | 2/3 + 0.95   |
+  | frame ISBN-13 check digits   | 3/4 valid          | 3/4 valid    |
+  | avg / worst frame            | 19.3s / 96.7s      | 9.0s / 18.1s |
+  | tokens over 49 frames        | 121,565            | 84,106       |
+  | native video (with audio)    | 20 items, 1 call   | HTTP 404     |
+
+  Chose qwen for companion (titles exact, cheaper output, and the only one that
+  can take video/audio) despite the latency, and added both aliases to
+  `litellm-config` so Settings can switch without a deploy.
+- **One native-video call beat 49 image calls**: 26,745 tokens (~$0.004) for the
+  whole clip, 20 items, versus 121.5k/84.1k tokens for the frame passes. It also
+  read the narration — prices and "tag removed" — which no frame contains. That
+  is the shape of the walkthrough-intake route: video → items → `import_csv`.
+- **Lessons, in the order they bit:**
+  - **An output-token cap looks exactly like a model failure.** Capping at 700
+    tokens truncated JSON in 19 frames (luna) and 3 (qwen); with 2500 both are
+    49/49. Check the budget before concluding a model can't produce structured
+    output.
+  - **Low resolution makes anything hallucinate.** Reading a 240px contact
+    sheet, I called *Da Freebooterz Code* (Justin Woolley) "Da Freedom Code" by
+    "Justin Kojima" — invented author, wrong title. At 720px both models read it
+    correctly. Frame size is a correctness setting, not a bandwidth one.
+  - **Model priors fill fields the image never showed.** qwen attributed the
+    book to "Callisto Publishing"; the imprint on the cover is Rockridge Press
+    and the ISBN resolves to Rockridge. Treat `manufacturer`/publisher as
+    suspect unless the frame shows it.
+  - **Barcodes are readable but not reliable** — and ISBN-13 gives an objective
+    test. Both models produced one bad check digit from frames; the video pass
+    validated 3/3. Validate, then prefer the video for identifiers.
+  - **The audio track is where serials and prices live.** A narrated walkthrough
+    is unreadable from stills alone; check for an audio stream
+    (`ffprobe`) before deciding a clip is only worth frames.
+
+**Field names are part of the interface.** The companion key lives in 1Password
+item `homebox-companion`, field **`credential`** — an API Credential item, so
+that is the field the UI gives you. An ExternalSecret pointing at a field the
+item does not have fails only as an empty Secret at runtime, but
+`mise run secrets:verify` catches it before the cluster does.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 

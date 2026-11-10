@@ -32,6 +32,16 @@
       },
       "exposure": "codemode",
       "description": "Grafana dashboards, datasources, metrics, and Loki queries"
+    },
+    "homebox": {
+      "command": "uvx",
+      "args": ["homebox-mcp"],
+      "env": {
+        "HOMEBOX_URL": "https://homebox.waltr.tech",
+        "HOMEBOX_TOKEN": "!fnox get HOMEBOX_TOKEN"
+      },
+      "exposure": "codemode",
+      "description": "HomeBox home inventory Q&A and intake (dgahagan/homebox-mcp)"
     }
   }
 }

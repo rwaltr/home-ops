@@ -109,12 +109,39 @@ Profile → API Keys issues `hb_…` tokens, one-time visible. That token is how
 both AI integrations authenticate:
 
 - **homebox-companion** — photo in, structured item out (vision model extracts
-  name, quantity, serial, price). Uses the LiteLLM _library_, so it needs
-  `HBC_LLM_API_BASE` pointed at the gateway and a **vision-capable** model in
-  `litellm-config`'s `model_list` — the gateway currently has none.
-- **homebox-mcp** — inventory Q&A / intake over MCP, for the in-cluster agent.
+  name, quantity, serial, price), plus an AI chat that can edit inventory. It
+  uses the LiteLLM _library_, so `HBC_LLM_API_BASE` points at our own proxy and
+  `HBC_LLM_MODEL` names an alias in `litellm-config`'s `model_list`
+  (`openai/qwen3.8-omni-flash`) — a nonstandard alias also needs
+  `HBC_LLM_ALLOW_UNSAFE_MODELS=true`, or LiteLLM's capability check refuses it.
+- **homebox-mcp** — inventory Q&A / intake over MCP (`dgahagan/homebox-mcp`).
+  Not a cluster workload: pi spawns it over stdio from `.pi/mcp.json`, reading
+  `HOMEBOX_URL` + `HOMEBOX_TOKEN` (1Password `homebox-mcp`/`API_KEY`) via fnox.
+  It talks to the same 0.26+ entities API, so it needs nothing from this
+  chart — but it is an agent with write access to the inventory.
 
-Both are deliberately **not** deployed here. Also available but unused: the
+## Companion
+
+Deployed as `homebox-companion.waltr.tech`, **internal only** — it holds an API
+key that reads and writes the whole inventory, and anyone who can reach the UI
+acts as that key's owner (`infra/k8s/kyz/apps/default/homebox-companion/`).
+
+| Thing        | Choice                                                              |
+| ------------ | ------------------------------------------------------------------- |
+| API key      | Its own `hb_…` key — 1Password `homebox-companion`/`credential`     |
+| Model        | `qwen3.8-omni-flash`, chosen over `gpt-5.6-luna` on a measured test |
+| `/app/data`  | **emptyDir** — config is declarative here, not in the UI            |
+| Update check | Disabled; Flux owns the pinned image digest                         |
+
+A UI-changed model or field preference lives in `/app/data/settings.yaml`, which
+is ephemeral, so it reverts to the values in the HelmRelease on restart. That is
+intentional: the alternative is a PVC whose contents quietly disagree with git.
+
+It is not an intake path by itself — it identifies items and writes them to
+Homebox, so the inventory fills up with whatever the model saw. Review before
+submitting.
+
+Also available but unused: the
 external label service hook (`HBOX_LABEL_MAKER_LABEL_SERVICE_URL`, an HTTP GET
 that returns an image) and Shoutrrr notifiers for maintenance reminders.
 

@@ -1,0 +1,163 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# HomeBox Companion — unofficial AI front-end for Homebox
+# (github.com/Duelion/homebox-companion, GPL-3.0): pick a location, snap photos,
+# a vision model identifies the items, you review, then it writes them.
+#
+# Deliberately internal-only (envoy-internal, no envoy-external parentRef): it
+# holds a Homebox API key that can read and write the entire inventory, and
+# anyone who can reach the UI acts as that key's owner.
+#
+# It calls the in-cluster LiteLLM proxy with the LiteLLM *library*, so
+# HBC_LLM_MODEL is addressed as openai/<alias> against HBC_LLM_API_BASE — the
+# alias must exist in litellm-config's model_list (litellm app, same namespace).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: homebox-companion
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: homebox-companion
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: homebox-companion
+    controllers:
+      homebox-companion:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/duelion/homebox-companion
+              # 3.2.2, pinned by index digest. The app's own update check is off
+              # below, so the digest is the only thing that moves this.
+              tag: 3.2.2@sha256:5bc324f5db2bc96f8b516b10ee5b1477044e8e721e39f6c2627911e31f09827a
+            env:
+              TZ: America/Chicago
+              # In-cluster Homebox, not the public hostname: keeps the traffic off
+              # envoy and works before any DNS/cert discussion.
+              HBC_HOMEBOX_URL: http://homebox.default.svc.cluster.local:7745
+              # Item/location links in the chat UI are for the human's browser, so
+              # these must be the reachable hostname, not the service DNS above.
+              HBC_LINK_BASE_URL: https://homebox.waltr.tech
+              HBC_LLM_API_BASE: http://litellm.default.svc.cluster.local:4000/v1
+              # Measured on a real 49-frame walkthrough before picking this over
+              # gpt-5.6-luna: 3/3 book titles exact, 3/4 barcodes with a valid
+              # ISBN-13 check digit, and the only alias that also takes audio and
+              # video. Slower per photo than luna (19.3s avg, 96.7s worst frame
+              # vs 9.0s/18.1s) — change this line, not the UI, if that bites.
+              HBC_LLM_MODEL: openai/qwen3.8-omni-flash
+              # Required for any alias LiteLLM's model database doesn't know:
+              # capability detection otherwise refuses the model outright.
+              HBC_LLM_ALLOW_UNSAFE_MODELS: "true"
+              # Keep the photos the app uploads to Homebox at full quality; the
+              # AI always analyses its own optimised copy regardless.
+              HBC_IMAGE_QUALITY: high
+              # Flux owns the version. An in-app "update available" nag would only
+              # ever be about a tag this file doesn't use.
+              HBC_DISABLE_UPDATE_CHECK: "true"
+            envFrom:
+              - secretRef:
+                  name: homebox-companion-secret
+            probes:
+              # The image's own HEALTHCHECK path (needs no auth, works before any
+              # Homebox key is validated).
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/version
+                    port: &port 8000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/version
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: { drop: ["ALL"] }
+              # readOnlyRootFilesystem is NOT set: besides the /app/data mount
+              # below, the app runs under `uv` with HOME=/home/appuser and writes
+              # caches there. A read-only root would need several more mounts for
+              # no security gain over dropping caps here.
+            resources:
+              requests:
+                cpu: 50m
+                memory: 192Mi
+              limits:
+                # Photo uploads (up to 20MB each, 30 per capture session) are
+                # decoded and re-encoded in-process, so the ceiling is well above
+                # the idle footprint. Bounded because this node has no swap.
+                memory: 1Gi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        # uid/gid verified against the 3.2.2 image with podman (`id -u` → 1000);
+        # the image's own `appuser` is unprivileged and needs write access to
+        # /app/data, which it refuses to start without.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: homebox-companion
+        ports:
+          http:
+            appProtocol: http
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+          # Discovered by Homepage: it lists HTTPRoutes carrying this annotation
+          # and derives href from the hostname below — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: HomeBox Companion
+          gethomepage.dev/description: AI photo intake for the home inventory
+          gethomepage.dev/group: Household
+          gethomepage.dev/icon: homebox.png
+        hostnames:
+          - homebox-companion.waltr.tech
+        parentRefs:
+          # Internal only: same reasoning as homebox itself. Adding an
+          # envoy-external parentRef here is the whole publish step if the phone
+          # ever needs it off-LAN — but this UI can write the inventory.
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      # Ephemeral on purpose. Configuration is declarative in this file, and a
+      # PVC would only persist whatever a model/profile changed in the UI —
+      # state that would then disagree with git. Homebox itself holds the
+      # inventory, which is the only thing worth keeping.
+      #
+      # Not optional: the app refuses to serve until it can create, replace and
+      # delete files in /app/data.
+      data:
+        type: emptyDir
+        globalMounts:
+          - path: /app/data

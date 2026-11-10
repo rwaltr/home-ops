@@ -56,3 +56,10 @@ description = "Grafana service account token (mcp-grafana)"
 provider = "op"
 value = "paperless/api_token"
 description = "Paperless-ngx API token (paperless:seed)"
+# Client credential, not server config: the `homebox` item holds the API key
+# pepper the server HMACs keys with, and adding this key there would invite
+# rotating the wrong field. Issued one-time in HomeBox Profile → API Keys.
+[secrets.HOMEBOX_TOKEN]
+provider = "op"
+value = "homebox-mcp/API_KEY"
+description = "HomeBox API key (hb_…) for the agent MCP server"
