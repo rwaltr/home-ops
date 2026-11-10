@@ -52,6 +52,32 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "true"
+        initContainers:
+          # kubelet creates the models hostPath as root:root, and the image's
+          # entrypoint only chowns its own dirs (data/media/consume/tmp) — so the
+          # app, running as uid 1000, cannot write its HuggingFace cache and the
+          # LLM index build dies with EACCES on the xet log dir. Chown it here.
+          # Reuses the app image, so there is no extra image to pull or pin.
+          chown-models:
+            image:
+              repository: ghcr.io/paperless-ngx/paperless-ngx
+              tag: 3.4.2@sha256:d704e84f88300eb6ab001ab15720a2330ff99169cf9f94d6b8fcc44b63a84c84
+            command: ["bash", "-c", "chown -R 1000:1000 /usr/src/paperless/models"]
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+                add: ["CHOWN", "FOWNER", "DAC_OVERRIDE"]
+            resources:
+              requests:
+                cpu: 5m
+                memory: 16Mi
+              limits:
+                memory: 64Mi
         containers:
           app:
             image:
@@ -299,4 +325,6 @@ spec:
         advancedMounts:
           app:
             app:
+              - path: /usr/src/paperless/models
+            chown-models:
               - path: /usr/src/paperless/models
