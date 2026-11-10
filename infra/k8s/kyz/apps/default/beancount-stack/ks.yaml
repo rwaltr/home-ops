@@ -5,15 +5,27 @@ kind: Kustomization
 metadata:
   name: beancount-stack
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/beancount-stack/app
+  postBuild:
+    substitute:
+      APP: beancount
+      PVC: beancount-data
+      # Distinct hour (1-16 are taken). The mover reads the live PVC —
+      # openebs-hostpath has no CSI snapshots — so one mover Job per hour keeps
+      # two of them from racing for the same node.
+      KOPIUR_CRON: "H 17 * * *"
+      # KOPIUR_RUNAS is left at the component default of 1000:1000, which is
+      # what this pod runs as; fsGroup 1000 makes the PVC readable by the mover.
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
   targetNamespace: default
-  # No kopiur component on purpose: there is no PVC to snapshot. The ledger is
-  # a ConfigMap in git, so it is already versioned and backed up. That changes
-  # the moment the real ledger lands in a PVC - see docs/beancount-stack.md.
+  dependsOn:
+    - name: openebs # PVC on the openebs-hostpath storage class
+      namespace: openebs
   wait: false
