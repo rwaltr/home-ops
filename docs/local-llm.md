@@ -1,8 +1,9 @@
 # LiteLLM gateway (cloud chat + audio)
 
-One OpenAI-compatible endpoint for cloud models and speech: OpenRouter chat plus
-whisper / piper audio, with key auth, spend tracking and model aliasing. Defined
-in `infra/k8s/kyz/apps/default/litellm/`.
+One OpenAI-compatible endpoint for cloud models, self-hosted models and
+speech: OpenRouter chat, Dan Manners' shared LiteLLM gateway (self-hosted
+Qwen3-32B / Llama / gpt-oss), plus whisper / piper audio, with key auth, spend
+tracking and model aliasing. Defined in `infra/k8s/kyz/apps/default/litellm/`.
 
 |              |                                                                           |
 | ------------ | ------------------------------------------------------------------------- |
@@ -41,11 +42,31 @@ never have hosted it. Community OpenAI-compatible wrappers exist
 
 ## Live models
 
-| Model                 | Backend    | Notes                                                             |
-| --------------------- | ---------- | ----------------------------------------------------------------- |
-| `deepseek-v4.1-flash` | OpenRouter | Cloud; key reused from `hermes-secret`.                           |
-| `whisper`             | speaches   | `audio_transcription` (faster-whisper small-int8).                |
-| `piper`               | speaches   | `audio_speech`. Pass `voice` through, e.g. `en_US-glados-medium`. |
+| Model                 | Backend       | Notes                                                                   |
+| --------------------- | ------------- | ----------------------------------------------------------------------- |
+| `deepseek-v4.1-flash` | OpenRouter    | Cloud; key reused from `hermes-secret`.                                 |
+| `nvidia-llama`        | Dan's gateway | Self-hosted **Qwen3-32B** (vLLM, nvfp4). 151k context. Best local pick. |
+| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware. 229k context.                      |
+| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`. 114k context.                            |
+| `whisper`             | speaches      | `audio_transcription` (faster-whisper small-int8).                      |
+| `piper`               | speaches      | `audio_speech`. Pass `voice` through, e.g. `en_US-glados-medium`.       |
+
+## Dan Manners' gateway
+
+A second LiteLLM proxy at `https://llm.cloud.danmanners.com/v1`, reached with
+its own outbound key (1P item `llm.cloud.danmanners.com`, field `credential` →
+`DANMANNERS_LLM_API_KEY` in `litellm-secret`; the pod picks it up via the
+existing `envFrom`). It exposes ~28 models; only the three backed by hardware on
+his network are aliased here — the rest of his catalog is cloud-backed and
+proxying it would just be a second hop to OpenRouter/Z.ai.
+
+Useful distinction when adding more: query
+`GET /v1/model/info` with the key and read
+`litellm_params.model` / `litellm_params.api_base`. Anything with an
+`api_base` pointing at `*.aiml.svc.cluster.local` or a LAN IP is self-hosted;
+an empty `api_base` with an `openrouter/...` or vendor `/...` model is cloud.
+Names can lie — his `media-analysis`, `decision` and `embed-text` are cloud
+(Google, OpenAI, OpenRouter), not local.
 
 ## Adding a model
 
@@ -134,4 +155,5 @@ kubectl exec -n default -c app deploy/litellm -- \
   print([m["id"] for m in json.loads(u.urlopen(r).read())["data"]])'
 ```
 
-Expect exactly `deepseek-v4.1-flash`, `whisper`, `piper`.
+Expect `deepseek-v4.1-flash`, `nvidia-llama`, `intel-llama`, `gptoss-llama`,
+`whisper`, `piper`.
