@@ -95,6 +95,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/homepage.md` — Homepage service dashboard
 - `docs/hermes-agent.md` — Hermes agent
 - `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)
+- `docs/beancount-stack.md` — Beancount v3 + Fava (ledger UI, internal-only; example ledger, real data TBD)
 - TODOs: `git grep "TODO:"`
 
 ## 🔍 Common Tasks

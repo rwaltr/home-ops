@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: beancount-stack
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/beancount-stack/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  # No kopiur component on purpose: there is no PVC to snapshot. The ledger is
+  # a ConfigMap in git, so it is already versioned and backed up. That changes
+  # the moment the real ledger lands in a PVC - see docs/beancount-stack.md.
+  wait: false
