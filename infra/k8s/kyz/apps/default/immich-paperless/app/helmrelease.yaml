@@ -40,9 +40,8 @@ spec:
         cronjob:
           schedule: "*/15 * * * *"
           concurrencyPolicy: Forbid
-          # One job in flight is enough; keep a little history for debugging.
-          successfulJobsHistoryLimit: 1
-          failedJobsHistoryLimit: 3
+          # One attempt: a transient Immich/network failure is retried by the next
+          # 15-minute tick anyway, so backoff just delays the obvious.
           backoffLimit: 1
         containers:
           bridge:

@@ -46,9 +46,14 @@ data:
             data=data,
             headers={"x-api-key": KEY, "Content-Type": "application/json", "Accept": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            body = resp.read()
-            return body if raw else json.loads(body or b"{}")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                body = resp.read()
+                return body if raw else json.loads(body or b"{}")
+        except urllib.error.HTTPError as err:
+            # A bare traceback is useless in a CronJob log. 401/403 almost always
+            # means the 1Password "immich" password is not an Immich API key.
+            sys.exit(f"Immich API returned {err.code} for {method} {path}: check IMMICH_API_KEY")
 
 
     def safe_name(asset):
