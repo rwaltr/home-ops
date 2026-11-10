@@ -12,7 +12,9 @@
 # (infra/terraform/tailscale/policy.hujson) or device creation fails later.
 resource "tailscale_oauth_client" "operator" {
   # Capped at 50 characters by the provider.
-  description = "mouse k8s operator (infra/terraform/bootstrap)"
+  # Tailscale rejects punctuation here (parentheses and slashes included), so the
+  # description stays alphanumeric with spaces and dashes.
+  description = "mouse k8s operator - home-ops repo"
   scopes      = ["devices:core", "auth_keys", "services"]
   tags        = ["tag:k8s-operator"]
 }

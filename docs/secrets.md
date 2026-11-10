@@ -26,6 +26,37 @@ only thing in the repo that writes to 1Password. It cannot create the credential
 it authenticates as, so that one is hand-made — see `docs/tailscale.md` for the
 one-time step.
 
+**That account needs read _and write_ on the vault.** Reading is the everyday case
+(`secrets:verify`, `op` lookups) and read-only access satisfies all of it, so a
+read-only account fails at the first write and nowhere earlier:
+
+```text
+Error creating 1Password item ... you do not have the right permissions to
+perform this action: not sufficient permissions for the item update operation
+```
+
+Grant it read/write in 1Password (Developer → Service Accounts → the account → the
+`home-ops` vault). Terraform cannot repair that from the outside. A failed apply
+leaves whatever it managed to create — credentials sitting in state rather than in
+1Password — so grant access and re-run; it creates only what is missing.
+
+### Running an apply without a human
+
+`mise run tf:apply` asks for confirmation and Terraform asks again, so a
+non-interactive apply (CI, an agent) has to answer both:
+
+```bash
+MISE_YES=1 TF_CLI_ARGS_apply=-auto-approve mise run tf:apply <workspace>
+```
+
+Without the second, the run aborts before changing anything with
+`error asking for approval: EOF`. And never pipe a _running_ `terraform` command
+into `head` or anything else that exits early — the SIGPIPE kills it mid-plan and
+the cloud backend keeps the state lock, which then blocks every later command.
+Redirect to a file and read the file. A lock you own clears with
+`terraform force-unlock` given the **workspace path** (`<org>/<workspace>`) as the
+id, not the UUID the error also prints.
+
 ## Checking it
 
 ```bash
@@ -68,18 +99,21 @@ silently — certificates simply stop renewing — so the flip is a separate ste
 can verify and undo.
 
 1. `mise run tf:apply bootstrap` — mints both tokens and writes the two items.
-2. Check the tokens work before anything depends on them (this prints no token):
+2. Confirm both tokens exist and are active. These are account-owned, so read
+   them with the account token instead of revealing the tokens themselves (account
+   id: `infra/terraform/bootstrap/cloudflare-tokens.tf`):
 
    ```bash
-   for i in cloudflare-external-dns cloudflare-cert-manager; do
-     T=$(op item get "$i" --vault home-ops --fields password --reveal)
-     curl -s -H "Authorization: Bearer $T" \
-       https://api.cloudflare.com/client/v4/user/tokens/verify | jq -c .result
-     unset T
-   done
+   CF=$(fnox get CLOUDFLARE_API_TOKEN)
+   curl -s -H "Authorization: Bearer $CF" \
+     "https://api.cloudflare.com/client/v4/accounts/<account_id>/tokens?per_page=50" |
+     jq -r '.result[] | select(.name | startswith("home-ops-")) |
+       "\(.name)  \(.status)  \(.expires_on)  zones: \([.policies[].resources | keys[]] | join(","))"'
    ```
 
-   Expect `{"status":"active", ...}` from each.
+   Expect `home-ops-external-dns` with one zone id and `home-ops-cert-manager`
+   with two, both `active`, both expiring together. That proves the scope before
+   anything depends on it; step 4 is what proves they work.
 
 3. Flip one service at a time, starting with external-dns. In
    `infra/k8s/kyz/apps/network/external-dns/app/externalsecret.yaml`, the token
