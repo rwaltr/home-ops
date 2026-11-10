@@ -4,9 +4,10 @@ Device-identity access to services that should not be published to the open
 internet. VPN only — this is transport and network identity, not application
 authentication; there is no AAA here and no app SSO.
 
-The host already ships `tailscaled` (Flatcar sysext 1.102.2, see
-`infra/flatcar/butane/base.bu`) and `envoy.yaml` already reserves the external
-VIPs for it. What had never been built is the cluster side.
+The host ships `tailscaled` (Flatcar sysext 1.102.2, see
+`infra/flatcar/butane/base.bu`) and is joined as the device `mouse`. The cluster
+side is the operator below: a second device, plus a subnet router that makes the
+internal services reachable from anywhere on the tailnet.
 
 ## What Terraform owns
 
@@ -15,7 +16,7 @@ Cloud):
 
 | Workspace   | Directory                    | Owns                                                     |
 | ----------- | ---------------------------- | -------------------------------------------------------- |
-| `tailscale` | `infra/terraform/tailscale/` | tailnet policy file, MagicDNS, tailnet settings          |
+| `tailscale` | `infra/terraform/tailscale/` | tailnet policy file, MagicDNS, settings, split DNS       |
 | `bootstrap` | `infra/terraform/bootstrap/` | the operator's OAuth client, and writing it to 1Password |
 
 `bootstrap` is the only project in the repo that holds `OP_SERVICE_ACCOUNT_TOKEN`,
@@ -91,7 +92,9 @@ Two things worth knowing about `bootstrap`:
 
 ```bash
 mise run tf:check                       # fmt, init, validate across all workspaces
-tailscale status                        # on mouse, after joining the tailnet
+tailscale status                        # on mouse: is the host connected
+kubectl -n network get pods             # operator, and the connector's proxy
+kubectl -n network get connector cluster -o yaml   # routes, and their approval
 ```
 
 The tailnet policy file is also readable as a whole:
@@ -118,11 +121,38 @@ secret passes through a HelmRelease.
 Credential changes are read once, at startup, so the operator carries
 `reloader.stakater.com/auto`.
 
+## Reaching cluster services from the tailnet
+
+A `Connector` (`connector.yaml`, beside the operator) advertises the Cilium
+LoadBalancer VIP range — `10.10.100.0/24` and its IPv6 counterpart — so tailnet
+clients reach `envoy-internal` and `envoy-external` at the same addresses LAN
+clients use. One device and one object, and the 26 HTTPRoutes stay the only
+description of what exists.
+
+Split DNS is the other half (`dns.tf`, `waltr.tech` → k8s-gateway at
+`10.10.100.53`). Without it a tailnet client cannot resolve the internal
+hostnames at all: the public zone carries only what external-dns published
+through `envoy-external`. k8s-gateway answers each HTTPRoute with the VIP of the
+Gateway serving it, so internal and public hostnames each resolve correctly.
+
+Routes are approved by `autoApprovers.routes` in `policy.hujson` rather than by
+clicking them in the console, so the capability stays declarative — and the
+Connector has to be created _after_ that policy lands, or its routes sit
+unapproved.
+
+The trade, stated plainly: this is network-level access for **every device in the
+tailnet**, including the internal apps that have no login of their own. That is
+what being on the LAN already means. A per-app `Ingress` with
+`ingressClassName: tailscale` inverts it — per-app granularity and ACLs, at the
+cost of a proxy pod per app, hostnames that are not `waltr.tech`, and traffic
+that bypasses envoy entirely.
+
 ## Not yet built
 
-- **Exposing the gateway on the tailnet.** Two shapes, and the choice depends on
-  how Envoy Gateway manages its Service: annotate the generated Service so the
-  LAN VIP and a tailnet address both work, or create per-app `Ingress` objects
-  with `ingressClassName: tailscale` — more objects, but every one owned in git.
-- **Joining mouse to the tailnet**, which is `tailscale up --hostname=mouse`
-  followed by approving the device.
+- **API server proxy** (`apiServerProxyConfig`), so `kubectl` works from a
+  tailnet device without network access to the API.
+- **ACLs.** The policy file is still Tailscale's stock `src: ["*"] dst:
+["*:*"] accept`. Fine for one user, and a plain statement of the current
+  posture rather than a plan.
+- **The host's node key.** `mouse` authenticates as a user device, so its key
+  expires after 180 days; tagged devices are exempt.

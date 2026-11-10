@@ -62,6 +62,15 @@
         "services": {
             "tag:k8s": ["tag:k8s"],
         },
+        // The k8s operator's Connector advertises the cluster's LoadBalancer VIP
+        // range. Without this, its subnet routes sit unapproved until somebody
+        // clicks them in the console — which would make the operator's own
+        // capability depend on a human. tag:k8s is what the Connector device
+        // carries (the operator tags its proxies with it).
+        "routes": {
+            "10.10.100.0/24": ["tag:k8s"],
+            "fdad:207a:f1ab:100::/64": ["tag:k8s"],
+        },
     },
 
     // Test access rules every time they're saved.
