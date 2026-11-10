@@ -149,6 +149,13 @@ spec:
     retryOn:
       triggers:
         - reset
+  # Envoy's route timeout defaults to 15s when unset, which truncates any
+  # response that streams longer than that — i.e. large/slow media (a 1.3GB
+  # Immich video, Jellyfin direct-play). 0s disables it; dead connections are
+  # still reaped by the stream idle timeout.
+  timeout:
+    http:
+      requestTimeout: 0s
   targetSelectors:
     - group: gateway.networking.k8s.io
       kind: Gateway
