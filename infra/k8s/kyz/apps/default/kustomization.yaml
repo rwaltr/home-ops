@@ -39,6 +39,7 @@ resources:
   - ./freshrss/ks.yaml
   - ./navidrome/ks.yaml
   - ./homebox/ks.yaml
+  - ./homebox-companion/ks.yaml
   - ./kitchenowl/ks.yaml
   - ./homepage/ks.yaml
   - ./beancount-stack/ks.yaml

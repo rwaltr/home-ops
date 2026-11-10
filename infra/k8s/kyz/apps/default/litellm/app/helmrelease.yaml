@@ -233,6 +233,30 @@ spec:
                 litellm_params:
                   model: openrouter/deepseek/deepseek-v4.1-flash
                   api_key: os.environ/OPENROUTER_API_KEY
+              # Vision aliases for photo intake. homebox-companion calls this
+              # proxy through the LiteLLM *library* with an OpenAI-compatible
+              # api_base, so it addresses these as `openai/<alias>` and the
+              # proxy resolves the alias. Both read image input; both were
+              # measured on a real walkthrough (49 frames @1fps) before this
+              # was added — see the comparison in REFACTOR_PLANS.md.
+              #   qwen3.8-omni-flash — companion's default. Also takes audio
+              #   and video, which is why the walkthrough-intake route uses it:
+              #   one 49s clip cost ~26.7k tokens and returned 20 items, more
+              #   cheaply than 49 still frames. Slower per photo (19.3s avg,
+              #   96.7s worst) than luna (9.0s/18.1s), so swap in Settings if
+              #   the photo path feels sluggish.
+              #   gpt-5.6-luna — companion's own documented default, and the
+              #   faster of the two on single photos.
+              # Image barcodes are read by both, with occasional bad digits:
+              # validate the ISBN-13 check digit before trusting one.
+              - model_name: qwen3.8-omni-flash
+                litellm_params:
+                  model: openrouter/qwen/qwen3.8-omni-flash
+                  api_key: os.environ/OPENROUTER_API_KEY
+              - model_name: gpt-5.6-luna
+                litellm_params:
+                  model: openrouter/openai/gpt-5.6-luna
+                  api_key: os.environ/OPENROUTER_API_KEY
               # Dan Manners' shared LiteLLM gateway — another LiteLLM proxy at
               # https://llm.cloud.danmanners.com/v1. Only the models backed by
               # hardware on his network are aliased here: they cost nothing and
