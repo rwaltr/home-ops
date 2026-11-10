@@ -828,17 +828,23 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   reverted back to the slim stack. Revisit later (try a fresh node/containerd
   or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
-- **Video playback hung for external users** (2026-11-10): the cloudflared
-  connector used the default QUIC edge protocol, whose connection-level
-  flow-control credit (`MAX_DATA`) intermittently stalls while the edge keeps
-  routing requests to that connection, so cloudflared cannot send response data
-  — large/streaming bodies (Immich video playback and hover previews) hang until
-  the client gives up. Signature: `stream N canceled by remote with error code 0`
-  on `/api/assets/*/video/playback`, plus repeated QUIC `no recent network
-  activity` / `datagram manager` reconnects (cloudflared#1767, #1519). Fixed by
-  forcing `--protocol http2` in the cloudflare-tunnel args; verify with
-  `kubectl -n network logs deploy/cloudflare-tunnel | grep protocol=` (expect
-  `protocol=http2`). LAN traffic never touches the tunnel, so it was unaffected.
+- **Video playback hung for external users** (2026-11-10). Two independent
+  faults were involved.
+  - **The real one — gateway route timeout.** Untimed HTTPRoutes inherit Envoy's
+    15 s default route timeout, so any response that streams longer than 15 s is
+    silently truncated. Measured: a 1.33 GB video died at exactly 15.0 s through
+    `envoy-internal` when throttled (and via CF), while sub-15 s media
+    completed — hence "some videos" failing. Fixed by `timeout.http.requestTimeout:
+    0s` on the shared `BackendTrafficPolicy/envoy` (`envoy.yaml`); the stream
+    idle timeout still reaps dead connections.
+  - **QUIC connector stalls.** The cloudflared connector also used the default
+    QUIC edge protocol, whose connection-level flow-control credit (`MAX_DATA`)
+    intermittently stalls while the edge keeps routing requests to it
+    (cloudflared#1767, #1519; signature `stream N canceled by remote with error
+    code 0` + repeated QUIC reconnects). Forced `--protocol http2` in the
+    cloudflare-tunnel args; verify with `grep protocol=` (expect `protocol=http2`).
+  - LAN traffic never touches the tunnel, but it *does* cross the gateway — the
+    timeout affected internal playback too.
 
 ### 2026-09-22 — OTBR moved in-cluster; HA zeroconf needed per-VLAN enablement
 
