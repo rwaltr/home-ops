@@ -1,0 +1,100 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/configmap
+# The bridge script, mounted read-only. Deliberately standard library only, so
+# the job needs no pip install and cannot drift from a requirements file.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: immich-paperless-script
+data:
+  bridge.py: |
+    #!/usr/bin/env python3
+    """Copy new Immich album assets into Paperless's consume directory.
+
+    Standard library only: the job runs from a stock python image with no pip
+    install, so it cannot drift from its dependencies.
+
+    State lives in Immich, not here: an asset is considered sent once it carries
+    SENT_TAG. That makes the job idempotent across reruns and node restarts, and it
+    is visible in the Immich UI rather than hidden in a volume nobody looks at.
+    """
+
+    import datetime
+    import json
+    import os
+    import pathlib
+    import sys
+    import urllib.request
+
+    IMMICH = os.environ.get("IMMICH_URL", "http://immich-server.default.svc.cluster.local:2283")
+    KEY = os.environ.get("IMMICH_API_KEY", "")
+    ALBUM = os.environ.get("IMMICH_ALBUM", "Paperless")
+    SENT_TAG = os.environ.get("SENT_TAG", "paperless-sent")
+    CONSUME = pathlib.Path(os.environ.get("CONSUME_DIR", "/consume"))
+
+    # What Paperless can ingest. Everything else (notably HEIC from iPhones) is
+    # fetched as Immich's fullsize JPEG instead: Paperless has no HEIC support, and
+    # its consumer would fail the file rather than convert it.
+    SAFE_EXT = {".jpg", ".jpeg", ".png", ".pdf", ".tif", ".tiff", ".webp", ".gif", ".txt"}
+
+
+    def api(path, method="GET", payload=None, raw=False):
+        data = json.dumps(payload).encode() if payload is not None else None
+        req = urllib.request.Request(
+            f"{IMMICH}/api{path}",
+            method=method,
+            data=data,
+            headers={"x-api-key": KEY, "Content-Type": "application/json", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            body = resp.read()
+            return body if raw else json.loads(body or b"{}")
+
+
+    def safe_name(asset):
+        stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
+        keep = "".join(c if c.isalnum() or c in " -_" else "-" for c in stem).strip() or "photo"
+        when = (asset.get("fileCreatedAt") or "")[:10] or datetime.date.today().isoformat()
+        ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
+        if ext not in SAFE_EXT:
+            return f"{when} immich {keep[:48]}.jpg"
+        return f"{when} immich {keep[:48]}{ext}"
+
+
+    def main():
+        if not KEY:
+            sys.exit("IMMICH_API_KEY is empty: create an Immich API key and put it in 1Password (see docs/paperless.md)")
+
+        album = next((a for a in api("/albums?withoutAssets=false") if a.get("albumName") == ALBUM), None)
+        if album is None:
+            sys.exit(f"no Immich album named {ALBUM!r}: create it and add receipt photos to it")
+
+        tag = next((t for t in api("/tags") if t.get("name") == SENT_TAG), None)
+        if tag is None:
+            tag = api("/tags", "POST", {"name": SENT_TAG})
+
+        assets = album.get("assets") or []
+        sent = 0
+        for asset in assets:
+            if any((t or {}).get("name") == SENT_TAG for t in (asset.get("tags") or [])):
+                continue
+            ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
+            if ext in SAFE_EXT:
+                path, suffix = f"/assets/{asset['id']}/original", ext
+            else:
+                path, suffix = f"/assets/{asset['id']}/thumbnail?size=fullsize", ".jpg"
+            dest = CONSUME / safe_name(asset)
+            if dest.suffix.lower() != suffix:
+                dest = dest.with_suffix(suffix)
+            dest.write_bytes(api(path, raw=True))
+            # 0644 because the Paperless consumer runs as uid 1000 and must read it.
+            os.chmod(dest, 0o644)
+            api(f"/tags/{tag['id']}/assets", "PUT", {"ids": [asset["id"]]})
+            print(f"sent {asset['id']} ({asset.get('originalFileName')}) -> {dest.name}", flush=True)
+            sent += 1
+
+        print(f"done: {sent} sent, {len(assets)} in album {ALBUM!r}", flush=True)
+
+
+    if __name__ == "__main__":
+        main()

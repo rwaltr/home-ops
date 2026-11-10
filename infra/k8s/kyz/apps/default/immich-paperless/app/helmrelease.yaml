@@ -1,0 +1,103 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# immich-paperless — moves documents out of Immich and into Paperless.
+#
+# The gap this fills: a receipt photographed on the phone lands in Immich and
+# stays there. Immich's ML container is not deployed here, so there is no
+# content-based "this looks like a document" detection to lean on — detection is
+# therefore explicit: drop the photo in the Immich album named by IMMICH_ALBUM.
+#
+# It writes into Paperless's consume directory rather than calling the upload
+# API, because docs/paperless.md already defines that directory as the bridge
+# handoff: Paperless's own consumer then does OCR and its workflows assign the
+# document type and `accounting/inbox` tag, exactly as for any other document.
+# The upshot is that this job needs no Paperless credential, only an Immich one.
+#
+# Idempotent by tag: an asset is skipped once it carries SENT_TAG, so reruns and
+# overlapping schedules cannot produce duplicates in the archive.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich-paperless
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: immich-paperless
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: immich-paperless
+    controllers:
+      bridge:
+        type: cronjob
+        cronjob:
+          schedule: "*/15 * * * *"
+          concurrencyPolicy: Forbid
+          # One job in flight is enough; keep a little history for debugging.
+          successfulJobsHistoryLimit: 1
+          failedJobsHistoryLimit: 3
+          backoffLimit: 1
+        containers:
+          bridge:
+            image:
+              repository: python
+              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+            command: ["python3", "/scripts/bridge.py"]
+            env:
+              IMMICH_URL: http://immich-server.default.svc.cluster.local:2283
+              # The album is the trigger. Rename here if you rename it in Immich.
+              IMMICH_ALBUM: Paperless
+              # Tag applied after a successful handoff; also the idempotency key.
+              SENT_TAG: paperless-sent
+              CONSUME_DIR: /consume
+            envFrom:
+              - secretRef:
+                  name: immich-paperless
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                # Downloads and writes one photo at a time; no need to hold more.
+                memory: 256Mi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        # uid 1000 owns the consume hostPath (the Paperless image chowns it), and
+        # it is also what the written files should be readable by.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+    persistence:
+      script:
+        type: configMap
+        name: immich-paperless-script
+        globalMounts:
+          - path: /scripts
+            readOnly: true
+      # The same dropbox the Paperless consumer watches. A hostPath because
+      # Paperless keeps media and consume on tank, outside any PVC.
+      consume:
+        type: hostPath
+        hostPath: /var/tank/nas/paperless/consume
+        globalMounts:
+          - path: /consume
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

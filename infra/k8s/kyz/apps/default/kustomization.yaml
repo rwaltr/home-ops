@@ -43,6 +43,7 @@ resources:
   - ./kitchenowl/ks.yaml
   - ./homepage/ks.yaml
   - ./beancount-stack/ks.yaml
+  - ./immich-paperless/ks.yaml
   # Matrix comms-channel demo for the self-hosted agent — retired 2026-11-09, see
   # docs/comms-demos.md. Commented out rather than deleted, in the same style as
   # the other disabled apps: reconciling this prunes tuwunel, element-web AND the

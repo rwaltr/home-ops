@@ -159,3 +159,40 @@ Recreate`); never run two pods against `data/`.
 - **The PVC name is pinned** with `forceRename: paperless-data`: app-template
   only suffixes PVC names once a second PVC exists, and the kopiur policy
   references this exact name.
+
+## Immich bridge (photo → archive)
+
+Receipts photographed on a phone land in Immich and used to stay there.
+`immich-paperless` (`infra/k8s/kyz/apps/default/immich-paperless/`) is a
+CronJob that every 15 minutes:
+
+1. lists the Immich album named `Paperless` — the trigger. Detection is
+   **explicit**, because Immich's ML container is not deployed here, so there is
+   no content-based "this looks like a document" signal to lean on;
+2. skips any asset already carrying the `paperless-sent` tag;
+3. downloads the original — or, for formats Paperless cannot read (HEIC straight
+   off an iPhone), Immich's `fullsize` JPEG. The bridge never hands
+   Paperless a HEIC, because its consumer would fail the file rather than
+   convert it;
+4. writes it into the consume dropbox as `<date> immich <name>.<ext>`, mode 0644
+   so the consumer (uid 1000) can read it;
+5. tags the asset `paperless-sent`.
+
+Paperless then does everything it normally does: OCR, then its workflows assign
+the document type and the `accounting/inbox` tag. **The bridge holds no
+Paperless credential** — it only writes into the dropbox — so its only secret is
+an Immich API key.
+
+State lives in Immich (the tag), not in a volume, so the job is idempotent and
+restartable, and "did this one get sent?" is answerable from the Immich UI.
+
+### Setting it up
+
+1. Create the album `Paperless` in Immich and add a receipt photo to it.
+2. Create an Immich API key (Account Settings → API Keys).
+3. Add it to 1Password as a LOGIN item named `immich`, with the key in the
+   **password** field — the ExternalSecret reads `immich/password`.
+4. `mise run secrets:verify` should then report it as resolving.
+
+Until step 3 the CronJob's pods fail with an explicit message instead of
+silently doing nothing.
