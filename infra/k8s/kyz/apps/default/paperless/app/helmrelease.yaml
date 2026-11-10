@@ -79,6 +79,26 @@ spec:
               PAPERLESS_TIKA_ENDPOINT: http://paperless-tika:9998
               PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://paperless-gotenberg:3000
               PAPERLESS_EMAIL_PARSE_DEFAULT_LAYOUT: "2" # HTML then text
+              # Native AI (Paperless 3.0+), off by default. Generation —
+              # suggestions and document chat — runs on Qwen3-32B through the
+              # local LiteLLM, which proxies Dan Manners' self-hosted vLLM (his
+              # proxy does not store prompt/response content; see
+              # docs/local-llm.md). Embeddings stay local in-process, so the RAG
+              # index needs no second backend and no embedding API key.
+              PAPERLESS_AI_ENABLED: "true"
+              PAPERLESS_AI_LLM_BACKEND: openai-like
+              PAPERLESS_AI_LLM_MODEL: nvidia-llama
+              PAPERLESS_AI_LLM_ENDPOINT: http://litellm.default.svc.cluster.local:4000/v1
+              PAPERLESS_AI_LLM_API_KEY:
+                secretKeyRef:
+                  name: litellm-secret
+                  key: LITELLM_MASTER_KEY
+              PAPERLESS_AI_LLM_EMBEDDING_BACKEND: huggingface
+              PAPERLESS_AI_LLM_EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+              # Model cache. The default is the data dir (the kopia-backed PVC),
+              # which would put ~90MB of re-downloadable weights into every
+              # snapshot; point it at the tank instead.
+              HF_HOME: /usr/src/paperless/models
             envFrom:
               - secretRef:
                   name: paperless-secret
@@ -119,7 +139,9 @@ spec:
             resources:
               requests:
                 cpu: 100m
-                memory: 512Mi
+                # Torch + the embedding model load in-process for local RAG
+                # embeddings; 512Mi left no room for that on top of OCR.
+                memory: 1Gi
               limits:
                 memory: 4Gi
       broker:
@@ -267,3 +289,14 @@ spec:
           app:
             app:
               - path: /usr/src/paperless/consume
+      # Hugging Face cache for the local embedding model (HF_HOME above).
+      # Re-downloadable, so deliberately not kopia-backed — same call as the
+      # LiteLLM model weights.
+      models:
+        type: hostPath
+        hostPath: /var/tank/nas/paperless/models
+        hostPathType: DirectoryOrCreate
+        advancedMounts:
+          app:
+            app:
+              - path: /usr/src/paperless/models

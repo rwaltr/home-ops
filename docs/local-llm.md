@@ -60,6 +60,17 @@ existing `envFrom`). It exposes ~28 models; only the three backed by hardware on
 his network are aliased here — the rest of his catalog is cloud-backed and
 proxying it would just be a second hop to OpenRouter/Z.ai.
 
+**What it retains.** Prompt/response content is **not** stored —
+`store_prompts_in_spend_logs` is unset (→ false), and spend-log rows come back
+with `messages={}` / `response={}` / `proxy_server_request={}`. Metadata _is_
+kept: `maximum_spend_logs_retention_period` is unset (→ no pruning), so the
+model, token counts, cost, timing, hashed key, requester IP and user agent of
+every request persist indefinitely. Daily aggregates currently span the
+instance's whole life (2026-10-11 → now). The key we hold is admin-level — an
+unfiltered `/spend/logs` returns global rows from other users, and
+`/config/list` answers — so treat it as broad read on his proxy, not a scoped
+virtual key.
+
 Useful distinction when adding more: query
 `GET /v1/model/info` with the key and read
 `litellm_params.model` / `litellm_params.api_base`. Anything with an

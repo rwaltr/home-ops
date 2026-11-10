@@ -40,6 +40,27 @@ image alone.
   `PAPERLESS_TIKA_ENDPOINT` and `PAPERLESS_TIKA_GOTENBERG_ENDPOINT`. There is no
   `PAPERLESS_GOTENBERG_ENDPOINT`; setting the wrong name fails silently.
 
+## AI features
+
+Native AI (Paperless 3.0+) is enabled: **suggestions** (title, tags,
+correspondent, document type, storage path, dates), **document chat** and
+**similar documents** (RAG). The non-LLM classifier still runs alongside it.
+
+- **Generation** — `nvidia-llama`, the self-hosted **Qwen3-32B** (151k context)
+  on Dan Manners' cluster, reached through the local LiteLLM. The key is
+  `litellm-secret` / `LITELLM_MASTER_KEY`. His proxy does **not** store prompt or
+  response content (`store_prompts_in_spend_logs` unset → false), so document
+  text never reaches his spend logs — it is still processed in memory on his
+  vLLM node. See `docs/local-llm.md` and the retention notes there.
+- **Embeddings** — `huggingface` with `sentence-transformers/all-MiniLM-L6-v2`,
+  running in-process. No embedding backend, no API key, nothing leaves the
+  cluster. Cache lives on the tank (see storage); first use downloads ~90 MB.
+- The two roles are independent. Swapping the generation model leaves the index
+  alone; changing the **embedding** model requires rebuilding the LLM index
+  (_Settings → LLM index_).
+- Knobs are `PAPERLESS_AI_*` in the HelmRelease, or the admin under _Settings →
+  Application Configuration_ — where the DB value overrides the env.
+
 ## Secrets (create before first boot)
 
 The ExternalSecret reads 1Password item **`paperless`** (vault `home-ops`):
@@ -72,11 +93,12 @@ Adding that parentRef is the whole publish step if it is ever wanted.
 
 Paperless puts everything under three defaults, mounted explicitly:
 
-| Mount                        | Backing                           | Contents                                   |
-| ---------------------------- | --------------------------------- | ------------------------------------------ |
-| `/usr/src/paperless/media`   | `/var/tank/nas/paperless/media`   | The archived documents (originals + PDF/A) |
-| `/usr/src/paperless/consume` | `/var/tank/nas/paperless/consume` | Ingestion dropbox                          |
-| `/usr/src/paperless/data`    | `paperless-data` PVC (5Gi)        | SQLite DB, search index, matcher model     |
+| Mount                        | Backing                           | Contents                                       |
+| ---------------------------- | --------------------------------- | ---------------------------------------------- |
+| `/usr/src/paperless/media`   | `/var/tank/nas/paperless/media`   | The archived documents (originals + PDF/A)     |
+| `/usr/src/paperless/consume` | `/var/tank/nas/paperless/consume` | Ingestion dropbox                              |
+| `/usr/src/paperless/data`    | `paperless-data` PVC (5Gi)        | SQLite DB, search index, matcher model         |
+| `/usr/src/paperless/models`  | `/var/tank/nas/paperless/models`  | Hugging Face embedding cache (re-downloadable) |
 
 `media` and `consume` are tank hostPaths (`DirectoryOrCreate`), so ZFS raidz1
 covers the documents — the same tradeoff as immich's photo library: redundant
@@ -95,6 +117,12 @@ snapshotted nightly, which is what preserves the metadata and tags.
 Recreate`); never run two pods against `data/`.
 - **Gotenberg and Tika are separate Deployments** sized for conversion spikes
   (the JVM sizes its heap from the Tika container's memory limit).
+- **The first AI call downloads the embedding model** (~90 MB) into the models
+  hostPath. The RAG index is rebuilt nightly at 02:10 by default
+  (`PAPERLESS_LLM_INDEX_TASK_CRON`) and on demand from the admin.
+- **Qwen3-32B is a reasoning model.** LiteLLM separates its thinking into
+  `reasoning_content`, so it does not pollute the answer, but suggestions spend
+  extra tokens/latency before emitting JSON.
 - **The PVC name is pinned** with `forceRename: paperless-data`: app-template
   only suffixes PVC names once a second PVC exists, and the kopiur policy
   references this exact name.

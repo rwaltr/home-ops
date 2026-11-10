@@ -1821,6 +1821,27 @@ Decisions worth recording:
     1000:1000, so there is no manual host `mkdir` step (unlike immich's
     library).
 
+### 2026-11-10 (later) — Paperless AI: Qwen3-32B generation, local embeddings
+
+Turned on Paperless' native AI (3.0+) and recorded the decisions:
+
+- **Generation on `nvidia-llama`** (self-hosted **Qwen3-32B**, 151k ctx) via the
+  local LiteLLM → Dan Manners' shared gateway. `deepseek-v4.1-flash` was only
+  the path of least resistance; Qwen3-32B is a stronger instruction model and
+  costs nothing. Verified it returns valid suggestion JSON with its thinking
+  separated into `reasoning_content`.
+- **Embeddings local** (`huggingface`, `all-MiniLM-L6-v2`) in-process — the
+  image ships torch/sentence-transformers, so no second backend, no key, and
+  document text stays in the cluster for the RAG index. Cache on the tank, not
+  the kopia-backed data PVC (weights are re-downloadable; ~90MB).
+- **Checked the friend's gateway before sending documents.** Content is *not*
+  retained (`store_prompts_in_spend_logs` unset → false; rows return
+  `messages={}`), but metadata is retained forever
+  (`maximum_spend_logs_retention_period` unset). Details in `docs/local-llm.md`.
+- **The key is admin-level** on his proxy (global `/spend/logs`, `/config/list`
+  both answer). Metadata exposure was accepted; worth scoping to a virtual key
+  if that ever changes.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
