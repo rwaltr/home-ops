@@ -316,7 +316,11 @@ data:
             # Any of these means the question is already answered: sent, archived, or
             # declined. paperless-maybe is deliberately absent, so assets queued by the
             # old OCR gate get a real verdict now instead of sitting in review forever.
-            if already_tagged(asset["id"], (SENT_TAG, DOC_TAG, SKIP_TAG)):
+            # Decided means the question is answered: sent, a document, or carrying any of
+            # the content tags this script writes. There is no skip tag - a photo that is not
+            # a document needs no record, and its description and content tags are that record.
+            # A tag the operator added by hand counts as their answer too.
+            if already_tagged(asset["id"], set(VOCAB) | {SENT_TAG, DOC_TAG}):
                 continue
             if vision_calls >= MAX_VISION_CALLS:
                 print(f"classify: {asset['id']} left for the next run, vision budget of {MAX_VISION_CALLS} spent", flush=True)
