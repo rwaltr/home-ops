@@ -270,9 +270,10 @@ only proposes.
 | `paperless-sent`  | the job | already handed to Paperless               |
 | `paperless-skip`  | you     | never suggest this one again              |
 
-To archive a suggestion: filter Immich by the `paperless-maybe` tag, add the
-real documents to the `Paperless` album, and the next run copies them. To
-decline one, replace its tag with `paperless-skip` — the job never re-tags an
+To archive a suggestion: filter Immich by the `paperless-maybe` tag (the tag page
+is `/tags`), add the real documents to the `Paperless` album, and the next run
+copies them. To decline one, replace its tag with `paperless-skip` — create that
+tag once, because the job reads it but never creates it. The job never re-tags an
 asset that already carries any of its own tags.
 
 State lives in Immich (the tags), not in a volume, so the job is idempotent,
