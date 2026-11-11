@@ -357,6 +357,9 @@ data:
     PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless-app.default.svc.cluster.local:8000").rstrip("/")
     PAPERLESS_KEY = os.environ.get("PAPERLESS_API_TOKEN", "")
     VISION_TAG = os.environ.get("VISION_TAG", "status/vision-enriched")
+    # Documents the model examined and could not read. Labelled rather than left
+    # untitled so they can be found and deleted.
+    USELESS_TAG = os.environ.get("USELESS_TAG", "useless")
     ENRICH_PROMPT = (
         "You are shown one photo of a receipt, invoice, bill or statement. Reply with JSON "
         "only, no prose and no code fence, in exactly this shape: "
@@ -394,6 +397,34 @@ data:
             if (item.get("name") or "").strip().lower() == name.lower():
                 return item["id"]
         return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+
+
+    def ensure_custom_field(name, data_type):
+        """The id of a custom field, created with the right type if this is the first."""
+        found = paperless("/custom_fields/?name=%s" % urllib.parse.quote(name))
+        for item in found.get("results", []):
+            if (item.get("name") or "").strip().lower() == name.lower():
+                return item["id"]
+        return paperless("/custom_fields/", "POST", {"name": name, "data_type": data_type})["id"]
+
+
+    def reading_block(answer):
+        """The model's reading as text, so it is searchable inside Paperless."""
+        title = (answer.get("title") or "").strip()
+        bits = []
+        for label, key in (
+            ("Merchant", "merchant"),
+            ("Transaction date", "date"),
+            ("Total", "total"),
+            ("Payment method", "payment_method"),
+            ("Reference", "reference"),
+        ):
+            value = answer.get(key)
+            if value not in (None, "", 0):
+                bits.append(f"{label}: {value}")
+        if not title and not bits:
+            return ""
+        return "--- read by the vision model ---\n" + "\n".join([b for b in [title] + bits if b])
 
 
     def vision_fields(asset_id):
@@ -436,8 +467,9 @@ data:
             answer = json.loads(text)
         except ValueError:
             return None, "unparsable answer"
-        if not isinstance(answer, dict) or not (answer.get("title") or "").strip():
-            return None, "answer had no title"
+        if not isinstance(answer, dict):
+            return None, "answer was not an object"
+        # A parsed but empty answer is still an answer: the caller labels it useless.
         return answer, ""
 
 
@@ -451,13 +483,15 @@ data:
         if merchant:
             patch["correspondent"] = ensure_named("correspondents", merchant)
         when = (answer.get("date") or "").strip()
-        if len(when) == 10 and when[4] == "-" and when[7] == "-":
+        dated = len(when) == 10 and when[4] == "-" and when[7] == "-"
+        if dated:
+            # created is the document's own date, which for a receipt is the transaction
+            # date. The custom field keeps the transaction date visible in its own right,
+            # because the two are not always the same thing.
             patch["created"] = when
         # Paperless replaces the whole custom-field list on PATCH, so merge with what is
         # there. Monetary fields carry the currency as a three-character prefix.
-        values = dict()
-        for entry in doc.get("custom_fields") or []:
-            values[entry["field"]] = entry["value"]
+        values = {entry["field"]: entry["value"] for entry in doc.get("custom_fields") or []}
         fields = {f["name"]: f["id"] for f in paperless("/custom_fields/?page_size=100").get("results", [])}
         total = answer.get("total")
         code = (answer.get("currency") or "").strip().upper()
@@ -467,9 +501,25 @@ data:
         for name, value in (("Payment method", answer.get("payment_method")), ("Reference", answer.get("reference"))):
             if isinstance(value, str) and value.strip() and name in fields:
                 values[fields[name]] = value.strip()[:128]
+        if dated:
+            values[ensure_custom_field("Transaction date", "date")] = when
         if values:
             patch["custom_fields"] = [{"field": k, "value": v} for k, v in values.items()]
-        # our own content tags, plus a status tag in the convention this stack uses
+        # Content is the only text Paperless can search, and a document whose OCR came back
+        # empty has none at all. Appended, never replaced: the OCR text is the raw evidence.
+        marker = "--- read by the vision model"
+        block = reading_block(answer)
+        existing = doc.get("content") or ""
+        if block and marker not in existing:
+            patch["content"] = (existing.rstrip() + "\n\n" + block).strip()
+        usable = any([
+            title,
+            merchant,
+            dated,
+            isinstance(total, (int, float)) and total > 0,
+            (answer.get("payment_method") or "").strip(),
+            (answer.get("reference") or "").strip(),
+        ])
         tag_ids = {t["name"]: t["id"] for t in paperless("/tags/?page_size=200").get("results", [])}
         # Paperless replaces the whole tag list too, so merge rather than assign: what the
         # document already carries stays. Immich hands back tag dicts, not names.
@@ -479,6 +529,8 @@ data:
             if name in VOCAB and name in tag_ids:
                 ids.append(tag_ids[name])
         ids.append(ensure_named("tags", VISION_TAG))
+        if not usable:
+            ids.append(ensure_named("tags", USELESS_TAG))
         patch["tags"] = sorted(set(ids))
         paperless("/documents/%s/" % doc["id"], "PATCH", patch)
         return len([k for k in patch if k != "tags"])
