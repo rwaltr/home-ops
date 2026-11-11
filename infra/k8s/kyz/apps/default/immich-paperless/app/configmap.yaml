@@ -237,8 +237,11 @@ data:
 
 
     def ensure_album():
+    # Listed exactly as send() does: with withoutAssets=true the albumName came back
+    # absent, so this created a second album named Paperless and the documents went
+    # into the copy while send() drained the empty original.
         """The Paperless album, created on first use. This album is the queue."""
-        for album in api("/albums?withoutAssets=true"):
+        for album in api("/albums?withoutAssets=false"):
             if album.get("albumName") == ALBUM:
                 return album["id"]
         return api("/albums", "POST", {"albumName": ALBUM})["id"]
