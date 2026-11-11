@@ -72,7 +72,6 @@ spec:
               LITELLM_URL: http://litellm.default.svc.cluster.local:4000
               VISION_MODEL: intel-vl
               # Immich OCR must beat this score to count as evidence of text.
-              MIN_OCR_SCORE: "0.5"
               # Per run, so a 500-photo day cannot quietly run up a bill.
               MAX_VISION_CALLS: "20"
             envFrom:
@@ -109,7 +108,6 @@ spec:
               CONSUME_DIR: /consume
               LITELLM_URL: http://litellm.default.svc.cluster.local:4000
               VISION_MODEL: intel-vl
-              MIN_OCR_SCORE: "0.5"
               MAX_VISION_CALLS: "20"
               # Long enough for Immich's own OCR job to finish and become evidence.
               UPLOAD_DEBOUNCE: "45"
