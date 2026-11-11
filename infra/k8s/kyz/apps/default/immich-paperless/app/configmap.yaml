@@ -123,7 +123,9 @@ data:
             asset = api(f"/assets/{asset_id}")
         except SystemExit:
             # Cannot read it (deleted mid-run, or a scope we lack): leave it alone
-            # rather than tag it again.
+            # rather than tag it again. Said out loud, because a silent skip here is
+            # indistinguishable from a working skip in the log.
+            print(f"warn: cannot read {asset_id}, leaving it untouched", flush=True)
             return True
         return bool({t.get("name") for t in asset.get("tags") or []} & set(names))
 
