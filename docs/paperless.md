@@ -228,33 +228,69 @@ Receipts photographed on a phone land in Immich and used to stay there.
 `immich-paperless` (`infra/k8s/kyz/apps/default/immich-paperless/`) is a
 CronJob that every 15 minutes:
 
-1. lists the Immich album named `Paperless` — the trigger. Detection is
-   **explicit**, because Immich's ML container is not deployed here, so there is
-   no content-based "this looks like a document" signal to lean on;
-2. skips any asset already carrying the `paperless-sent` tag;
-3. downloads the original — or, for formats Paperless cannot read (HEIC straight
-   off an iPhone), Immich's `fullsize` JPEG. The bridge never hands
-   Paperless a HEIC, because its consumer would fail the file rather than
-   convert it;
-4. writes it into the consume dropbox as `<date> immich <name>.<ext>`, mode 0644
+**classify** — every image added in the last 24 hours that carries none of the
+bridge's tags is scored against Immich's CLIP smart search (`DOC_QUERIES` in the
+script). Assets that come back for a document-ish query are tagged
+`paperless-maybe` so they can be reviewed in the UI. Immich's OCR text boxes are
+logged alongside as corroboration (`ocr_rows=N`), never as a gate: Immich only
+writes them once its OCR job has run, so anything added before OCR was enabled
+has none, and thresholding on them would silently classify nothing.
+
+**send** — assets in the Immich album named `Paperless` are copied into the
+consume dropbox:
+
+1. skips any asset already carrying `paperless-sent`, and any video (a video
+   would otherwise be archived as a single JPEG frame);
+2. downloads the original — or, for formats Paperless cannot read (HEIC straight
+   off an iPhone), Immich's `fullsize` JPEG. The bridge never hands Paperless a
+   HEIC, because its consumer would fail the file rather than convert it;
+3. writes it into the consume dropbox as `<date> immich <name>.<ext>`, mode 0644
    so the consumer (uid 1000) can read it;
-5. tags the asset `paperless-sent`.
+4. tags the asset `paperless-sent`.
 
 Paperless then does everything it normally does: OCR, then its workflows assign
 the document type and the `accounting/inbox` tag. **The bridge holds no
 Paperless credential** — it only writes into the dropbox — so its only secret is
 an Immich API key.
 
-State lives in Immich (the tag), not in a volume, so the job is idempotent and
-restartable, and "did this one get sent?" is answerable from the Immich UI.
+### The review loop
+
+The archive is permanent, so nothing enters it unreviewed — the automatic path
+only proposes.
+
+| Tag               | Set by  | Means                                     |
+| ----------------- | ------- | ----------------------------------------- |
+| `paperless-maybe` | the job | CLIP thinks this is a document; review it |
+| `paperless-sent`  | the job | already handed to Paperless               |
+| `paperless-skip`  | you     | never suggest this one again              |
+
+To archive a suggestion: filter Immich by the `paperless-maybe` tag, add the
+real documents to the `Paperless` album, and the next run copies them. To
+decline one, replace its tag with `paperless-skip` — the job never re-tags an
+asset that already carries any of its own tags.
+
+State lives in Immich (the tags), not in a volume, so the job is idempotent,
+restartable, and "did this one get sent?" is answerable from the Immich UI. A
+missing album is **not** an error: the album is opt-in, so an empty review queue
+is the normal state.
 
 ### Setting it up
 
-1. Create the album `Paperless` in Immich and add a receipt photo to it.
-2. Create an Immich API key (Account Settings → API Keys).
-3. Add it to 1Password as a LOGIN item named `immich`, with the key in the
-   **password** field — the ExternalSecret reads `immich/password`.
-4. `mise run secrets:verify` should then report it as resolving.
+1. Create an Immich API key (Account Settings → API Keys). The bridge needs
+   `album.read`, `asset.read`, `asset.view`, `asset.download`, `tag.read`,
+   `tag.create` and `tag.asset`.
+2. Add it to 1Password as an **API Credential** item named `paperless-bridge` in
+   the `home-ops` vault, with the key in the **credential** field. The
+   ExternalSecret reads `paperless-bridge/credential`, and the vault matters: the
+   ClusterSecretStore is pinned to `home-ops`, so an item in any other vault is
+   invisible to the sync.
+3. `mise run secrets:verify` should then report it as resolving.
 
-Until step 3 the CronJob's pods fail with an explicit message instead of
-silently doing nothing.
+Without step 2 the job fails with an explicit message instead of silently doing
+nothing.
+
+Backfilling is Immich UI work, not a mise task: Administration → Jobs → **OCR →
+All** gives existing photos OCR text (corroboration only), and **Smart Search →
+All** rebuilds embeddings if smart search ever returns nothing. The classify
+window is 24 hours; to classify the existing library in one go, run the script
+once with a wider `WINDOW_HOURS`.
