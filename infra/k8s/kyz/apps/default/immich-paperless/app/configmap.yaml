@@ -465,8 +465,11 @@ data:
     def handle(name, data):
         """Events are hints only. Anything we cannot read, we do not act on."""
         if name == "on_upload_success":
-            asset = (data or {}).get("asset") or {}
-            print("realtime: on_upload_success %s" % (asset.get("id") or "no id in payload"), flush=True)
+            # The payload is the asset itself - the server calls
+            # clientSend(event, ownerId, mapAsset(asset)) - so the id is top level.
+            # Logged only: the classify re-queries by window rather than trusting a
+            # shape that is not contractual.
+            print("realtime: on_upload_success %s" % ((data or {}).get("id") or "no id in payload"), flush=True)
             # The payload shape is not contractual, so the debounced classify
             # re-queries by time window instead of trusting an id it may not carry.
             WORK.put(("classify", None))
