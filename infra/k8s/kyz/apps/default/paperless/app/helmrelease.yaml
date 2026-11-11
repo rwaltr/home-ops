@@ -113,7 +113,7 @@ spec:
               # index needs no second backend and no embedding API key.
               PAPERLESS_AI_ENABLED: "true"
               PAPERLESS_AI_LLM_BACKEND: openai-like
-              PAPERLESS_AI_LLM_MODEL: nvidia-llama
+              PAPERLESS_AI_LLM_MODEL: intel-vl
               PAPERLESS_AI_LLM_ENDPOINT: http://litellm.default.svc.cluster.local:4000/v1
               PAPERLESS_AI_LLM_API_KEY:
                 secretKeyRef:
