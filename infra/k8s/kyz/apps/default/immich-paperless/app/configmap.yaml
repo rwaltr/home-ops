@@ -275,7 +275,12 @@ data:
             found = api(
                 "/search/metadata",
                 "POST",
-                {"createdAfter": since, "type": "IMAGE", "size": 200, "page": page, "order": "asc"},
+    # Newest first: the event path catches fresh uploads, but the sweep is what
+    # recovers anything that arrived while it was down, so it looks at the recent end.
+    # Already-decided assets are skipped, so successive runs still walk backwards
+    # through the window. The old backlog is not reachable from here at all: it needs
+    # its own explicit run with a wide window, not the hourly sweep.
+                {"createdAfter": since, "type": "IMAGE", "size": 200, "page": page, "order": "desc"},
             )
             items = ((found.get("assets") or {}).get("items")) or []
             recent.extend(items)
