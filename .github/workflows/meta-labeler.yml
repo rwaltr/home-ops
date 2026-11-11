@@ -23,5 +23,5 @@ jobs:
       - name: Labeler
         uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7
         with:
-          configuration-path: .github/labeler.yaml
+          configuration-path: .github/labeler.yml
           repo-token: "${{ steps.generate-token.outputs.token }}"
