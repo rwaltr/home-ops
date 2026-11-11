@@ -1,20 +1,19 @@
 ---
-# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# immich-paperless — moves documents out of Immich and into Paperless.
+# Immich → Paperless bridge. docs/paperless.md has the review loop and the tag
+# vocabulary; this file only needs to stay true about what runs.
 #
-# The gap this fills: a receipt photographed on the phone lands in Immich and
-# stays there. Immich's ML container is not deployed here, so there is no
-# content-based "this looks like a document" detection to lean on — detection is
-# therefore explicit: drop the photo in the Immich album named by IMMICH_ALBUM.
+# Every 15 minutes it does two things: tags newly added photos that look like
+# documents (paperless-maybe) so they can be reviewed, and copies whatever is in
+# the Immich album named by IMMICH_ALBUM into Paperless's consume directory,
+# tagging it paperless-sent.
 #
-# It writes into Paperless's consume directory rather than calling the upload
-# API, because docs/paperless.md already defines that directory as the bridge
-# handoff: Paperless's own consumer then does OCR and its workflows assign the
-# document type and `accounting/inbox` tag, exactly as for any other document.
-# The upshot is that this job needs no Paperless credential, only an Immich one.
+# The album is the only path into Paperless, deliberately - that archive is
+# permanent, so a human approves what enters it rather than a model. The job
+# never creates the album: an empty album simply means an empty review queue.
 #
-# Idempotent by tag: an asset is skipped once it carries SENT_TAG, so reruns and
-# overlapping schedules cannot produce duplicates in the archive.
+# No Paperless credential is needed, because the bridge only writes into the
+# consume dropbox. Its one secret is the Immich API key: 1Password item
+# paperless-bridge, field credential.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
