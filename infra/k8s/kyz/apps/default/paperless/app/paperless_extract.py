@@ -120,12 +120,15 @@ def extract(content: str) -> dict:
 
 def clean(fields: dict) -> dict:
     out: dict[str, object] = {}
+    currency = fields.get("currency")
+    code = currency.upper() if isinstance(currency, str) and re.fullmatch(r"[A-Za-z]{3}", currency) else ""
     total = fields.get("total")
     if isinstance(total, (int, float)) and total > 0:
-        out["Total"] = f"{float(total):.2f}"
-    currency = fields.get("currency")
-    if isinstance(currency, str) and re.fullmatch(r"[A-Za-z]{3}", currency):
-        out["Currency"] = currency.upper()
+        # Paperless monetary fields carry the currency as a 3-char prefix
+        # ("CAD155.11"); the generated value_monetary_amount strips it. There is
+        # deliberately no separate Currency field.
+        amount = f"{float(total):.2f}"
+        out["Total"] = f"{code}{amount}" if code else amount
     card = fields.get("payment_method")
     if isinstance(card, str) and card.strip():
         out["Payment method"] = card.strip()[:128]

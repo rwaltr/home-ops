@@ -86,11 +86,12 @@ DOCUMENT_TYPES = [
 CUSTOM_FIELDS = [
     ("Reference", "string"),
     ("Total", "monetary"),
-    ("Currency", "string"),
     ("Payment method", "string"),
 ]
 CUSTOM_FIELD_RENAMES = {"Invoice Number": "Reference"}
-REMOVED_CUSTOM_FIELDS = ["Date Paid"]
+# Date Paid is redundant with the document's created date; Currency is redundant
+# with the monetary prefix Paperless already parses out of Total ("CAD155.11").
+REMOVED_CUSTOM_FIELDS = ["Date Paid", "Currency"]
 
 # The AI may title and type the document and set a correspondent; it never
 # touches tags, so the tag namespace stays hand-designed. ai_create_missing is
