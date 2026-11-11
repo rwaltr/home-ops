@@ -99,7 +99,7 @@ document — split across two namespaces:
 | ------------------------ | -------------------------- | --------------------------- | ------------------------------------- |
 | `status/inbox`           | Paperless (`is_inbox_tag`) | the classification workflow | transient; visible only if one failed |
 | `status/ai-enriched`     | the AI workflow            | never                       | classified by the LLM, not by a rule  |
-| `accounting/unlinked`    | the Beancount bridge       | the bridge, on a match      | financial, not yet matched            |
+| `accounting/unlinked`    | rules + hourly sweep       | the bridge, on a match      | financial, not yet matched            |
 | `accounting/beancounted` | the Beancount bridge       | never                       | matched to a transaction              |
 
 `status/inbox` is stamped on every new document and removed by whichever
@@ -117,13 +117,13 @@ name):
   `accounting/beancounted`
 - **Custom fields:** `Reference`, `Total` (monetary), `Currency`, `Payment method`
 - **Workflows:** `auto-classify: invoice`, `auto-classify: receipt`,
-  `auto-classify: ai`
+  `auto-classify: ai`, `mark accounting/unlinked`
 
-All three workflows trigger on **Document Added**:
+The three classification workflows trigger on **Document Added**:
 
-1. `invoice` and `receipt` regex-match the OCR text and assign the document type.
-   Invoice runs first, receipt second, so a store receipt that also says
-   "invoice" lands as `Receipt` (a later assignment wins).
+1. `invoice` and `receipt` regex-match the OCR text, assign the document type
+   and tag `accounting/unlinked`. Invoice runs first, receipt second, so a store
+   receipt that also says "invoice" lands as `Receipt` (a later assignment wins).
 2. `ai` runs on documents the rules left **untyped** and applies AI suggestions
    (title, correspondent, document type) plus `status/ai-enriched`. It may create
    correspondents; a document it cannot type becomes `Other`.
@@ -132,8 +132,14 @@ Because the rules only catch invoices and receipts, the AI is effectively the
 primary classifier — expect `status/ai-enriched` on most documents. If the LLM
 is unreachable the workflow fails and the document keeps `status/inbox`.
 
-The two `accounting/*` tags belong to the Beancount bridge (issue #988), never
-to Paperless classification, so the ledger has a single owner.
+A fourth workflow, `mark accounting/unlinked`, is **scheduled** (hourly). It
+re-queries documents typed Invoice/Receipt that have neither accounting tag and
+adds `accounting/unlinked`. It exists because workflow mutations do not re-fire
+`document_updated`, so a follow-up Added/Updated workflow cannot catch documents
+the AI typed. Up to an hour of latency; the rules cover the immediate case.
+
+The Beancount bridge owns the transition: it removes `accounting/unlinked` and
+adds `accounting/beancounted` when it matches a transaction (issue #988).
 
 Limits worth knowing:
 
