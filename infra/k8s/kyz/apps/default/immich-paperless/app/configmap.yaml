@@ -111,6 +111,23 @@ data:
         return tags[name]
 
 
+    def already_tagged(asset_id, names):
+        """True if any of the given tags is already on this asset.
+
+        Asked per asset rather than read off the search result: /search/metadata
+        does not include tags on its items, and assuming it did made every rerun
+        re-tag the same assets - which also meant an operator's paperless-skip could
+        never take effect, so a declined suggestion came back forever.
+        """
+        try:
+            asset = api(f"/assets/{asset_id}")
+        except SystemExit:
+            # Cannot read it (deleted mid-run, or a scope we lack): leave it alone
+            # rather than tag it again.
+            return True
+        return bool({t.get("name") for t in asset.get("tags") or []} & set(names))
+
+
     def human_candidates():
         """Union of CLIP smart-search results for the document-ish queries."""
         ids = set()
@@ -130,13 +147,12 @@ data:
             return 0
 
         candidates = human_candidates()
-        # A tag on any of these means the question has already been answered: sent,
-        # already queued for review, or explicitly declined by the operator.
-        decided = {SENT_TAG, MAYBE_TAG, SKIP_TAG}
         maybe = ensure_tag(tags, MAYBE_TAG)
         tagged = 0
         for asset in recent:
-            if {t.get("name") for t in asset.get("tags") or []} & decided:
+            # A tag on any of these means the question has already been answered:
+            # sent, already queued for review, or explicitly declined.
+            if already_tagged(asset["id"], (SENT_TAG, MAYBE_TAG, SKIP_TAG)):
                 continue
             if asset["id"] not in candidates:
                 continue
@@ -169,7 +185,7 @@ data:
         assets = album.get("assets") or []
         sent = 0
         for asset in assets:
-            if any((t or {}).get("name") == SENT_TAG for t in (asset.get("tags") or [])):
+            if already_tagged(asset["id"], (SENT_TAG,)):
                 continue
             # Videos are not documents. Without this guard, a video in the album
             # would be sent as a single fullsize JPEG frame and archived as a
