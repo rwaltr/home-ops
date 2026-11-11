@@ -63,8 +63,11 @@ spec:
               SENT_TAG: paperless-sent
               CONSUME_DIR: /consume
               # Vision confirm stage. LITELLM_API_KEY arrives with envFrom below.
+              # intel-vl is Qwen3-VL-8B on Dan's Intel Arc, reached through our own
+              # LiteLLM alias - self-hosted, not a model provider. Anything else
+              # named here (e.g. qwen3.8-omni-flash) sends the photo to OpenRouter.
               LITELLM_URL: http://litellm.default.svc.cluster.local:4000
-              VISION_MODEL: qwen3.8-omni-flash
+              VISION_MODEL: intel-vl
               # Immich OCR must beat this score to count as evidence of text.
               MIN_OCR_SCORE: "0.5"
               # Per run, so a 500-photo day cannot quietly run up a bill.

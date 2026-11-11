@@ -71,8 +71,9 @@ data:
     # query at all. So a candidate must show evidence before it is queued.
     #
     # The evidence is checked in cost order. Immich's OCR is local and free, so text
-    # wins first; only when OCR has nothing to say do we pay a vision model, which is
-    # not free - it bills through OpenRouter, a fraction of a cent per image.
+    # wins first; only when OCR has nothing to say does the vision model get asked.
+    # VISION_MODEL points at intel-vl (Qwen3-VL-8B on Dan's Intel Arc), so that call
+    # costs nothing and the photo stays off a model provider.
     MIN_OCR_SCORE = float(os.environ.get("MIN_OCR_SCORE", "0.5"))
     MAX_VISION_CALLS = int(os.environ.get("MAX_VISION_CALLS", "20"))
     LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm.default.svc.cluster.local:4000")

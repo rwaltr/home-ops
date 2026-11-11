@@ -262,7 +262,8 @@ spec:
               # hardware on his network are aliased here: they cost nothing and
               # keep document text off a cloud provider.
               #   nvidia-llama -> nvidia-qwen3-32b-nvfp4 (vLLM, 151k ctx)
-              #   intel-llama  -> llama                (vLLM, 229k ctx)
+              #   intel-llama  -> llama                (PARKED 2026-11-11, see below)
+              #   intel-vl     -> Qwen3-VL-8B           (llama.cpp SYCL, vision)
               #   gptoss-llama -> gpt-oss-20b-f16      (114k ctx)
               # His catalog also carries cloud-backed models (zai/glm-*, and the
               # misleadingly-named media-analysis/decision/embed-text which
@@ -273,11 +274,24 @@ spec:
                   model: openai/nvidia-llama
                   api_base: https://llm.cloud.danmanners.com/v1
                   api_key: os.environ/DANMANNERS_LLM_API_KEY
+              # Parked on his side in favour of intel-vl on the same Arc, so calls
+              # to it 500 until he roles Flint back. Kept aliased for that reason.
               - model_name: intel-llama
                 litellm_params:
                   model: openai/intel-llama
                   api_base: https://llm.cloud.danmanners.com/v1
                   api_key: os.environ/DANMANNERS_LLM_API_KEY
+              # The local vision model: Qwen3-VL-8B on his Intel ARC B70 PRO,
+              # served by llama.cpp (SYCL) in place of intel-llama. This is what
+              # keeps photographed documents off a model provider - the same
+              # rationale as the aliases above, but for image input.
+              - model_name: intel-vl
+                litellm_params:
+                  model: openai/intel-vl
+                  api_base: https://llm.cloud.danmanners.com/v1
+                  api_key: os.environ/DANMANNERS_LLM_API_KEY
+                model_info:
+                  supports_vision: true
               - model_name: gptoss-llama
                 litellm_params:
                   model: openai/gptoss-llama
