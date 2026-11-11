@@ -1,11 +1,18 @@
 ---
-area/ansible:
-  - "ansible/**/*"
-area/github:
-  - ".github/**/*"
-area/kubernetes:
-  - "k8s/**/*"
-area/hack:
-  - "hack/**/*"
-area/terraform:
-  - "terraform/**/*"
+# Labels are declared in .github/labels.yaml; this file is consumed by
+# .github/workflows/meta-labeler.yml. Keep the keys equal to a label name there
+# or the action creates a second, near-duplicate label.
+github:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**/*"
+kubernetes:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "infra/k8s/**/*"
+          - "infra/k0s/**/*"
+terraform:
+  - changed-files:
+      - any-glob-to-any-file: "infra/terraform/**/*"
+docs:
+  - changed-files:
+      - any-glob-to-any-file: "docs/**/*"
