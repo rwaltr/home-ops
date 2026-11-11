@@ -398,7 +398,10 @@ data:
                 path, suffix = f"/assets/{asset['id']}/original", ext
             else:
                 path, suffix = f"/assets/{asset['id']}/thumbnail?size=fullsize", ".jpg"
-            dest = CONSUME / safe_name(asset)
+            # The metadata search result carries no exifInfo, so read the asset: that is
+            # where the description lives, and the filename is built from it.
+            described = api(f"/assets/{asset['id']}")
+            dest = CONSUME / safe_name(described)
             if dest.suffix.lower() != suffix:
                 dest = dest.with_suffix(suffix)
             dest.write_bytes(api(path, raw=True))
