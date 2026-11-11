@@ -278,8 +278,8 @@ const EDGES = [
   { from: "download", to: "consume", flows: ["send"] },
   { from: "consume", to: "paperless", flows: ["send"] },
   { from: "send", to: "tags", flows: ["send"], label: "tag paperless-sent", side: "right" },
-  { from: "paperless", to: "asn", flows: ["ledger"] },
-  { from: "asn", to: "beancount", flows: ["ledger"] },
+  { from: "paperless", to: "docid", flows: ["ledger"] },
+  { from: "docid", to: "beancount", flows: ["ledger"] },
   { from: "beancount", to: "fava", flows: ["ledger"] },
   { from: "sweep", to: "classify", flows: ["backstop"], label: "re-asks anything missed", dashed: true, side: "right" },
   { from: "sweep", to: "send", flows: ["backstop"], label: "backfill", dashed: true, side: "right" }
