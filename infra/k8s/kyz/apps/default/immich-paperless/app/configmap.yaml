@@ -148,7 +148,7 @@ data:
         if not stem:
             stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
         # 90 characters is a comfortable title; a paragraph helps nobody.
-        keep = "".join(c if c.isalnum() or c in " -_" else "-" for c in stem).strip() or "photo"
+        keep = "".join(c if c.isalnum() or c in " -_$" else "-" for c in stem).strip(" -_") or "photo"
         ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
         if ext not in SAFE_EXT:
             return f"{when} {keep[:90]}.jpg"
