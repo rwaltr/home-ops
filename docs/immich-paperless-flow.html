@@ -85,7 +85,7 @@
 <header>
   <h1>immich-paperless <small>receipt photo → Paperless → ledger, event-driven</small>
     <span class="plan">plan · not built yet</span></h1>
-  <p class="lat">album add → copied: <b>was 0–15 min</b> (sweep was the only path) · <b>now seconds</b> (event-driven) · a confident receipt needs <b>no human step at all</b> ·
+  <p class="lat">album add → copied: <b>was 0–15 min</b> (sweep was the only path) · <b>now seconds</b> (event-driven) · the routing signal is an <b>extracted field</b>, not a confidence score ·
      verified against Immich <b>v3.2.4</b>, gateway <code>/api/socket.io</code>, websocket-only, <code>x-api-key</code> auth</p>
   <div class="bar">
     <span class="lbl">Flows</span>
@@ -189,15 +189,15 @@ const NODES = [
 
   { id: "vision", col: 0, row: 9, title: "intel-vl vision", actor: "dan", flows: ["upload", "backstop"],
     sub: "Qwen3-VL-8B, temperature 0",
-    detail: "Asked for structured JSON: <code>document</code>, <code>confidence</code>, <code>kind</code>, whatever fields it can actually read — <code>merchant</code>, <code>date</code>, <code>amount</code> — and a one-line reason.<br><br>Two changes from today: <b>temperature 0</b> (nothing sets a temperature now, so classification is not even deterministic), and the confidence field, which is free on a call we were making anyway.<br><br>The model only <em>reports</em>. The routing rule lives in our code." },
+    detail: "Asked for structured JSON: <code>document</code>, <code>confidence</code>, <code>kind</code>, whatever fields it can actually read — <code>merchant</code>, <code>date</code>, <code>amount</code> — and a one-line reason. The gateway accepts <code>response_format: json_object</code>, so unparsable output can be made structurally impossible.<br><br>Two changes from today: <b>temperature 0</b> (nothing sets a temperature now, so classification is not even deterministic), and the fields, which are free on a call we were making anyway.<br><br>The fields are a routing signal, not data to trust: a Starbucks coupon was read as a receipt from "B&amp;N Cafe" for 1.00, the coupon's own value. The model reports; the rule decides; your eye supplies anything that ends up in the ledger." },
 
-  { id: "d-conf", col: 0, row: 10.5, title: "confidence rule", actor: "bridge", flows: ["upload", "backstop"],
+  { id: "d-conf", col: 0, row: 10.5, title: "grounding rule", actor: "bridge", flows: ["upload", "backstop"],
     kind: "decision",
-    sub: "document + confidence + grounding",
-    detail: "<code>auto-add</code> needs all of: <code>document=true</code>, <code>confidence ≥ AUTO</code>, a document kind, at least one field it could actually read, and one second signal (OCR text or two CLIP queries). Otherwise a confident <em>no</em> becomes <code>paperless-skip</code> and anything else queues.<br><br>Grounding is the point, not the score: a small VLM's self-reported confidence clusters near 1.0 whether or not it really looked, so a bare 0.95 threshold auto-files junk. Needing a readable amount or date does not.<br><br>Both thresholds come from measuring the existing backlog, never from guessing." },
+    sub: "document + one readable field",
+    detail: "<code>auto-add</code> needs <code>document=true</code> and at least one field it could actually read — a merchant, a date or an amount. A confident <em>no</em> becomes <code>paperless-skip</code>; anything else queues.<br><br><b>No confidence threshold, because it was measured and it does not work.</b> Over 50 calls on labelled data every document scored exactly <code>0.95</code> — an ceiling, not a measurement — while non-documents scored <code>0.98</code> to <code>1.00</code>. It is inverted: any threshold either rejects the receipts or accepts everything.<br><br>The fields separate cleanly instead: 26 photos, 7 receipts all grounded, 19 non-documents (dogs, a baby, a toddler, a kitchen) all rejected. The score is logged, never gated on." },
   { id: "auto", col: 1.75, row: 10.5, title: "auto-add to the album", actor: "bridge", flows: ["upload", "send"],
     sub: "and tag paperless-auto",
-    detail: "A confident receipt skips the human entirely and goes into the album, which the send path already treats as the instruction.<br><br>Every machine decision is tagged <code>paperless-auto</code>, so <em>what did it file without asking me?</em> is one filter, and each decision is logged with the confidence and the fields it read. Post-hoc audit replaces pre-hoc review." },
+    detail: "A grounded receipt skips the human entirely and goes into the album, which the send path already treats as the instruction.<br><br>Every machine decision is tagged <code>paperless-auto</code>, so <em>what did it file without asking me?</em> is one filter, and each decision is logged with the fields it read. Post-hoc audit replaces pre-hoc review." },
   { id: "retry", col: 1.6, row: 9.5, title: "write nothing", actor: "bridge", flows: ["upload", "backstop"],
     sub: "stays untagged",
     kind: "quiet",
@@ -297,8 +297,8 @@ const SEQ = [
   ["d-clip", "Not document-like at all? It stops here at zero cost — most of a library does."],
   ["evidence", "Otherwise gather what is free: OCR boxes and score, how many CLIP queries matched, the filename."],
   ["vision", "One call to intel-vl at temperature 0, returning a confidence and whatever fields it can actually read."],
-  ["d-conf", "The rule decides — document, confidence, a grounded field, a second signal. Never the score alone."],
-  ["auto", "Confident enough: it goes into the album itself, tagged paperless-auto so you can audit what it filed."],
+  ["d-conf", "The rule decides: a document verdict plus one field it could actually read. The confidence score is logged and ignored — measured, it is inverted."],
+  ["auto", "Grounded enough: it goes into the album itself, tagged paperless-auto so you can audit what it filed."],
   ["human", "Had it not been confident it would wait here instead, and this queue is opt-in — ignoring it costs nothing."],
   ["album", "Album membership is the send instruction, whether a person or the rule put it there."],
   ["send", "on_album_update → send(): skip anything already sent, and skip videos."],
@@ -320,9 +320,9 @@ const FAILURES = [
   { id: "drop", label: "socket drops", on: ["sock", "sweep", "classify", "send"],
     caption: "Reconnect with backoff. Anything that happened while disconnected is recovered by the sweep — the pull path never depended on the stream." },
   { id: "late", label: "Immich OCR is late", on: ["jobs", "classify", "evidence", "vision"],
-    caption: "Classify debounces until the OCR evidence exists, then asks with it — so the confidence that comes back is grounded rather than guessed." },
+    caption: "Classify debounces until the OCR evidence exists, then asks with it. It matters in the other direction too: OCR alone already tagged five of these photos as documents that the model then rejected." },
   { id: "wrong", label: "it files a non-document", on: ["d-conf", "auto", "album", "send", "tags", "human"],
-    caption: "A wrong auto-add is the real cost: the archive is permanent, so recovery is two steps — tag it paperless-skip and delete it in Paperless. paperless-auto makes every machine decision auditable in one filter, which is how the threshold gets tuned." },
+    caption: "A wrong auto-add is the real cost: the archive is permanent, so recovery is two steps — tag it paperless-skip and delete it in Paperless. Measured on 26 photos it got all 26 right, but that is one window on one library: paperless-auto keeps every machine decision auditable in one filter." },
   { id: "gpu", label: "backfill would flood Dan's GPU", on: ["sweep", "classify", "vision", "d-conf"],
     caption: "The sweep caps model calls per pass and queues the remainder instead of auto-adding it — fail closed. Live uploads are a handful of calls and always get one." },
   { id: "rename", label: "Immich renames an event", on: ["gw", "sock", "sweep"],
