@@ -48,8 +48,8 @@ Reply with a single JSON object and nothing else:
 
 - total: the printed TOTAL / amount paid, as a number. Null if absent.
 - currency: three-letter code. Null if it cannot be inferred.
-- payment_method: copy the card line as printed, brand and last four, e.g.
-  "VISA **** 5678". Null if there is no card.
+- payment_method: the card brand and the last four digits, e.g.
+  "MASTERCARD 3642". No asterisks and no masking. Null if there is no card.
 - reference: the invoice number or transaction id. Null if absent.
 
 OCR can misread digits. Prefer the printed TOTAL line; do not invent a value."""
