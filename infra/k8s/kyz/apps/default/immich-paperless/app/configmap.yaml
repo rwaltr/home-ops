@@ -52,6 +52,9 @@ data:
     # library, which is what "new" means here - not when the photo was taken, so a
     # photo imported from an old camera roll is still classified.
     WINDOW_HOURS = int(os.environ.get("WINDOW_HOURS", "24"))
+    # Ceiling on pages walked per run, so a wide WINDOW_HOURS cannot make a run
+    # unbounded: MAX_PAGES * 200 assets, newest first.
+    MAX_PAGES = int(os.environ.get("MAX_PAGES", "5"))
 
     # Immich's smart search returns its best matches for a query with no score
     # threshold, so these are recall nets rather than classifiers. Several plain
@@ -234,7 +237,20 @@ data:
 
     def classify(tags):
         since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=WINDOW_HOURS)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        found = api("/search/metadata", "POST", {"createdAfter": since, "type": "IMAGE", "size": 200, "order": "desc"})
+        # Immich caps a metadata page at 200 and has no "everything in this window" call,
+        # so walk pages newest-first. Without this a CLIP hit older than the newest 200
+        # is skipped as "not recent" on every run and can never be classified at all.
+        recent = []
+        for page in range(1, MAX_PAGES + 1):
+            found = api(
+                "/search/metadata",
+                "POST",
+                {"createdAfter": since, "type": "IMAGE", "size": 200, "page": page, "order": "desc"},
+            )
+            items = ((found.get("assets") or {}).get("items")) or []
+            recent.extend(items)
+            if len(items) < 200:
+                break
         recent = ((found.get("assets") or {}).get("items")) or []
         if not recent:
             print(f"classify: no images added in the last {WINDOW_HOURS}h", flush=True)
