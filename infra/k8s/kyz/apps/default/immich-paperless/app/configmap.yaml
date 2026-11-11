@@ -60,14 +60,6 @@ data:
     # threshold, so these are recall nets rather than classifiers. Several plain
     # phrases beat one clever one: each is one cheap call and the union is what gets
     # reviewed. Tune the list, not a numeric threshold.
-    DOC_QUERIES = (
-        "a photo of a receipt",
-        "a photo of an invoice or bill",
-        "a photo of a bank statement",
-        "a scan of a document",
-        "a screenshot of an app or website",
-    )
-    SMART_PAGE = 100
 
     # CLIP alone over-suggests: measured on this library, most of its top-100 hits
     # ranked 20th or worse for their own query, and 6 of 11 tagged assets matched no
@@ -77,21 +69,47 @@ data:
     # wins first; only when OCR has nothing to say does the vision model get asked.
     # VISION_MODEL points at intel-vl (Qwen3-VL-8B on Dan's Intel Arc), so that call
     # costs nothing and the photo stays off a model provider.
-    MIN_OCR_SCORE = float(os.environ.get("MIN_OCR_SCORE", "0.5"))
     MAX_VISION_CALLS = int(os.environ.get("MAX_VISION_CALLS", "20"))
     LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm.default.svc.cluster.local:4000")
     VISION_MODEL = os.environ.get("VISION_MODEL", "intel-vl")
     VISION_KEY = os.environ.get("LITELLM_API_KEY", "")
 
+    # The closed vocabulary the model must choose from. Free-form tags sprawl into
+    # hundreds nobody can filter on, so anything outside this set is dropped and
+    # logged. Reserved for the HomeBox feed, not wired yet: homebox.
+    VOCAB = {
+        "person",
+        "casual",
+        "formal",
+        "landscape",
+        "art",
+        "food",
+        "pet",
+        "children",
+        "vehicle",
+        "screenshot",
+        "indoor",
+        "outdoor",
+        "holiday",
+        "document",
+    }
+
+    DOC_TAG = os.environ.get("DOC_TAG", "document")
+
     VISION_PROMPT = (
-        "You are shown one photo. Decide whether it is a document that belongs in a "
-        "paperless archive: a receipt, invoice, bill, bank statement, tax form, "
-        "insurance letter, or a scan or photo of such a thing. A photograph of a "
-        "person, place, object, food, animal or scenery is NOT a document. A "
-        "screenshot of a chat, game, map, social feed or app UI is NOT a document. A "
-        "screenshot or photo that shows the text of a bill, statement or receipt IS a "
-        "document. Answer with JSON only, no prose and no code fence: "
-        '{"document": true, "kind": "receipt", "reason": "shows a store receipt with prices"}'
+        "You are shown one photo. Answer with JSON only, no prose and no code fence, "
+        "in exactly this shape: "
+        '{"description": "one short sentence", "tags": ["casual", "person"], '
+        '"document": false, "confidence": 0.0, "kind": ""}'
+        "tags must be 1-4 words from this list, spelled exactly: "
+        + ", ".join(sorted(VOCAB))
+        + ". document is true only if this is a document that belongs in a paperless "
+        "archive: a receipt, invoice, bill, bank statement, tax form, insurance letter, "
+        "or a scan or photo of one. A photograph of a person, place, object, food, "
+        "animal or scenery is not a document, and neither is a screenshot of a chat, "
+        "game, map or app UI. confidence is 0 to 1 for document. kind is one of "
+        "receipt, invoice, bill, statement, tax, insurance, letter or other when "
+        "document is true, otherwise an empty string."
     )
 
     # What Paperless can ingest. Everything else (notably HEIC from iPhones) is
@@ -159,40 +177,38 @@ data:
         return bool({t.get("name") for t in asset.get("tags") or []} & set(names))
 
 
-    def ocr_text_evidence(asset_id):
-        """(boxes, best score) from Immich's stored OCR, or (0, 0.0) when there is none.
-
-        Stored, not computed: Immich's OCR job writes these rows and this endpoint
-        only reads them, so an empty result means "OCR has not run on this asset
-        yet" - which is why the caller falls through to the vision model rather than
-        rejecting the candidate.
-        """
+    def parse_verdict(text):
+        """The model's answer as a dict, or (None, why) when it did not answer."""
+        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:
-            rows = api(f"/assets/{asset_id}/ocr")
-        except SystemExit:
-            return 0, 0.0
-        if not isinstance(rows, list) or not rows:
-            return 0, 0.0
-        scores = [float(r.get("textScore") or 0) for r in rows]
-        return len(rows), (max(scores) if scores else 0.0)
+            answer = json.loads(text)
+        except ValueError:
+            return None, "unparsable answer"
+        if not isinstance(answer, dict) or "document" not in answer:
+            # A reply without the gate is not a verdict: treating a missing field as
+            # false would silently park real documents forever.
+            return None, "answer had no document field"
+        return answer, ""
 
 
-    def vision_says_document(asset_id):
-        """Ask the configured vision model. Returns (verdict, kind, reason).
+    def vision_verdict(asset_id):
+        """Ask the configured vision model about one photo. Returns (verdict, why).
 
-        verdict is True, False, or None when no answer came back. None must never be
-        treated as False: an outage would otherwise teach the library that every
-        unreadable asset is junk, and that verdict is cached as a tag.
+        verdict is the model's dict, or None when no answer came back. None must never
+        be treated as a rejection: an outage would otherwise teach the library that
+        every unreadable asset is junk, and that verdict is cached as a tag.
         """
         if not VISION_KEY:
-            return None, "", "no LITELLM_API_KEY"
+            return None, "no LITELLM_API_KEY"
         try:
             image = api(f"/assets/{asset_id}/thumbnail?size=preview", raw=True)
         except SystemExit as err:
-            return None, "", f"thumbnail failed ({err})"
+            return None, f"thumbnail failed ({err})"
         body = {
             "model": VISION_MODEL,
-            "max_tokens": 200,
+            "max_tokens": 300,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
             "messages": [
                 {
                     "role": "user",
@@ -213,42 +229,53 @@ data:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 payload = json.loads(resp.read().decode() or "{}")
         except urllib.error.HTTPError as err:
-            return None, "", f"litellm {err.code}"
-        except Exception as err:  # noqa: BLE001 - any transport failure means "no answer"
-            return None, "", f"litellm unreachable ({err})"
+            return None, f"litellm {err.code}"
+        except Exception as err:  # noqa: BLE001 - any transport failure means no answer
+            return None, f"litellm unreachable ({err})"
         text = ((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        try:
-            verdict = json.loads(text)
-        except ValueError:
-            return None, "", "unparsable answer"
-        return bool(verdict.get("document")), str(verdict.get("kind") or ""), str(verdict.get("reason") or "")[:60]
+        return parse_verdict(text)
 
 
-    def human_candidates():
-        """Union of CLIP smart-search results for the document-ish queries."""
-        ids = set()
-        for query in DOC_QUERIES:
-            found = api("/search/smart", "POST", {"query": query, "size": SMART_PAGE})
-            for asset in (found.get("assets") or {}).get("items") or []:
-                ids.add(asset["id"])
-        return ids
+    def ensure_album():
+        """The Paperless album, created on first use. This album is the queue."""
+        for album in api("/albums?withoutAssets=true"):
+            if album.get("albumName") == ALBUM:
+                return album["id"]
+        return api("/albums", "POST", {"albumName": ALBUM})["id"]
 
 
-    def classify(tags, window_hours=None, require_clip=True):
+    def describe(asset_id, verdict, tags):
+        """Write the model's description and tags onto the asset. Returns writes made."""
+        writes = 0
+        asset = api(f"/assets/{asset_id}")
+        existing = ((asset.get("exifInfo") or {}).get("description") or "").strip()
+        description = (verdict.get("description") or "").strip()
+        if description and not existing:
+            # Never overwrite a description: the operator's words outrank the model's.
+            api(f"/assets/{asset_id}", "PUT", {"description": description})
+            writes += 1
+        for name in verdict.get("tags") or []:
+            if name not in VOCAB:
+                print(f"describe: dropping {name!r}, not in the vocabulary", flush=True)
+                continue
+            api(f"/tags/{ensure_tag(tags, name)}/assets", "PUT", {"ids": [asset_id]})
+            writes += 1
+        return writes
+
+    def classify(tags, window_hours=None):
         # The sweep uses the configured window. The event path passes minutes instead,
         # so one upload is examined on its own rather than re-scanning the day.
         hours = WINDOW_HOURS if window_hours is None else window_hours
         since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         # Immich caps a metadata page at 200 and has no "everything in this window" call,
-        # so walk pages newest-first. Without this a CLIP hit older than the newest 200
-        # is skipped as "not recent" on every run and can never be classified at all.
+        # so walk pages. Oldest first: with a per-run model budget, this drains the
+        # backlog from the far end instead of restacking the newest page every run.
         recent = []
         for page in range(1, MAX_PAGES + 1):
             found = api(
                 "/search/metadata",
                 "POST",
-                {"createdAfter": since, "type": "IMAGE", "size": 200, "page": page, "order": "desc"},
+                {"createdAfter": since, "type": "IMAGE", "size": 200, "page": page, "order": "asc"},
             )
             items = ((found.get("assets") or {}).get("items")) or []
             recent.extend(items)
@@ -258,57 +285,46 @@ data:
             print(f"classify: no images added in the last {hours}h", flush=True)
             return 0
 
-        candidates = human_candidates()
+        decided = ensure_tag(tags, DOC_TAG)
+        skip = ensure_tag(tags, SKIP_TAG)
         maybe = ensure_tag(tags, MAYBE_TAG)
-        tagged = 0
-        vision_calls = 0
+        album = ensure_album()
+        documents = skipped = vision_calls = 0
         for asset in recent:
-            # A tag on any of these means the question has already been answered:
-            # sent, already queued for review, or declined by the operator or by the
-            # vision model on an earlier run.
-            if already_tagged(asset["id"], (SENT_TAG, MAYBE_TAG, SKIP_TAG)):
+            # Any of these means the question is already answered: sent, archived, or
+            # declined. paperless-maybe is deliberately absent, so assets queued by the
+            # old OCR gate get a real verdict now instead of sitting in review forever.
+            if already_tagged(asset["id"], (SENT_TAG, DOC_TAG, SKIP_TAG)):
                 continue
-            # CLIP is a cheap prefilter for bulk backfill, but it is lossy: a real
-            # receipt came back from none of the five queries and was skipped forever,
-            # by the sweep as well as here. The live path asks about every upload
-            # instead, so nothing depends on CLIP's recall.
-            if require_clip and asset["id"] not in candidates:
-                continue
-
-            boxes, score = ocr_text_evidence(asset["id"])
-            if boxes and score >= MIN_OCR_SCORE:
-                # Free and local: this asset has OCR text, so it is a document of
-                # some kind. No model call needed and none made.
-                api(f"/tags/{maybe}/assets", "PUT", {"ids": [asset["id"]]})
-                print(f"classify: {asset['id']} -> {MAYBE_TAG} via ocr ({boxes} boxes, best score {score:.2f})", flush=True)
-                tagged += 1
-                continue
-
             if vision_calls >= MAX_VISION_CALLS:
                 print(f"classify: {asset['id']} left for the next run, vision budget of {MAX_VISION_CALLS} spent", flush=True)
                 continue
             vision_calls += 1
-            verdict, kind, reason = vision_says_document(asset["id"])
+            verdict, why = vision_verdict(asset["id"])
             if verdict is None:
-                # No answer: leave it untagged so a later run can ask again. Writing
-                # the skip tag here would turn an outage into a permanent verdict.
-                print(f"classify: {asset['id']} not queued, vision gave no answer ({reason})", flush=True)
+                # No answer: write nothing, so a later run asks again. Writing skip here
+                # would turn an outage into a permanent verdict.
+                print(f"classify: {asset['id']} untouched, no answer ({why})", flush=True)
                 continue
-            if verdict:
-                api(f"/tags/{maybe}/assets", "PUT", {"ids": [asset["id"]]})
-                print(f"classify: {asset['id']} -> {MAYBE_TAG} via vision ({kind}: {reason})", flush=True)
-                tagged += 1
+            wrote = describe(asset["id"], verdict, tags)
+            # One verdict, and maybe is cleared whichever way it went.
+            api(f"/tags/{maybe}/assets", "DELETE", {"ids": [asset["id"]]})
+            if verdict.get("document"):
+                api(f"/tags/{decided}/assets", "PUT", {"ids": [asset["id"]]})
+                api(f"/albums/{album}/assets", "PUT", {"ids": [asset["id"]]})
+                documents += 1
+                print(f"classify: {asset['id']} -> {DOC_TAG}, {wrote} write(s), kind={verdict.get('kind') or '?'}, conf={verdict.get('confidence')}: {verdict.get('description') or '?'}", flush=True)
             else:
-                skip = ensure_tag(tags, SKIP_TAG)
                 api(f"/tags/{skip}/assets", "PUT", {"ids": [asset["id"]]})
-                print(f"classify: {asset['id']} -> {SKIP_TAG}, vision says not a document ({kind}: {reason})", flush=True)
+                skipped += 1
+                print(f"classify: {asset['id']} -> {SKIP_TAG}, {wrote} write(s): {verdict.get('description') or '?'}", flush=True)
 
         print(
-            f"classify: {len(recent)} new image(s), {len(candidates)} CLIP hits, "
-            f"{tagged} queued, {vision_calls} vision call(s)",
+            f"classify: {len(recent)} image(s), {documents} document(s), {skipped} skipped, "
+            f"{vision_calls} vision call(s)",
             flush=True,
         )
-        return tagged
+        return documents
 
 
     def send(tags):
@@ -460,8 +476,7 @@ data:
                     # Immich's own OCR lands after the upload event, so waiting is
                     # what makes the evidence real rather than absent.
                     time.sleep(UPLOAD_DEBOUNCE)
-                    classify(tags_by_name(), window_hours=EVENT_WINDOW_MINUTES / 60,
-                             require_clip=False)
+                    classify(tags_by_name(), window_hours=EVENT_WINDOW_MINUTES / 60)
                 else:
                     send(tags_by_name())
             except Exception as err:  # noqa: BLE001 - one bad event must not stop the rest
@@ -550,11 +565,11 @@ data:
             sys.exit("IMMICH_API_KEY is empty: create an Immich API key and put it in 1Password (see docs/paperless.md)")
 
         tags = tags_by_name()
-        # send first, so an asset that is both in the album and newly added is
-        # marked sent and skipped by classify rather than queued for review.
+        # classify first: a document found this run lands in the album and is sent in
+        # the same pass rather than waiting an hour for the next one.
+        documents = classify(tags)
         sent = send(tags)
-        tagged = classify(tags)
-        print(f"done: {sent} sent, {tagged} flagged for review", flush=True)
+        print(f"done: {sent} sent, {documents} document(s)", flush=True)
 
 
     if __name__ == "__main__":
