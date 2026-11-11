@@ -251,7 +251,6 @@ data:
             recent.extend(items)
             if len(items) < 200:
                 break
-        recent = ((found.get("assets") or {}).get("items")) or []
         if not recent:
             print(f"classify: no images added in the last {WINDOW_HOURS}h", flush=True)
             return 0
