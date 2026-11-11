@@ -365,13 +365,13 @@ data:
         "only, no prose and no code fence, in exactly this shape: "
         '{"title": "H-E-B receipt for Evian water", "merchant": "H-E-B", '
         '"date": "2026-11-08", "total": 20.64, "currency": "USD", '
-        '"payment_method": "VISA ****1234", "reference": ""} '
+        '"payment_method": "MASTERCARD 3642", "reference": ""} '
         "title: the merchant and what was bought, under 80 characters. Name the shop and a "
         "couple of items. Never describe the room, table, lighting or camera angle. "
         "merchant: the shop, as printed. date: the transaction date, YYYY-MM-DD. "
         "total: the printed TOTAL as a number, not a string, or null. "
         "currency: three-letter code, or null. payment_method: the card line as printed, "
-        "brand and last four. reference: invoice or transaction id, or an empty string. "
+        "brand and the last four digits, like MASTERCARD 3642, with no asterisks. reference: invoice or transaction id, or an empty string. "
         "OCR is unreliable on digits: prefer the printed TOTAL line and do not invent a value."
     )
 
@@ -498,9 +498,14 @@ data:
         code = code if len(code) == 3 and code.isalpha() else ""
         if isinstance(total, (int, float)) and total > 0 and "Total" in fields:
             values[fields["Total"]] = f"{code}{float(total):.2f}"
-        for name, value in (("Payment method", answer.get("payment_method")), ("Reference", answer.get("reference"))):
-            if isinstance(value, str) and value.strip() and name in fields:
-                values[fields[name]] = value.strip()[:128]
+        # "<BRAND> <last4>". The masked form carries the same information with noise in it,
+        # and the two writers here disagreed on the shape, which is the inconsistency.
+        card = answer.get("payment_method")
+        if isinstance(card, str) and card.strip() and "Payment method" in fields:
+            values[fields["Payment method"]] = " ".join(card.replace("*", " ").replace("#", " ").split())[:128]
+        reference = answer.get("reference")
+        if isinstance(reference, str) and reference.strip() and "Reference" in fields:
+            values[fields["Reference"]] = reference.strip()[:128]
         if dated:
             values[ensure_custom_field("Transaction date", "date")] = when
         if values:
