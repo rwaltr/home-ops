@@ -115,7 +115,7 @@ name):
   `Policy`, `Medical`, `Correspondence`, `Other`
 - **Tags:** `status/inbox`, `status/ai-enriched`, `accounting/unlinked`,
   `accounting/beancounted`
-- **Custom fields:** `Invoice Number`, `Total` (monetary), `Date Paid`, `Currency`
+- **Custom fields:** `Reference`, `Total` (monetary), `Currency`, `Payment method`
 - **Workflows:** `auto-classify: invoice`, `auto-classify: receipt`,
   `auto-classify: ai`
 
@@ -137,9 +137,9 @@ to Paperless classification, so the ledger has a single owner.
 
 Limits worth knowing:
 
-- Custom fields are **not** auto-filled — the Apply AI Suggestions action covers
-  title/correspondent/type/storage path/created only. `Total` and
-  `Invoice Number` are filled by the bridge (issue #988) or by hand.
+- Paperless' Apply AI Suggestions action covers title/correspondent/type/storage
+  path/created only — it cannot touch custom fields. A separate extractor fills
+  `Total`/`Currency`/`Payment method`/`Reference` (next section).
 - There is no "was OCRed" tag: Paperless stores no such flag. Adding one would
   need a post-consume script comparing the original against the OCR'd archive.
 - Mail rules are _not_ seeded (they need an IMAP account) — the content
@@ -155,6 +155,34 @@ Limits worth knowing:
   no type — that shape is the failure signature.
 - Re-run `mise run paperless:seed` after changing the definitions, and after any
   Paperless config wipe.
+
+## Receipt metadata (extractor)
+
+Paperless' AI suggestion action cannot write custom fields, so a CronJob fills
+the financial ones. `paperless-extract` (`paperless_extract.py`, every 15
+minutes) scans documents typed `Invoice` or `Receipt`, asks the same LLM
+(`nvidia-llama` via LiteLLM) for the values, and PATCHes the document:
+
+| Field            | Example          |
+| ---------------- | ---------------- |
+| `Total`          | `155.11`         |
+| `Currency`       | `USD`            |
+| `Payment method` | `VISA **** 5678` |
+| `Reference`      | `987654`         |
+
+The merchant stays the correspondent and the transaction date is the document's
+`created` date (Paperless parses it), so neither is a custom field. A document
+that already has a `Total` is skipped, so the job only fills blanks and is safe
+to re-run.
+
+Two gotchas worth keeping:
+
+- Qwen3 is a reasoning model. Without
+  `chat_template_kwargs.enable_thinking=false` it spends the token budget
+  thinking and returns `content: null` — observed on a receipt whose OCR read
+  `TOTAL: $155. uu`. The extractor sets it.
+- The extractor writes `Total` as a decimal string; the monetary field accepts
+  that (verified against the live API).
 
 ## Storage layout
 

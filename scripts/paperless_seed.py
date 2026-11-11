@@ -78,12 +78,16 @@ DOCUMENT_TYPES = [
     "Other",
 ]
 
+# Reference holds an invoice number or a receipt transaction id; the date already
+# lives in the document's `created` field, so Date Paid is gone.
 CUSTOM_FIELDS = [
-    ("Invoice Number", "string"),
+    ("Reference", "string"),
     ("Total", "monetary"),
-    ("Date Paid", "date"),
     ("Currency", "string"),
+    ("Payment method", "string"),
 ]
+CUSTOM_FIELD_RENAMES = {"Invoice Number": "Reference"}
+REMOVED_CUSTOM_FIELDS = ["Date Paid"]
 
 # The AI may title and type the document and set a correspondent; it never
 # touches tags, so the tag namespace stays hand-designed. ai_create_missing is
@@ -138,6 +142,22 @@ def upsert(kind: str, path: str, desired: list[tuple[str, dict]]) -> dict[str, i
             print(f"  = {kind}: {name} (id {obj['id']})")
         ids[name] = obj["id"]
     return ids
+
+
+def sync_custom_fields(desired: list[tuple[str, dict]]) -> dict[str, int]:
+    """Apply renames/deletions first, then upsert the current set by name."""
+    existing = {obj["name"]: obj for obj in list_all("/api/custom_fields/")}
+    for old, new in CUSTOM_FIELD_RENAMES.items():
+        if old in existing and new not in existing:
+            api("PATCH", f"/api/custom_fields/{existing[old]['id']}/", {"name": new})
+            print(f"  ~ custom field: {old} -> {new}")
+            existing[new] = existing.pop(old)
+    for name in REMOVED_CUSTOM_FIELDS:
+        if name in existing:
+            api("DELETE", f"/api/custom_fields/{existing[name]['id']}/")
+            print(f"  - custom field: {name} (deleted)")
+            del existing[name]
+    return upsert("custom field", "/api/custom_fields/", desired)
 
 
 def delete_tags(names: list[str]) -> None:
@@ -230,9 +250,7 @@ def main() -> None:
         "/api/tags/",
         [(name, {"name": name, **extra}) for name, extra in TAGS],
     )
-    upsert(
-        "custom field",
-        "/api/custom_fields/",
+    sync_custom_fields(
         [(name, {"name": name, "data_type": data_type}) for name, data_type in CUSTOM_FIELDS],
     )
     delete_tags(REMOVED_TAGS)
