@@ -378,14 +378,17 @@ data:
         "only, no prose and no code fence, in exactly this shape: "
         '{"title": "H-E-B receipt for Evian water", "merchant": "H-E-B", '
         '"date": "2026-11-08", "total": 20.64, "currency": "USD", '
-        '"payment_method": "MASTERCARD 3642", "reference": ""} '
+        '"payment_method": "MASTERCARD 3642", "reference": "", "useful": true} '
         "title: the merchant and what was bought, under 80 characters. Name the shop and a "
         "couple of items. Never describe the room, table, lighting or camera angle. "
         "merchant: the shop, as printed. date: the transaction date, YYYY-MM-DD. "
         "total: the printed TOTAL as a number, not a string, or null. "
         "currency: three-letter code, or null. payment_method: the card line as printed, "
         "brand and the last four digits, like MASTERCARD 3642, with no asterisks. reference: invoice or transaction id, or an empty string. "
-        "OCR is unreliable on digits: prefer the printed TOTAL line and do not invent a value."
+        "OCR is unreliable on digits: prefer the printed TOTAL line and do not invent a value. "
+        "useful: false when the document is junk with no lasting value - a discount coupon, "
+        "an advertisement, a flyer, a loyalty card, a promotional slip, or something you "
+        "cannot read at all. True when it is worth keeping."
     )
 
 
@@ -530,7 +533,9 @@ data:
         existing = doc.get("content") or ""
         if block and marker not in existing:
             patch["content"] = (existing.rstrip() + "\n\n" + block).strip()
-        usable = any([
+        # A coupon is a document the model can read perfectly and that nobody will ever
+        # file. useful=false covers that as well as a reading too thin to act on.
+        usable = answer.get("useful") is not False and any([
             title,
             merchant,
             dated,
