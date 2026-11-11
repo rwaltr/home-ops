@@ -471,8 +471,13 @@ data:
             patch["custom_fields"] = [{"field": k, "value": v} for k, v in values.items()]
         # our own content tags, plus a status tag in the convention this stack uses
         tag_ids = {t["name"]: t["id"] for t in paperless("/tags/?page_size=200").get("results", [])}
-        wanted = [name for name in (asset.get("tags") or []) if name in VOCAB]
-        ids = [tag_ids[name] for name in wanted if name in tag_ids]
+        # Paperless replaces the whole tag list too, so merge rather than assign: what the
+        # document already carries stays. Immich hands back tag dicts, not names.
+        ids = list(doc.get("tags") or [])
+        for entry in asset.get("tags") or []:
+            name = entry.get("name") if isinstance(entry, dict) else entry
+            if name in VOCAB and name in tag_ids:
+                ids.append(tag_ids[name])
         ids.append(ensure_named("tags", VISION_TAG))
         patch["tags"] = sorted(set(ids))
         paperless("/documents/%s/" % doc["id"], "PATCH", patch)
