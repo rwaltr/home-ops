@@ -44,7 +44,10 @@ spec:
       bridge:
         type: cronjob
         cronjob:
-          schedule: "*/15 * * * *"
+          # Backstop, not the primary path: uploads and album changes are handled by
+          # the realtime controller below within seconds. This catches whatever the
+          # socket missed, and backfills older photos.
+          schedule: "0 * * * *"
           concurrencyPolicy: Forbid
           # One attempt: a transient Immich/network failure is retried by the next
           # 15-minute tick anyway, so backoff just delays the obvious.
@@ -86,6 +89,45 @@ spec:
               limits:
                 # Downloads and writes one photo at a time; no need to hold more.
                 memory: 256Mi
+      realtime:
+        type: deployment
+        replicas: 1
+        strategy: Recreate
+        containers:
+          realtime:
+            image:
+              repository: python
+              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+            # Same script, different entry point: it holds Immich's websocket.
+            command: ["python3", "/scripts/bridge.py", "--realtime"]
+            env:
+              # Kept in step with the bridge container above by hand; app-template has
+              # no way to share one env block between controllers.
+              IMMICH_URL: http://immich-server.default.svc.cluster.local:2283
+              IMMICH_ALBUM: Paperless
+              SENT_TAG: paperless-sent
+              CONSUME_DIR: /consume
+              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              VISION_MODEL: intel-vl
+              MIN_OCR_SCORE: "0.5"
+              MAX_VISION_CALLS: "20"
+              # Long enough for Immich's own OCR job to finish and become evidence.
+              UPLOAD_DEBOUNCE: "45"
+              # The event path looks at a few minutes, not the sweep's whole window.
+              EVENT_WINDOW_MINUTES: "15"
+            envFrom:
+              - secretRef:
+                  name: immich-paperless
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 192Mi
     defaultPodOptions:
       automountServiceAccountToken: false
       enableServiceLinks: false

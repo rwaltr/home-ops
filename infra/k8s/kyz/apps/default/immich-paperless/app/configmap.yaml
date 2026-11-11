@@ -80,7 +80,7 @@ data:
     MIN_OCR_SCORE = float(os.environ.get("MIN_OCR_SCORE", "0.5"))
     MAX_VISION_CALLS = int(os.environ.get("MAX_VISION_CALLS", "20"))
     LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm.default.svc.cluster.local:4000")
-    VISION_MODEL = os.environ.get("VISION_MODEL", "qwen3.8-omni-flash")
+    VISION_MODEL = os.environ.get("VISION_MODEL", "intel-vl")
     VISION_KEY = os.environ.get("LITELLM_API_KEY", "")
 
     VISION_PROMPT = (
@@ -235,8 +235,11 @@ data:
         return ids
 
 
-    def classify(tags):
-        since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=WINDOW_HOURS)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    def classify(tags, window_hours=None):
+        # The sweep uses the configured window. The event path passes minutes instead,
+        # so one upload is examined on its own rather than re-scanning the day.
+        hours = WINDOW_HOURS if window_hours is None else window_hours
+        since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         # Immich caps a metadata page at 200 and has no "everything in this window" call,
         # so walk pages newest-first. Without this a CLIP hit older than the newest 200
         # is skipped as "not recent" on every run and can never be classified at all.
@@ -252,7 +255,7 @@ data:
             if len(items) < 200:
                 break
         if not recent:
-            print(f"classify: no images added in the last {WINDOW_HOURS}h", flush=True)
+            print(f"classify: no images added in the last {hours}h", flush=True)
             return 0
 
         candidates = human_candidates()
@@ -344,6 +347,187 @@ data:
         return sent
 
 
+    # ---------------------------------------------------------------- realtime
+    # The event path: one long-running pod holds Immich's websocket and reacts to
+    # uploads and album changes, so the wait is seconds rather than the sweep's
+    # interval. The sweep stays the backstop, so a bug in here costs latency and
+    # never correctness. Stdlib only - socket, struct, base64 - so there is no
+    # dependency to pin and no image to build.
+    import queue
+    import socket
+    import struct
+    import threading
+    import time
+    import urllib.parse
+
+    REALTIME_PATH = "/api/socket.io/?EIO=4&transport=websocket"
+    # The gateway accepts exactly one credential form: an x-api-key header on the
+    # upgrade. Query string, Authorization Bearer, the access-token cookie and the
+    # socket.io connect payload were all measured and all answer "unauthorized".
+    UPLOAD_DEBOUNCE = float(os.environ.get("UPLOAD_DEBOUNCE", "45"))
+    EVENT_WINDOW_MINUTES = int(os.environ.get("EVENT_WINDOW_MINUTES", "15"))
+
+
+    class _WS:
+        """Just enough RFC 6455 to hold one connection."""
+
+        def __init__(self, sock, pending):
+            self.sock = sock
+            # The engine.io open frame can share a TCP read with the upgrade
+            # headers, so the leftovers are the first bytes of the first frame.
+            self.buf = pending
+
+        def _take(self, count):
+            while len(self.buf) < count:
+                chunk = self.sock.recv(4096)
+                if not chunk:
+                    raise ConnectionError("socket closed")
+                self.buf += chunk
+            taken, self.buf = self.buf[:count], self.buf[count:]
+            return taken
+
+        def read(self):
+            head = self._take(2)
+            opcode, length = head[0] & 0x0F, head[1] & 0x7F
+            if length == 126:
+                length = struct.unpack(">H", self._take(2))[0]
+            elif length == 127:
+                length = struct.unpack(">Q", self._take(8))[0]
+            mask = self._take(4) if head[1] & 0x80 else None
+            payload = self._take(length)
+            if mask:
+                payload = bytes(c ^ mask[i % 4] for i, c in enumerate(payload))
+            return opcode, payload
+
+        def send(self, text, opcode=0x1):
+            body = text.encode() if isinstance(text, str) else text
+            if len(body) < 126:
+                head = bytes([0x80 | opcode, 0x80 | len(body)])
+            elif len(body) < 65536:
+                head = bytes([0x80 | opcode, 0x80 | 126]) + struct.pack(">H", len(body))
+            else:
+                head = bytes([0x80 | opcode, 0x80 | 127]) + struct.pack(">Q", len(body))
+            mask = os.urandom(4)
+            # A client must mask and a server must not; this is the one asymmetry.
+            self.sock.sendall(head + mask + bytes(c ^ mask[i % 4] for i, c in enumerate(body)))
+
+
+    def ws_connect():
+        """Upgrade to the gateway's websocket, authenticated with the API key."""
+        if not KEY:
+            raise RuntimeError("IMMICH_API_KEY is empty")
+        # IMMICH is the script's own resolved base URL (it is not called IMMICH_URL).
+        url = urllib.parse.urlparse(IMMICH)
+        if url.scheme != "http":
+            # Plain HTTP in-cluster. TLS would need an ssl wrap here and nothing else.
+            raise RuntimeError("realtime expects an http IMMICH_URL, got %s" % url.scheme)
+        host, port = url.hostname, url.port or 80
+        sock = socket.create_connection((host, port), timeout=60)
+        sock.sendall((
+            "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\nx-api-key: %s\r\n\r\n"
+            % (REALTIME_PATH, host, port, base64.b64encode(os.urandom(16)).decode(), KEY)
+        ).encode())
+        raw = b""
+        while b"\r\n\r\n" not in raw:
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("closed during upgrade")
+            raw += chunk
+        head, _, pending = raw.partition(b"\r\n\r\n")
+        status = head.split(b"\r\n", 1)[0].decode("utf-8", "replace")
+        if " 101 " not in status:
+            raise ConnectionError("upgrade refused: %s" % status)
+        return _WS(sock, pending)
+
+
+    WORK = queue.Queue()
+
+
+    def _worker():
+        """Runs the slow work off the socket loop, which must keep answering pings."""
+        while True:
+            kind, _ = WORK.get()
+            try:
+                if kind == "classify":
+                    # Immich's own OCR lands after the upload event, so waiting is
+                    # what makes the evidence real rather than absent.
+                    time.sleep(UPLOAD_DEBOUNCE)
+                    classify(tags_by_name(), window_hours=EVENT_WINDOW_MINUTES / 60)
+                else:
+                    send(tags_by_name())
+            except Exception as err:  # noqa: BLE001 - one bad event must not stop the rest
+                print("realtime: %s failed (%s)" % (kind, err), flush=True)
+            finally:
+                WORK.task_done()
+
+
+    def handle(name, data):
+        """Events are hints only. Anything we cannot read, we do not act on."""
+        if name == "on_upload_success":
+            asset = (data or {}).get("asset") or {}
+            print("realtime: on_upload_success %s" % (asset.get("id") or "no id in payload"), flush=True)
+            # The payload shape is not contractual, so the debounced classify
+            # re-queries by time window instead of trusting an id it may not carry.
+            WORK.put(("classify", None))
+        elif name == "on_album_update":
+            print("realtime: on_album_update -> send", flush=True)
+            WORK.put(("send", None))
+        else:
+            # on_asset_update is deliberately not a send trigger: our own tag writes
+            # emit it, so reacting would make classify trigger itself. Unknown names
+            # are logged and ignored - the sweep still covers whatever we miss.
+            print("realtime: %s ignored" % name, flush=True)
+
+
+    def realtime():
+        """Hold the socket forever. It reconnects rather than exiting."""
+        threading.Thread(target=_worker, daemon=True).start()
+        backoff = 1
+        while True:
+            try:
+                ws = ws_connect()
+                # The upgrade only opens engine.io. socket.io needs an explicit CONNECT
+                # before the server joins this client to the user's room - and that join
+                # is what per-user events are delivered to. Without it, the socket looks
+                # connected and receives nothing.
+                ws.send("40")
+                backoff = 1
+                print("realtime: websocket up on %s" % IMMICH, flush=True)
+                while True:
+                    opcode, payload = ws.read()
+                    if opcode == 0x9:  # websocket ping
+                        ws.send(payload, opcode=0xA)
+                        continue
+                    if opcode == 0x8:
+                        raise ConnectionError("server closed the websocket")
+                    if opcode != 0x1:
+                        continue
+                    message = payload.decode("utf-8", "replace")
+                    if message.startswith("2"):  # engine.io ping, reply engine.io pong
+                        ws.send("3")
+                        continue
+                    if not message.startswith("4"):
+                        continue
+                    kind, rest = message[1:2], message[2:]
+                    if kind == "0":  # namespace connected: events can arrive from here
+                        print("realtime: namespace connected", flush=True)
+                    elif kind == "1":
+                        raise ConnectionError("server disconnected the namespace")
+                    elif kind == "4":
+                        raise ConnectionError("namespace refused: %s" % rest[:80])
+                    elif kind == "2":
+                        frame = json.loads(rest)
+                        name = frame[0] if frame else ""
+                        if name == "error":
+                            raise ConnectionError("gateway error: %s" % str(frame[1:])[:80])
+                        handle(name, frame[1] if len(frame) > 1 else {})
+            except Exception as err:  # noqa: BLE001 - reconnecting is the whole behaviour
+                print("realtime: %s (retrying in %ss)" % (err, backoff), flush=True)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+
+
     def main():
         if not KEY:
             sys.exit("IMMICH_API_KEY is empty: create an Immich API key and put it in 1Password (see docs/paperless.md)")
@@ -357,4 +541,8 @@ data:
 
 
     if __name__ == "__main__":
-        main()
+        # One script, two entry points: the CronJob sweeps, the Deployment listens.
+        if "--realtime" in sys.argv:
+            realtime()
+        else:
+            main()
