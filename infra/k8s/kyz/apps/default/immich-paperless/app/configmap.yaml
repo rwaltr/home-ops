@@ -103,7 +103,7 @@ data:
         '"document": false, "confidence": 0.0, "kind": ""}'
         "description must name what the thing IS. For a document that means the merchant "
         "and the purchase (\"H-E-B receipt for Evian water\"), never the room, table or "
-        "lighting it was photographed on. For anything else describe what is happening. ",
+        "lighting it was photographed on. For anything else describe what is happening. "
         "tags must be 1-4 words from this list, spelled exactly: "
         + ", ".join(sorted(VOCAB))
         + ". document is true only if this is a document that belongs in a paperless "
