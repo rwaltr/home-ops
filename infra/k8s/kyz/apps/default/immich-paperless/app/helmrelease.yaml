@@ -43,6 +43,13 @@ spec:
           # One attempt: a transient Immich/network failure is retried by the next
           # 15-minute tick anyway, so backoff just delays the obvious.
           backoffLimit: 1
+          # Reap the finished job after a day. Without this a failed run pins
+          # kube_job_failed=1 indefinitely -- failedJobsHistoryLimit keeps the
+          # newest failure and the CronJob controller never prunes it -- so
+          # KubeJobFailed stays firing and re-notifies every repeat_interval
+          # long after the failure is understood. The day still keeps the log
+          # around for postmortem.
+          ttlSecondsAfterFinished: 86400
         containers:
           bridge:
             image:

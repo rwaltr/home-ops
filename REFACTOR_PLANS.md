@@ -1983,6 +1983,23 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
+### 2026-11-11 (alert review) — a failed CronJob page never resolves on its own
+
+- **A failed CronJob run pins `KubeJobFailed` until its Job object is deleted.**
+  `failedJobsHistoryLimit` keeps the *newest* failure, and the CronJob controller
+  only prunes on the next Job creation — so the object, and `kube_job_failed=1`
+  with it, stays indefinitely. The alert fires once at `for: 15m` and then
+  re-notifies every `repeat_interval` for a failure already understood. Two
+  `*/15` jobs that failed in the same 04:00 tick (`immich-paperless`, whose
+  script used to exit non-zero on a missing opt-in album, and `paperless-extract`,
+  collateral of a `paperless-app` restart) each pinned one.
+- **Fix: `ttlSecondsAfterFinished: 86400` on the jobTemplate**, which is also what
+  `recyclarr` already sets. The Job is reaped a day after finishing — long enough
+  to read the log, short enough that a stale failure cannot page forever.
+- **The alert rule itself is left alone.** `KubeJobFailed` is correct; the gap was
+  that the object it watches never goes away. Deleting a failed Job to clear the
+  alert by hand is a stopgap, not the repair.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
