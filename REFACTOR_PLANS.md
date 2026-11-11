@@ -1902,7 +1902,7 @@ Still permanent retention, still no manual triage. The superseded
 - **Paperless' AI action cannot write custom fields.** `AISuggestionField` stops
   at `created`, and `documents/workflows/ai.py` never touches
   `document.custom_fields`. So "let the AI extract the total" is not a setting —
-  it is our own LLM call. A 15-minute CronJob (`paperless-extract`) asks
+  it is our own LLM call. A 5-minute CronJob (`paperless-extract`) asks
   `nvidia-llama` for total/currency/card/reference and PATCHes the document. It
   skips documents that already have a `Total`, so it only fills blanks.
 - **Qwen3-32B is a reasoning model.** With the default chat template it spent

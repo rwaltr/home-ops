@@ -14,7 +14,7 @@ kind: CronJob
 metadata:
   name: paperless-extract
 spec:
-  schedule: "*/15 * * * *"
+  schedule: "*/5 * * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 120
   successfulJobsHistoryLimit: 1

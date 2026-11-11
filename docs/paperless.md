@@ -165,7 +165,7 @@ Limits worth knowing:
 ## Receipt metadata (extractor)
 
 Paperless' AI suggestion action cannot write custom fields, so a CronJob fills
-the financial ones. `paperless-extract` (`paperless_extract.py`, every 15
+the financial ones. `paperless-extract` (`paperless_extract.py`, every 5
 minutes) scans documents typed `Invoice` or `Receipt`, asks the same LLM
 (`nvidia-llama` via LiteLLM) for the values, and PATCHes the document:
 
