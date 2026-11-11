@@ -45,6 +45,7 @@ data:
     ALBUM = os.environ.get("IMMICH_ALBUM", "Paperless")
     SENT_TAG = os.environ.get("SENT_TAG", "paperless-sent")
     MAYBE_TAG = os.environ.get("MAYBE_TAG", "paperless-maybe")
+    SKIP_TAG = os.environ.get("SKIP_TAG", "paperless-skip")
     CONSUME = pathlib.Path(os.environ.get("CONSUME_DIR", "/consume"))
 
     # Only look at recently added assets. createdAfter is when the asset entered the
@@ -100,6 +101,9 @@ data:
         "in exactly this shape: "
         '{"description": "one short sentence", "tags": ["casual", "person"], '
         '"document": false, "confidence": 0.0, "kind": ""}'
+        "description must name what the thing IS. For a document that means the merchant "
+        "and the purchase (\"H-E-B receipt for Evian water\"), never the room, table or "
+        "lighting it was photographed on. For anything else describe what is happening. ",
         "tags must be 1-4 words from this list, spelled exactly: "
         + ", ".join(sorted(VOCAB))
         + ". document is true only if this is a document that belongs in a paperless "
@@ -137,22 +141,13 @@ data:
 
 
     def safe_name(asset):
-        """Name the file after what the photo is, because Paperless titles from it.
-
-        Paperless's own AI is text-only. For a photographed receipt whose OCR comes back
-        empty it has nothing to work with and the title stays the camera filename; the
-        vision model already described the image, so the filename carries that instead.
-        """
+        stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
+        keep = "".join(c if c.isalnum() or c in " -_" else "-" for c in stem).strip() or "photo"
         when = (asset.get("fileCreatedAt") or "")[:10] or datetime.date.today().isoformat()
-        stem = ((asset.get("exifInfo") or {}).get("description") or "").strip()
-        if not stem:
-            stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
-        # 90 characters is a comfortable title; a paragraph helps nobody.
-        keep = "".join(c if c.isalnum() or c in " -_$" else "-" for c in stem).strip(" -_") or "photo"
         ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
         if ext not in SAFE_EXT:
-            return f"{when} {keep[:90]}.jpg"
-        return f"{when} {keep[:90]}{ext}"
+            return f"{when} immich {keep[:48]}.jpg"
+        return f"{when} immich {keep[:48]}{ext}"
 
 
     def tags_by_name():
@@ -245,11 +240,8 @@ data:
 
 
     def ensure_album():
-    # A display grouping only: sending is driven by the document tag, because the
-    # list API omits an album's assets unless the key's user owns the album (this
-    # one has an empty ownerId), so it reads back empty even when assets are in it.
         """The Paperless album, created on first use. This album is the queue."""
-        for album in api("/albums?withoutAssets=false"):
+        for album in api("/albums?withoutAssets=true"):
             if album.get("albumName") == ALBUM:
                 return album["id"]
         return api("/albums", "POST", {"albumName": ALBUM})["id"]
@@ -307,6 +299,7 @@ data:
             return 0
 
         decided = ensure_tag(tags, DOC_TAG)
+        skip = ensure_tag(tags, SKIP_TAG)
         maybe = ensure_tag(tags, MAYBE_TAG)
         album = ensure_album()
         documents = skipped = vision_calls = 0
@@ -314,11 +307,7 @@ data:
             # Any of these means the question is already answered: sent, archived, or
             # declined. paperless-maybe is deliberately absent, so assets queued by the
             # old OCR gate get a real verdict now instead of sitting in review forever.
-            # Decided means the question is answered: sent, a document, or carrying any of
-            # the content tags this script writes. There is no skip tag - a photo that is not
-            # a document needs no record, and its description and content tags are that
-            # record. A tag the operator added by hand counts as their answer too.
-            if already_tagged(asset["id"], set(VOCAB) | {SENT_TAG, DOC_TAG}):
+            if already_tagged(asset["id"], (SENT_TAG, DOC_TAG, SKIP_TAG)):
                 continue
             if vision_calls >= MAX_VISION_CALLS:
                 print(f"classify: {asset['id']} left for the next run, vision budget of {MAX_VISION_CALLS} spent", flush=True)
@@ -342,10 +331,9 @@ data:
                     documents += 1
                     print(f"classify: {asset['id']} -> {DOC_TAG}, {wrote} write(s), kind={verdict.get('kind') or '?'}, conf={verdict.get('confidence')}: {verdict.get('description') or '?'}", flush=True)
                 else:
-                    # No tag: a non-document is recorded by its description and content tags,
-                    # which already make a later run skip it.
+                    api(f"/tags/{skip}/assets", "PUT", {"ids": [asset["id"]]})
                     skipped += 1
-                    print(f"classify: {asset['id']} not a document, {wrote} write(s): {verdict.get('description') or '?'}", flush=True)
+                    print(f"classify: {asset['id']} -> {SKIP_TAG}, {wrote} write(s): {verdict.get('description') or '?'}", flush=True)
             except SystemExit as err:
                 # api() exits on any non-2xx, so one asset that cannot be written would abort the
                 # run and strand every asset after it - which is exactly what the HEIC 400 did.
@@ -353,36 +341,204 @@ data:
                 continue
 
         print(
-            f"classify: {len(recent)} image(s), {documents} document(s), {skipped} not a document, "
+            f"classify: {len(recent)} image(s), {documents} document(s), {skipped} skipped, "
             f"{vision_calls} vision call(s)",
             flush=True,
         )
         return documents
 
 
-    def send(tags):
-        """Copy every asset tagged document into Paperless, once.
+    # ---------------------------------------------------------------- Paperless metadata
+    # Paperless's own AI writes title, tags, correspondent, document type, storage path and
+    # created date, and it reads text only. It has no custom-field path at all. So a
+    # photographed receipt whose OCR came back empty is titled after its camera filename with
+    # nothing filled in. This asks the vision model about the image instead and writes what
+    # it reads into the fields this stack already uses (see paperless_extract.py).
+    PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless-app.default.svc.cluster.local:8000").rstrip("/")
+    PAPERLESS_KEY = os.environ.get("PAPERLESS_API_TOKEN", "")
+    VISION_TAG = os.environ.get("VISION_TAG", "status/vision-enriched")
+    ENRICH_PROMPT = (
+        "You are shown one photo of a receipt, invoice, bill or statement. Reply with JSON "
+        "only, no prose and no code fence, in exactly this shape: "
+        '{"title": "H-E-B receipt for Evian water", "merchant": "H-E-B", '
+        '"date": "2026-11-08", "total": 20.64, "currency": "USD", '
+        '"payment_method": "VISA ****1234", "reference": ""} '
+        "title: the merchant and what was bought, under 80 characters. Name the shop and a "
+        "couple of items. Never describe the room, table, lighting or camera angle. "
+        "merchant: the shop, as printed. date: the transaction date, YYYY-MM-DD. "
+        "total: the printed TOTAL as a number, not a string, or null. "
+        "currency: three-letter code, or null. payment_method: the card line as printed, "
+        "brand and last four. reference: invoice or transaction id, or an empty string. "
+        "OCR is unreliable on digits: prefer the printed TOTAL line and do not invent a value."
+    )
 
-        Driven by the tag rather than the album. The album is a display grouping, and
-        the list API reports no assets for an album the key's user does not own, so it
-        reads back empty even when the assets are in it. The tag is the gate.
+
+    def paperless(path, method="GET", payload=None):
+        """Talk to Paperless. Separate from api(), which talks to Immich."""
+        data = json.dumps(payload).encode() if payload is not None else None
+        req = urllib.request.Request(
+            PAPERLESS_URL + "/api" + path,
+            data=data,
+            method=method,
+            headers={"Authorization": "Token " + PAPERLESS_KEY, "Content-Type": "application/json"},
+        )
+        raw = urllib.request.urlopen(req, timeout=90).read().decode()
+        return json.loads(raw) if raw.strip() else {}
+
+
+    def ensure_named(kind, name):
+        """The id of the Paperless object of this kind, created if this is the first."""
+        name = name.strip()[:128]
+        found = paperless("/%s/?name=%s" % (kind, urllib.parse.quote(name)))
+        for item in found.get("results", []):
+            if (item.get("name") or "").strip().lower() == name.lower():
+                return item["id"]
+        return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+
+
+    def vision_fields(asset_id):
+        """The model's reading of one document image, or None if it did not answer."""
+        try:
+            image = api(f"/assets/{asset_id}/thumbnail?size=preview", raw=True)
+        except SystemExit as err:
+            return None, f"thumbnail failed ({err})"
+        body = {
+            "model": VISION_MODEL,
+            "max_tokens": 400,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": ENRICH_PROMPT},
+                        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(image).decode()}},
+                    ],
+                }
+            ],
+        }
+        req = urllib.request.Request(
+            LITELLM_URL.rstrip("/") + "/v1/chat/completions",
+            method="POST",
+            data=json.dumps(body).encode(),
+            headers={"Authorization": f"Bearer {VISION_KEY}", "Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                payload = json.loads(resp.read().decode() or "{}")
+        except urllib.error.HTTPError as err:
+            return None, f"litellm {err.code}"
+        except Exception as err:  # noqa: BLE001 - any transport failure means no answer
+            return None, f"litellm unreachable ({err})"
+        text = ((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        try:
+            answer = json.loads(text)
+        except ValueError:
+            return None, "unparsable answer"
+        if not isinstance(answer, dict) or not (answer.get("title") or "").strip():
+            return None, "answer had no title"
+        return answer, ""
+
+
+    def enrich_document(tags, doc, asset, answer):
+        """Write the model's reading onto one Paperless document. Returns fields written."""
+        patch = {}
+        title = (answer.get("title") or "").strip()[:128]
+        if title and title != (doc.get("title") or ""):
+            patch["title"] = title
+        merchant = (answer.get("merchant") or "").strip()
+        if merchant:
+            patch["correspondent"] = ensure_named("correspondents", merchant)
+        when = (answer.get("date") or "").strip()
+        if len(when) == 10 and when[4] == "-" and when[7] == "-":
+            patch["created"] = when
+        # Paperless replaces the whole custom-field list on PATCH, so merge with what is
+        # there. Monetary fields carry the currency as a three-character prefix.
+        values = dict()
+        for entry in doc.get("custom_fields") or []:
+            values[entry["field"]] = entry["value"]
+        fields = {f["name"]: f["id"] for f in paperless("/custom_fields/?page_size=100").get("results", [])}
+        total = answer.get("total")
+        code = (answer.get("currency") or "").strip().upper()
+        code = code if len(code) == 3 and code.isalpha() else ""
+        if isinstance(total, (int, float)) and total > 0 and "Total" in fields:
+            values[fields["Total"]] = f"{code}{float(total):.2f}"
+        for name, value in (("Payment method", answer.get("payment_method")), ("Reference", answer.get("reference"))):
+            if isinstance(value, str) and value.strip() and name in fields:
+                values[fields[name]] = value.strip()[:128]
+        if values:
+            patch["custom_fields"] = [{"field": k, "value": v} for k, v in values.items()]
+        # our own content tags, plus a status tag in the convention this stack uses
+        tag_ids = {t["name"]: t["id"] for t in paperless("/tags/?page_size=200").get("results", [])}
+        wanted = [name for name in (asset.get("tags") or []) if name in VOCAB]
+        ids = [tag_ids[name] for name in wanted if name in tag_ids]
+        ids.append(ensure_named("tags", VISION_TAG))
+        patch["tags"] = sorted(set(ids))
+        paperless("/documents/%s/" % doc["id"], "PATCH", patch)
+        return len([k for k in patch if k != "tags"])
+
+
+    def enrich_all(tags):
+        """Fill in the Paperless side for documents we have already sent.
+
+        The join is the filename: send() named the file from the asset, so the document
+        can be found again. Idempotent via VISION_TAG on the document.
         """
-        document = tags.get(DOC_TAG)
-        if not document:
-            print(f"send: nothing tagged {DOC_TAG} yet", flush=True)
+        if not PAPERLESS_KEY:
+            print("enrich: no PAPERLESS_API_TOKEN, skipping", flush=True)
             return 0
-        assets = []
-        for page in range(1, MAX_PAGES + 1):
-            found = api(
-                "/search/metadata",
-                "POST",
-                {"tagIds": [document], "type": "IMAGE", "size": 200, "page": page},
-            )
-            items = ((found.get("assets") or {}).get("items")) or []
-            assets.extend(items)
-            if len(items) < 200:
+        sent = ensure_tag(tags, SENT_TAG)
+        wanted = {t["name"]: t["id"] for t in paperless("/tags/?page_size=200").get("results", [])}
+        done_id = wanted.get(VISION_TAG)
+        docs = paperless("/documents/?page_size=200&ordering=id").get("results", [])
+        # One pass over the sent assets: the filename is what joins the two systems, so it
+        # is computed once rather than per document.
+        by_stem = {}
+        for candidate in assets_with_tag(sent):
+            full = api(f"/assets/{candidate['id']}")
+            by_stem[pathlib.Path(safe_name(full)).stem] = full
+        enriched = calls = 0
+        for doc in docs:
+            if done_id and any(t["id"] == done_id for t in (doc.get("tags") or [])):
+                continue
+            fname = doc.get("original_file_name") or ""
+            asset = next((full for stem, full in by_stem.items() if stem in fname), None)
+            if asset is None:
+                continue
+            if calls >= MAX_VISION_CALLS:
+                print(f"enrich: {doc['id']} left for the next run, vision budget spent", flush=True)
                 break
+            calls += 1
+            answer, why = vision_fields(asset["id"])
+            if answer is None:
+                # No answer: leave the document untouched so a later run asks again.
+                print(f"enrich: {doc['id']} untouched, no answer ({why})", flush=True)
+                continue
+            written = enrich_document(tags, doc, asset, answer)
+            enriched += 1
+            print(f"enrich: {doc['id']} {written} field(s), title={answer.get('title')!r}", flush=True)
+        print(f"enrich: {enriched} document(s) enriched, {calls} vision call(s)", flush=True)
+        return enriched
+
+
+    def assets_with_tag(tag_id, limit=200):
+        """Immich assets carrying a tag."""
+        found = api("/search/metadata", "POST", {"tagIds": [tag_id], "type": "IMAGE", "size": limit})
+        return ((found.get("assets") or {}).get("items")) or []
+
+
+    def send(tags):
+        album = next((a for a in api("/albums?withoutAssets=false") if a.get("albumName") == ALBUM), None)
+        if album is None:
+            # Not an error: the album is opt-in, and an empty review queue is the
+            # normal state. Exiting non-zero here is what made this job fail loudly
+            # every 15 minutes.
+            print(f"send: no album named {ALBUM!r}, nothing to send", flush=True)
+            return 0
+
         sent_tag = ensure_tag(tags, SENT_TAG)
+        assets = album.get("assets") or []
         sent = 0
         for asset in assets:
             if already_tagged(asset["id"], (SENT_TAG,)):
@@ -398,10 +554,7 @@ data:
                 path, suffix = f"/assets/{asset['id']}/original", ext
             else:
                 path, suffix = f"/assets/{asset['id']}/thumbnail?size=fullsize", ".jpg"
-            # The metadata search result carries no exifInfo, so read the asset: that is
-            # where the description lives, and the filename is built from it.
-            described = api(f"/assets/{asset['id']}")
-            dest = CONSUME / safe_name(described)
+            dest = CONSUME / safe_name(asset)
             if dest.suffix.lower() != suffix:
                 dest = dest.with_suffix(suffix)
             dest.write_bytes(api(path, raw=True))
@@ -411,7 +564,7 @@ data:
             print(f"send: {asset['id']} -> {dest.name}", flush=True)
             sent += 1
 
-        print(f"send: {sent} sent, {len(assets)} tagged {DOC_TAG}", flush=True)
+        print(f"send: {sent} sent, {len(assets)} in album {ALBUM!r}", flush=True)
         return sent
 
 
@@ -617,7 +770,10 @@ data:
         # the same pass rather than waiting an hour for the next one.
         documents = classify(tags)
         sent = send(tags)
-        print(f"done: {sent} sent, {documents} document(s)", flush=True)
+        # Enrichment runs after send because it needs the Paperless document, which only
+        # exists once the consumer has picked the file up.
+        enriched = enrich_all(tags)
+        print(f"done: {sent} sent, {documents} document(s), {enriched} enriched", flush=True)
 
 
     if __name__ == "__main__":
