@@ -1877,10 +1877,11 @@ Revised to a provenance trail across two namespaces after grilling the model:
   list and creates correspondents as needed. `ai_create_missing` is global (it
   can invent a type too) — accepted, since it is the only way to get
   correspondents at all.
-- **The bridge owns `accounting/*`.** Workflow mutations do not re-fire
-  `document_updated`, so a follow-up "type became Invoice → tag unlinked"
-  workflow cannot catch AI-typed documents. The ledger tags are therefore set by
-  the bridge (issue #988), giving ledger state one owner.
+- **Paperless sets `accounting/unlinked`; the bridge owns the match.** Workflow
+  mutations do not re-fire `document_updated`, so a follow-up Added/Updated
+  workflow cannot catch AI-typed financial documents. The rules tag unlinked
+  immediately and a scheduled (hourly) workflow sweeps the rest by type. The
+  bridge only removes `unlinked` and adds `beancounted` on a match (issue #988).
 - **No OCR tag.** Paperless stores no "was OCRed" flag; it would need a
   post-consume script comparing the original against the OCR'd archive.
   Deferred.

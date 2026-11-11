@@ -16,9 +16,11 @@ The design is a provenance trail:
                       if a workflow failed.
   status/ai-enriched  terminal — the document was classified by the LLM.
   accounting/unlinked financial doc not yet matched to a ledger transaction.
+                      Set by the rules immediately, and by an hourly scheduled
+                      sweep for documents the AI typed.
   accounting/beancounted
-                      matched. Both accounting tags are owned by the Beancount
-                      bridge, never by Paperless classification.
+                      matched. The Beancount bridge owns the transition:
+                      remove unlinked and add beancounted.
 
 Env:
   PAPERLESS_URL        default https://paperless.waltr.tech
@@ -50,6 +52,7 @@ TOKEN = os.environ.get("PAPERLESS_API_TOKEN", "").strip()
 #   trigger type 2 = Document Added, matching algorithm 4 = Regular expression
 #   action types: 1 = Assignment, 2 = Removal, 8 = Apply AI suggestions
 TRIGGER_DOCUMENT_ADDED = 2
+TRIGGER_SCHEDULED = 4
 MATCH_REGEX = 4
 ACTION_ASSIGN = 1
 ACTION_REMOVE = 2
@@ -187,7 +190,14 @@ def upsert_workflow(payload: dict, existing: dict[str, dict]) -> int:
     return obj["id"]
 
 
-def rule_workflow(name: str, order: int, match: str, doc_type: int, inbox: list[int]) -> dict:
+def rule_workflow(
+    name: str,
+    order: int,
+    match: str,
+    doc_type: int,
+    inbox: list[int],
+    unlinked: list[int],
+) -> dict:
     return {
         "name": name,
         "order": order,
@@ -202,7 +212,11 @@ def rule_workflow(name: str, order: int, match: str, doc_type: int, inbox: list[
             },
         ],
         "actions": [
-            {"type": ACTION_ASSIGN, "assign_document_type": doc_type},
+            {
+                "type": ACTION_ASSIGN,
+                "assign_document_type": doc_type,
+                "assign_tags": unlinked,
+            },
             {"type": ACTION_REMOVE, "remove_tags": inbox},
         ],
     }
@@ -235,6 +249,36 @@ def ai_workflow(untyped_type_ids: list[int], ai_enriched: list[int], inbox: list
     }
 
 
+def unlinked_sweep(
+    financial_type_ids: list[int],
+    unlinked: list[int],
+    beancounted: list[int],
+) -> dict:
+    # Scheduled: re-queries documents each time check_scheduled_workflows runs
+    # (hourly) and pre-filters by type/tag. It exists because workflow mutations
+    # do not re-fire document_updated, so a follow-up Added/Updated workflow
+    # cannot catch documents the AI typed as Invoice/Receipt.
+    return {
+        "name": "mark accounting/unlinked",
+        "order": 40,
+        "enabled": True,
+        "triggers": [
+            {
+                "type": TRIGGER_SCHEDULED,
+                "schedule_date_field": "added",
+                "schedule_offset_days": 0,
+                "schedule_is_recurring": True,
+                "schedule_recurring_interval_days": 1,
+                "filter_has_any_document_types": financial_type_ids,
+                "filter_has_not_tags": unlinked + beancounted,
+            },
+        ],
+        "actions": [
+            {"type": ACTION_ASSIGN, "assign_tags": unlinked},
+        ],
+    }
+
+
 def main() -> None:
     if not TOKEN:
         sys.exit("PAPERLESS_API_TOKEN is not set")
@@ -257,6 +301,8 @@ def main() -> None:
 
     inbox = [tags["status/inbox"]]
     ai_enriched = [tags["status/ai-enriched"]]
+    unlinked = [tags["accounting/unlinked"]]
+    beancounted = [tags["accounting/beancounted"]]
     workflows = [
         # Invoice before receipt: a later assignment overrides an earlier one, so a
         # store receipt that also says "invoice" ends up as Receipt.
@@ -266,6 +312,7 @@ def main() -> None:
             r"(?i)\binvoice\b|amount due|invoice (number|no\.?)|bill to",
             types["Invoice"],
             inbox,
+            unlinked,
         ),
         rule_workflow(
             "auto-classify: receipt",
@@ -273,10 +320,14 @@ def main() -> None:
             r"(?i)\breceipt\b|order total|thank you for your (purchase|order)|payment received",
             types["Receipt"],
             inbox,
+            unlinked,
         ),
         # Last: only documents the rules did not type. Clears status/inbox, so a
         # document keeps it only when this workflow fails (the error signal).
         ai_workflow([types[name] for name in DOCUMENT_TYPES], ai_enriched, inbox),
+        # The AI types a document asynchronously, so the rules cannot tag it. This
+        # sweep is what closes that gap.
+        unlinked_sweep([types["Invoice"], types["Receipt"]], unlinked, beancounted),
     ]
     existing_workflows = {obj["name"]: obj for obj in list_all("/api/workflows/")}
     for workflow in workflows:
