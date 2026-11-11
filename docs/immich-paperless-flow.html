@@ -85,7 +85,7 @@
 <header>
   <h1>immich-paperless <small>receipt photo → Paperless → ledger, event-driven</small>
     <span class="plan">plan · not built yet</span></h1>
-  <p class="lat">album add → copied: <b>was 0–15 min</b> (sweep was the only path) · <b>now seconds</b> (event-driven) ·
+  <p class="lat">album add → copied: <b>was 0–15 min</b> (sweep was the only path) · <b>now seconds</b> (event-driven) · a confident receipt needs <b>no human step at all</b> ·
      verified against Immich <b>v3.2.4</b>, gateway <code>/api/socket.io</code>, websocket-only, <code>x-api-key</code> auth</p>
   <div class="bar">
     <span class="lbl">Flows</span>
@@ -115,8 +115,9 @@
     <div class="who" id="p-who">—</div>
     <div id="p-body">
       <p>Click any box. Filter by flow. Play the end-to-end path, then try <em>What if</em>.</p>
-      <p>The spine is the machine pipeline: deterministic, seconds. The right column is where a person decides, and the
-         left column is the hourly backstop that makes a socket bug cost latency instead of correctness.</p>
+      <p>The spine is the machine pipeline: deterministic, seconds. A confident receipt leaves it at <em>auto-add</em> and
+         never sees a person; only the genuinely ambiguous reach the right column, and the left column is the hourly
+         backstop that makes a socket bug cost latency instead of correctness.</p>
     </div>
     <p class="status" id="status">Ready.</p>
   </aside>
@@ -170,8 +171,8 @@ const NODES = [
     detail: "One long-running pod holding the socket, written with nothing but <code>socket</code>, <code>struct</code> and <code>base64</code> — no image, no dependency, no new secret.<br><br>Authenticates with <code>x-api-key</code> on the upgrade request. Verified: the header is accepted and real event frames arrive; the query string, <code>Authorization: Bearer</code>, the access-token cookie and every socket.io connect payload are all rejected with <code>unauthorized</code>." },
 
   { id: "classify", col: 0, row: 6, title: "classify_one(asset)", actor: "bridge", flows: ["upload", "backstop"],
-    sub: "debounce until Immich OCR lands",
-    detail: "The old sweep classified 1000 assets a tick; this classifies one, on demand. Same cascade, same thresholds.<br><br>It waits for Immich's OCR to appear before falling back to the model, because an instant classify would see no OCR text and spend a model call on something the free local stage would have settled." },
+    sub: "one asset, on demand",
+    detail: "The sweep classified up to 1000 assets a tick; this classifies one, the moment it is uploaded.<br><br>It still debounces until Immich's OCR lands — not to dodge the model call, but because OCR boxes are the strongest cheap evidence the rule has. Asking before they exist is asking the model to guess." },
 
   { id: "d-clip", col: 0, row: 7, title: "CLIP candidate?", actor: "bridge", flows: ["upload", "backstop"],
     kind: "decision",
@@ -182,14 +183,21 @@ const NODES = [
     kind: "quiet",
     detail: "No further work. Most of a photo library ends here, at zero cost." },
 
-  { id: "d-ocr", col: 0, row: 8, title: "OCR text above threshold?", actor: "bridge", flows: ["upload", "backstop"],
-    kind: "decision",
-    detail: "An asset that already has Immich OCR text is a document of some kind. This stage is free, local, and settled 14 of the 15 candidates in the run that proved it — scores 0.88 to 1.00." },
+  { id: "evidence", col: 0, row: 8, title: "gather free evidence", actor: "bridge", flows: ["upload", "backstop"],
+    sub: "OCR boxes · CLIP rank · filename",
+    detail: "Everything that costs nothing: how many queries CLIP matched it for and its rank in each, Immich's OCR box count and best score, and the filename — a screen capture is rarely a receipt.<br><br>This is <b>evidence now, not a gate</b>. It used to short-circuit and tag on OCR alone; instead it feeds the confidence rule, which is what lets a screenshot full of text be judged rather than waved through." },
 
   { id: "vision", col: 0, row: 9, title: "intel-vl vision", actor: "dan", flows: ["upload", "backstop"],
-    sub: "Qwen3-VL-8B on an Intel Arc",
-    detail: "Asked only when OCR cannot judge. Prompt requests JSON only: <code>{\"document\": true|false}</code>.<br><br>Same rationale as the local text aliases: it keeps photographed documents off a model provider. Any other name in <code>VISION_MODEL</code> sends the image to OpenRouter instead." },
+    sub: "Qwen3-VL-8B, temperature 0",
+    detail: "Asked for structured JSON: <code>document</code>, <code>confidence</code>, <code>kind</code>, whatever fields it can actually read — <code>merchant</code>, <code>date</code>, <code>amount</code> — and a one-line reason.<br><br>Two changes from today: <b>temperature 0</b> (nothing sets a temperature now, so classification is not even deterministic), and the confidence field, which is free on a call we were making anyway.<br><br>The model only <em>reports</em>. The routing rule lives in our code." },
 
+  { id: "d-conf", col: 0, row: 10.5, title: "confidence rule", actor: "bridge", flows: ["upload", "backstop"],
+    kind: "decision",
+    sub: "document + confidence + grounding",
+    detail: "<code>auto-add</code> needs all of: <code>document=true</code>, <code>confidence ≥ AUTO</code>, a document kind, at least one field it could actually read, and one second signal (OCR text or two CLIP queries). Otherwise a confident <em>no</em> becomes <code>paperless-skip</code> and anything else queues.<br><br>Grounding is the point, not the score: a small VLM's self-reported confidence clusters near 1.0 whether or not it really looked, so a bare 0.95 threshold auto-files junk. Needing a readable amount or date does not.<br><br>Both thresholds come from measuring the existing backlog, never from guessing." },
+  { id: "auto", col: 1.75, row: 10.5, title: "auto-add to the album", actor: "bridge", flows: ["upload", "send"],
+    sub: "and tag paperless-auto",
+    detail: "A confident receipt skips the human entirely and goes into the album, which the send path already treats as the instruction.<br><br>Every machine decision is tagged <code>paperless-auto</code>, so <em>what did it file without asking me?</em> is one filter, and each decision is logged with the confidence and the fields it read. Post-hoc audit replaces pre-hoc review." },
   { id: "retry", col: 1.6, row: 9.5, title: "write nothing", actor: "bridge", flows: ["upload", "backstop"],
     sub: "stays untagged",
     kind: "quiet",
@@ -197,18 +205,18 @@ const NODES = [
 
   { id: "tags", col: 2.6, row: 8, title: "Tags in Immich", actor: "immich", flows: ["upload", "human", "send"],
     kind: "store", h: 92,
-    sub: "paperless-maybe · -skip · -sent",
-    detail: "State lives here, not in a volume. The tag is the idempotency key: the socket path and the sweep can both run without coordinating, and a duplicated event is a no-op.<br><br>Live counts from the database: <code>paperless-maybe</code> 29, <code>paperless-skip</code> 4." },
+    sub: "maybe · auto · skip · sent",
+    detail: "State lives here, not in a volume. The tag is the idempotency key: the socket path and the sweep can both run without coordinating, and a duplicated event is a no-op.<br><br>Counts from the database as of the last run: <code>paperless-maybe</code> 29, <code>paperless-skip</code> 4, <code>paperless-auto</code> 0 — the auto tag does not exist yet." },
 
   { id: "human", col: 2.6, row: 10.5, title: "You review /tags", actor: "you", flows: ["human"],
     kind: "human",
-    sub: "add real docs · decline the rest",
-    detail: "The only step with human latency, and deliberately so: the archive is permanent, so the machine proposes and you dispose.<br><br>Adding to the album means <em>send this</em>. Replacing a tag with <code>paperless-skip</code> means <em>never suggest this again</em>." },
+    sub: "only the genuinely ambiguous",
+    detail: "No longer the main road: confident receipts never arrive here. This holds only what the rule refused to call, and it is <b>opt-in</b> — ignoring it costs nothing, because nothing enters the archive until you say so.<br><br>Friction work: the rule's evidence goes into the asset description so a decision needs no second app; Immich's multi-select adds many at once; and the queue is one bookmark from the dashboard. Every override you make is a label for tuning the threshold." },
 
   { id: "album", col: 2.6, row: 12.5, title: "Album: Paperless", actor: "immich", flows: ["human", "send"],
     kind: "store",
     sub: "the send instruction",
-    detail: "Membership is the only automatic path into Paperless. Its change emits <code>on_album_update</code>, which the socket turns into a <code>send()</code> — no promotion happens from a machine verdict alone." },
+    detail: "Still the only path into Paperless, and its change still emits <code>on_album_update</code> — but it now has two authors: you, and the confidence rule. The <code>paperless-auto</code> tag is what keeps those apart." },
 
   { id: "send", col: 0, row: 12.5, title: "send()", actor: "bridge", flows: ["send", "backstop"],
     sub: "skip paperless-sent and videos",
@@ -226,13 +234,13 @@ const NODES = [
     sub: "consume → its own OCR → workflows",
     detail: "Everything from here is Paperless's normal behaviour: OCR, then workflows assigning the document type and the <code>accounting/inbox</code> tag." },
 
-  { id: "asn", col: 0, row: 16.5, title: "ASN assigned", actor: "paperless", flows: ["ledger"],
-    sub: "archive serial number",
-    detail: "The join key between the archive and the books. The ASN is not the URL key — it is a field on the document." },
+  { id: "docid", col: 0, row: 16.5, title: "Paperless document id", actor: "paperless", flows: ["ledger"],
+    sub: "the numeric id — it is the URL",
+    detail: "The join key, replacing the archive serial number. Nothing to enable or assign: the id is already on every document, and <code>/documents/1234/</code> opens it, so the ledger line and the archive entry point at each other.<br><br>One caveat: the id is a database key. A restore from backup keeps it; a <b>re-import</b> would assign new ones and break every link. That is exactly what ASN would have been stable against." },
 
   { id: "beancount", col: 0, row: 17.5, title: "beancount link", actor: "ledger", flows: ["ledger"],
-    sub: "^ASN-NNNN in the link",
-    detail: "Verified against beancount 3.2.3: a link <code>^ASN-1234</code> resolves, a tag <code>#fsa-2026</code> resolves, and <code>metadata()</code> crashes bean-query — so the ASN goes in the link, eligibility in the account path, claims and reimbursements in a tag." },
+    sub: "^paperless-1234 in the link",
+    detail: "Verified against beancount 3.2.3: <code>^1234</code> parses and so does <code>^paperless-1234</code>, and you query it with <code>where \"paperless-1234\" in links</code>. Two traps to avoid: <code>metadata()</code> and <code>links ~ \"...\"</code> both crash bean-query.<br><br>The prefix is not decoration — a bare id says nothing to a reader and collides with every other link scheme in the ledger." },
 
   { id: "fava", col: 0, row: 18.5, title: "Fava / beancount-stack", actor: "ledger", flows: ["ledger"],
     sub: "read-only view", kind: "end",
@@ -241,7 +249,7 @@ const NODES = [
   { id: "sweep", col: -2.2, row: 9.5, title: "CronJob, hourly", actor: "bridge", flows: ["backstop"],
     kind: "backstop", h: 300, w: 190,
     sub: "same functions, newest first",
-    detail: "Demoted from the only path to a backstop. It calls the same two functions the socket calls, so the two can never disagree.<br><br>It recovers what events cannot: a pod restart mid-flight, a dropped socket, a model outage, and backfill of older photos. This is what makes ~120 lines of hand-rolled protocol acceptable — a missed event costs latency, not correctness." }
+    detail: "Demoted from the only path to a backstop. It calls the same two functions the socket calls, so the two can never disagree.<br><br>It recovers what events cannot: a pod restart mid-flight, a dropped socket, a model outage, and backfill of older photos. This is what makes ~120 lines of hand-rolled protocol acceptable — a missed event costs latency, not correctness.<br><br>Same rule as the live path, one difference: the sweep caps model calls per pass, because the backlog is hundreds of candidates and the model lives on a friend's GPU. A capped candidate queues rather than auto-adds — fail closed." }
 ];
 
 /* ---------- edges ---------- */
@@ -254,11 +262,14 @@ const EDGES = [
   { from: "sock", to: "classify", flows: ["upload"], label: "on_upload_success · debounce" },
   { from: "classify", to: "d-clip", flows: ["upload", "backstop"] },
   { from: "d-clip", to: "ignore", flows: ["upload", "backstop"], label: "no", side: "right" },
-  { from: "d-clip", to: "d-ocr", flows: ["upload", "backstop"], label: "yes" },
-  { from: "d-ocr", to: "tags", flows: ["upload", "backstop"], label: "yes · free, local", side: "right" },
-  { from: "d-ocr", to: "vision", flows: ["upload", "backstop"], label: "no" },
-  { from: "vision", to: "tags", flows: ["upload", "backstop"], label: "true → paperless-maybe", side: "right" },
-  { from: "vision", to: "retry", flows: ["upload", "backstop"], label: "error → write nothing", side: "right" },
+  { from: "d-clip", to: "evidence", flows: ["upload", "backstop"], label: "yes" },
+  { from: "evidence", to: "vision", flows: ["upload", "backstop"], label: "ask, with evidence" },
+  { from: "vision", to: "d-conf", flows: ["upload", "backstop"], label: "structured verdict" },
+  { from: "d-conf", to: "auto", flows: ["upload", "send"], label: "extremely confident", side: "right" },
+  { from: "d-conf", to: "tags", flows: ["upload", "backstop"], label: "document, not certain", side: "right" },
+  { from: "d-conf", to: "retry", flows: ["upload", "backstop"], label: "no answer", side: "right" },
+  { from: "auto", to: "album", flows: ["send"], label: "machine add", side: "right" },
+  { from: "auto", to: "tags", flows: ["upload"], label: "tag paperless-auto", side: "right" },
   { from: "tags", to: "human", flows: ["human"], label: "read the queue", side: "right" },
   { from: "human", to: "album", flows: ["human"], label: "add real documents", side: "right" },
   { from: "human", to: "tags", flows: ["human"], label: "replace with -skip", side: "left" },
@@ -282,20 +293,21 @@ const SEQ = [
   ["jobs", "Immich's own CLIP and OCR jobs run — after the upload event, not before."],
   ["gw", "on_upload_success is emitted on the realtime gateway. Seconds."],
   ["sock", "Our Deployment holds the socket: stdlib, x-api-key, reconnects on drop."],
-  ["classify", "classify_one debounces until Immich's OCR lands, so most assets never reach a model."],
-  ["d-clip", "Not a CLIP candidate? Then it is not document-like and stops here."],
-  ["d-ocr", "OCR text above threshold? Free and local — queue it and stop."],
-  ["vision", "Otherwise intel-vl is asked for a JSON verdict: true queues it, false writes paperless-skip, an error writes nothing."],
-  ["tags", "The verdict lands as a tag in Immich. Still seconds."],
-  ["human", "Now it waits for you. This is the only human-latency step, and it is deliberate: the archive is permanent."],
-  ["album", "Adding it to the Paperless album is the send instruction."],
+  ["classify", "classify_one debounces until Immich's OCR lands, so the rule has real evidence to weigh."],
+  ["d-clip", "Not document-like at all? It stops here at zero cost — most of a library does."],
+  ["evidence", "Otherwise gather what is free: OCR boxes and score, how many CLIP queries matched, the filename."],
+  ["vision", "One call to intel-vl at temperature 0, returning a confidence and whatever fields it can actually read."],
+  ["d-conf", "The rule decides — document, confidence, a grounded field, a second signal. Never the score alone."],
+  ["auto", "Confident enough: it goes into the album itself, tagged paperless-auto so you can audit what it filed."],
+  ["human", "Had it not been confident it would wait here instead, and this queue is opt-in — ignoring it costs nothing."],
+  ["album", "Album membership is the send instruction, whether a person or the rule put it there."],
   ["send", "on_album_update → send(): skip anything already sent, and skip videos."],
   ["download", "Download the original, or a fullsize JPEG for HEIC."],
   ["consume", "Written into the consume dropbox, mode 0644. No Paperless credential involved."],
   ["paperless", "Paperless consumes it, runs its own OCR, and its workflows assign the type and accounting/inbox."],
-  ["asn", "Paperless assigns the archive serial number."],
-  ["beancount", "The ledger links it as ^ASN-NNNN: eligibility in the account path, claims in a tag."],
-  ["fava", "Fava renders it. End to end."]
+  ["docid", "It has a document id, which is also its URL — the join key into the books."],
+  ["beancount", "The ledger links it as ^paperless-1234: eligibility in the account path, claims in a tag."],
+  ["fava", "Fava renders it. End to end, with no human step at all."]
 ];
 
 /* ---------- failure scenarios ---------- */
@@ -307,8 +319,12 @@ const FAILURES = [
     caption: "Handlers only read an event as a hint and re-query the API, and the tag is the idempotency key — so a duplicate delivery is a no-op." },
   { id: "drop", label: "socket drops", on: ["sock", "sweep", "classify", "send"],
     caption: "Reconnect with backoff. Anything that happened while disconnected is recovered by the sweep — the pull path never depended on the stream." },
-  { id: "late", label: "Immich OCR is late", on: ["jobs", "classify", "d-ocr", "tags"],
-    caption: "Classify debounces before falling back to the model, which is what keeps most assets free and local." },
+  { id: "late", label: "Immich OCR is late", on: ["jobs", "classify", "evidence", "vision"],
+    caption: "Classify debounces until the OCR evidence exists, then asks with it — so the confidence that comes back is grounded rather than guessed." },
+  { id: "wrong", label: "it files a non-document", on: ["d-conf", "auto", "album", "send", "tags", "human"],
+    caption: "A wrong auto-add is the real cost: the archive is permanent, so recovery is two steps — tag it paperless-skip and delete it in Paperless. paperless-auto makes every machine decision auditable in one filter, which is how the threshold gets tuned." },
+  { id: "gpu", label: "backfill would flood Dan's GPU", on: ["sweep", "classify", "vision", "d-conf"],
+    caption: "The sweep caps model calls per pass and queues the remainder instead of auto-adding it — fail closed. Live uploads are a handful of calls and always get one." },
   { id: "rename", label: "Immich renames an event", on: ["gw", "sock", "sweep"],
     caption: "An unknown event is ignored and the sweep still runs, so it degrades to the old behaviour rather than breaking. One-line fix when noticed." },
   { id: "before", label: "the old 15-minute sweep", on: ["sweep", "classify", "send", "tags"],
