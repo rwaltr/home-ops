@@ -9,14 +9,26 @@ metadata:
 data:
   bridge.py: |
     #!/usr/bin/env python3
-    """Copy new Immich album assets into Paperless's consume directory.
+    """Flag newly added Immich photos that look like documents, and copy the album
+    into Paperless's consume directory.
 
     Standard library only: the job runs from a stock python image with no pip
     install, so it cannot drift from its dependencies.
 
-    State lives in Immich, not here: an asset is considered sent once it carries
-    SENT_TAG. That makes the job idempotent across reruns and node restarts, and it
-    is visible in the Immich UI rather than hidden in a volume nobody looks at.
+    Two phases, in order:
+
+      send      assets in the ALBUM are copied into Paperless's consume directory
+                and tagged SENT_TAG. The album is the human answer to the review
+                queue below, and the only path into the archive - which is
+                permanent, so nothing enters it unreviewed.
+
+      classify  every image added in the last WINDOW_HOURS that carries none of the
+                bridge's tags is scored against Immich's CLIP smart search. Assets
+                that come back for a document-ish query are tagged MAYBE_TAG so they
+                can be reviewed in the UI. This phase copies nothing, ever.
+
+    State lives in Immich tags rather than in this pod, so reruns and restarts are
+    idempotent and the state is visible in the UI instead of hidden in a volume.
     """
 
     import datetime
@@ -24,13 +36,34 @@ data:
     import os
     import pathlib
     import sys
+    import urllib.error
     import urllib.request
 
     IMMICH = os.environ.get("IMMICH_URL", "http://immich-server.default.svc.cluster.local:2283")
     KEY = os.environ.get("IMMICH_API_KEY", "")
     ALBUM = os.environ.get("IMMICH_ALBUM", "Paperless")
     SENT_TAG = os.environ.get("SENT_TAG", "paperless-sent")
+    MAYBE_TAG = os.environ.get("MAYBE_TAG", "paperless-maybe")
+    SKIP_TAG = os.environ.get("SKIP_TAG", "paperless-skip")
     CONSUME = pathlib.Path(os.environ.get("CONSUME_DIR", "/consume"))
+
+    # Only look at recently added assets. createdAfter is when the asset entered the
+    # library, which is what "new" means here - not when the photo was taken, so a
+    # photo imported from an old camera roll is still classified.
+    WINDOW_HOURS = int(os.environ.get("WINDOW_HOURS", "24"))
+
+    # Immich's smart search returns its best matches for a query with no score
+    # threshold, so these are recall nets rather than classifiers. Several plain
+    # phrases beat one clever one: each is one cheap call and the union is what gets
+    # reviewed. Tune the list, not a numeric threshold.
+    DOC_QUERIES = (
+        "a photo of a receipt",
+        "a photo of an invoice or bill",
+        "a photo of a bank statement",
+        "a scan of a document",
+        "a screenshot of an app or website",
+    )
+    SMART_PAGE = 100
 
     # What Paperless can ingest. Everything else (notably HEIC from iPhones) is
     # fetched as Immich's fullsize JPEG instead: Paperless has no HEIC support, and
@@ -47,13 +80,14 @@ data:
             headers={"x-api-key": KEY, "Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 body = resp.read()
                 return body if raw else json.loads(body or b"{}")
         except urllib.error.HTTPError as err:
-            # A bare traceback is useless in a CronJob log. 401/403 almost always
-            # means the 1Password "immich" password is not an Immich API key.
-            sys.exit(f"Immich API returned {err.code} for {method} {path}: check IMMICH_API_KEY")
+            # A bare traceback is useless in a CronJob log. 401/403 means the
+            # 1Password paperless-bridge credential is not an Immich API key, or
+            # lacks a scope this bridge needs.
+            sys.exit(f"Immich API returned {err.code} for {method} {path}: check the paperless-bridge 1Password item")
 
 
     def safe_name(asset):
@@ -66,27 +100,82 @@ data:
         return f"{when} immich {keep[:48]}{ext}"
 
 
-    def main():
-        if not KEY:
-            sys.exit("IMMICH_API_KEY is empty: create an Immich API key and put it in 1Password (see docs/paperless.md)")
+    def tags_by_name():
+        return {t["name"]: t["id"] for t in api("/tags")}
 
+
+    def ensure_tag(tags, name):
+        """Return the tag id, creating the tag if this is the first run."""
+        if name not in tags:
+            tags[name] = api("/tags", "POST", {"name": name})["id"]
+        return tags[name]
+
+
+    def human_candidates():
+        """Union of CLIP smart-search results for the document-ish queries."""
+        ids = set()
+        for query in DOC_QUERIES:
+            found = api("/search/smart", "POST", {"query": query, "size": SMART_PAGE})
+            for asset in (found.get("assets") or {}).get("items") or []:
+                ids.add(asset["id"])
+        return ids
+
+
+    def classify(tags):
+        since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=WINDOW_HOURS)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        found = api("/search/metadata", "POST", {"createdAfter": since, "type": "IMAGE", "size": 200, "order": "desc"})
+        recent = ((found.get("assets") or {}).get("items")) or []
+        if not recent:
+            print(f"classify: no images added in the last {WINDOW_HOURS}h", flush=True)
+            return 0
+
+        candidates = human_candidates()
+        # A tag on any of these means the question has already been answered: sent,
+        # already queued for review, or explicitly declined by the operator.
+        decided = {SENT_TAG, MAYBE_TAG, SKIP_TAG}
+        maybe = ensure_tag(tags, MAYBE_TAG)
+        tagged = 0
+        for asset in recent:
+            if {t.get("name") for t in asset.get("tags") or []} & decided:
+                continue
+            if asset["id"] not in candidates:
+                continue
+            # OCR text boxes corroborate, but are not a gate: Immich only writes them
+            # once its OCR job has run, so assets added before OCR was switched on
+            # have none. Logged rather than thresholded, so the tag can be trusted
+            # more when the count is non-zero.
+            try:
+                boxes = api(f"/assets/{asset['id']}/ocr")
+            except SystemExit:
+                boxes = 0
+            api(f"/tags/{maybe}/assets", "PUT", {"ids": [asset["id"]]})
+            print(f"classify: {asset['id']} -> {MAYBE_TAG} (ocr_rows={len(boxes) if isinstance(boxes, list) else boxes})", flush=True)
+            tagged += 1
+
+        print(f"classify: {len(recent)} new image(s), {len(candidates)} CLIP hits, {tagged} tagged {MAYBE_TAG}", flush=True)
+        return tagged
+
+
+    def send(tags):
         album = next((a for a in api("/albums?withoutAssets=false") if a.get("albumName") == ALBUM), None)
         if album is None:
-            sys.exit(f"no Immich album named {ALBUM!r}: create it and add receipt photos to it")
+            # Not an error: the album is opt-in, and an empty review queue is the
+            # normal state. Exiting non-zero here is what made this job fail loudly
+            # every 15 minutes.
+            print(f"send: no album named {ALBUM!r}, nothing to send", flush=True)
+            return 0
 
-        tag = next((t for t in api("/tags") if t.get("name") == SENT_TAG), None)
-        if tag is None:
-            tag = api("/tags", "POST", {"name": SENT_TAG})
-
+        sent_tag = ensure_tag(tags, SENT_TAG)
         assets = album.get("assets") or []
         sent = 0
         for asset in assets:
             if any((t or {}).get("name") == SENT_TAG for t in (asset.get("tags") or [])):
                 continue
-            # Videos are not documents. Without this guard, a video in the album would
-            # be sent as a single fullsize JPEG frame and archived as a document.
+            # Videos are not documents. Without this guard, a video in the album
+            # would be sent as a single fullsize JPEG frame and archived as a
+            # document.
             if asset.get("type") == "VIDEO" or (asset.get("originalMimeType") or "").startswith("video/"):
-                print(f"skip {asset['id']}: video", flush=True)
+                print(f"send: skip {asset['id']}: video", flush=True)
                 continue
             ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
             if ext in SAFE_EXT:
@@ -99,11 +188,24 @@ data:
             dest.write_bytes(api(path, raw=True))
             # 0644 because the Paperless consumer runs as uid 1000 and must read it.
             os.chmod(dest, 0o644)
-            api(f"/tags/{tag['id']}/assets", "PUT", {"ids": [asset["id"]]})
-            print(f"sent {asset['id']} ({asset.get('originalFileName')}) -> {dest.name}", flush=True)
+            api(f"/tags/{sent_tag}/assets", "PUT", {"ids": [asset["id"]]})
+            print(f"send: {asset['id']} -> {dest.name}", flush=True)
             sent += 1
 
-        print(f"done: {sent} sent, {len(assets)} in album {ALBUM!r}", flush=True)
+        print(f"send: {sent} sent, {len(assets)} in album {ALBUM!r}", flush=True)
+        return sent
+
+
+    def main():
+        if not KEY:
+            sys.exit("IMMICH_API_KEY is empty: create an Immich API key and put it in 1Password (see docs/paperless.md)")
+
+        tags = tags_by_name()
+        # send first, so an asset that is both in the album and newly added is
+        # marked sent and skipped by classify rather than queued for review.
+        sent = send(tags)
+        tagged = classify(tags)
+        print(f"done: {sent} sent, {tagged} flagged for review", flush=True)
 
 
     if __name__ == "__main__":
