@@ -1987,6 +1987,35 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
+### 2026-11-11 (night) — rustfs memory ceiling was measuring itself
+
+`OomKilled` (critical, `kopiur-system/rustfs`) fired at 05:05Z on the cold-start
+resync after the node rebooted at 04:53Z. The cause is the cgroup limit, not node
+pressure: `container_memory_working_set_bytes` sat pinned at 1479Mi against the
+1536Mi cap, with a 30d p95 of 1482Mi and a 30d max of 1484Mi for the current pod.
+
+Those numbers are the ceiling, not the demand. The 2026-09-24 audit sized this at
+1536Mi from a ~925Mi peak, and the workload has grown past it — so the container
+has been running at its own cap for weeks, and the first cold start is what
+pushed it over. Re-sized from measurement:
+
+- request `256Mi` → `1536Mi` (the 30d p95; the old request was a fraction of
+  steady state, i.e. bookkeeping rather than a scheduling fact)
+- limit `1536Mi` → `3072Mi` (≈2× the observed peak, so a resync — the scanner
+  cycle plus a kopia listing — clears instead of dying)
+
+Two things this does **not** claim. A raised ceiling is not a fix for host memory
+pressure, and the same host rebooted **unplanned** at 04:53Z after 62 days up,
+with major page faulting in the 14 minutes before it (`pgmajfault` ~4.3k/s,
+`MemAvailable` 2.7Gi and falling) — no OS version change, so it was not a Flatcar
+update. That cause is still open and is host-side (console/IPMI/journal), not
+visible from the cluster. If the audit's ARC cap (4Gi) and zram leave less
+headroom than assumed, this change is the one to reject.
+
+Lesson: an `OomKilled` against a limit that is also the observed p95 and max is
+not a workload spike, it is a stale audit. Re-measure before re-sizing, and read
+the p95 against the old *ceiling* before believing it.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
