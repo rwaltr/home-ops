@@ -1912,6 +1912,9 @@ Still permanent retention, still no manual triage. The superseded
 - **Fields reworked:** `Invoice Number` → `Reference` (invoice or transaction
   id), `Date Paid` dropped (the document `created` date already holds the
   transaction date), `Payment method` added.
+- **No separate `Currency` field.** Paperless monetary fields carry the currency
+  in the value (`CAD155.11`) and expose a generated amount, so `Currency` was
+  redundant and is deleted by the seed.
 - **In-cluster jobs use the service URL** (`paperless-app.default.svc.cluster.local`),
   not the ingress name: the AAAA is unreachable from the LAN and Python has no
   Happy Eyeballs.

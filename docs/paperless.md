@@ -115,7 +115,7 @@ name):
   `Policy`, `Medical`, `Correspondence`, `Other`
 - **Tags:** `status/inbox`, `status/ai-enriched`, `accounting/unlinked`,
   `accounting/beancounted`
-- **Custom fields:** `Reference`, `Total` (monetary), `Currency`, `Payment method`
+- **Custom fields:** `Reference`, `Total` (monetary), `Payment method`
 - **Workflows:** `auto-classify: invoice`, `auto-classify: receipt`,
   `auto-classify: ai`, `mark accounting/unlinked`
 
@@ -145,7 +145,7 @@ Limits worth knowing:
 
 - Paperless' Apply AI Suggestions action covers title/correspondent/type/storage
   path/created only — it cannot touch custom fields. A separate extractor fills
-  `Total`/`Currency`/`Payment method`/`Reference` (next section).
+  `Total`/`Payment method`/`Reference` (next section).
 - There is no "was OCRed" tag: Paperless stores no such flag. Adding one would
   need a post-consume script comparing the original against the OCR'd archive.
 - Mail rules are _not_ seeded (they need an IMAP account) — the content
@@ -171,8 +171,7 @@ minutes) scans documents typed `Invoice` or `Receipt`, asks the same LLM
 
 | Field            | Example          |
 | ---------------- | ---------------- |
-| `Total`          | `155.11`         |
-| `Currency`       | `USD`            |
+| `Total`          | `CAD155.11`      |
 | `Payment method` | `VISA **** 5678` |
 | `Reference`      | `987654`         |
 
@@ -187,8 +186,9 @@ Two gotchas worth keeping:
   `chat_template_kwargs.enable_thinking=false` it spends the token budget
   thinking and returns `content: null` — observed on a receipt whose OCR read
   `TOTAL: $155. uu`. The extractor sets it.
-- The extractor writes `Total` as a decimal string; the monetary field accepts
-  that (verified against the live API).
+- `Total` is a monetary field that carries its own currency as a 3-char prefix
+  (`CAD155.11`); Paperless parses the amount out of it. There is deliberately no
+  separate `Currency` field.
 
 ## Storage layout
 
