@@ -1896,6 +1896,25 @@ Revised to a provenance trail across two namespaces after grilling the model:
 Still permanent retention, still no manual triage. The superseded
 `accounting/inbox`/`accounting/attached` tags are deleted by the seed.
 
+### 2026-11-11 (later still) — Paperless receipt metadata: call the AI directly
+
+- **Paperless' AI action cannot write custom fields.** `AISuggestionField` stops
+  at `created`, and `documents/workflows/ai.py` never touches
+  `document.custom_fields`. So "let the AI extract the total" is not a setting —
+  it is our own LLM call. A 15-minute CronJob (`paperless-extract`) asks
+  `nvidia-llama` for total/currency/card/reference and PATCHes the document. It
+  skips documents that already have a `Total`, so it only fills blanks.
+- **Qwen3-32B is a reasoning model.** With the default chat template it spent
+  the whole token budget on reasoning and returned `content: null` for a receipt
+  whose OCR read `TOTAL: $155. uu`. `chat_template_kwargs.enable_thinking=false`
+  fixes it (46 tokens, valid JSON).
+- **Fields reworked:** `Invoice Number` → `Reference` (invoice or transaction
+  id), `Date Paid` dropped (the document `created` date already holds the
+  transaction date), `Payment method` added.
+- **In-cluster jobs use the service URL** (`paperless-app.default.svc.cluster.local`),
+  not the ingress name: the AAAA is unreachable from the LAN and Python has no
+  Happy Eyeballs.
+
 ### 2026-11-10 (later) — Homebox intake: MCP server, Companion, and which vision model to trust
 
 Homebox had an API-key integration surface and nothing using it. Added both, and

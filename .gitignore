@@ -18,3 +18,7 @@ terraform.tfstate*
 
 # Ignition files (contain secrets like SSH keys)
 infra/flatcar/ignition/*.ign
+
+# Python bytecode (scripts/ and the paperless extractor)
+__pycache__/
+*.pyc
