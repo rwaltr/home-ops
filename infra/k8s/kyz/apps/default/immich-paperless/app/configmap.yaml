@@ -141,13 +141,22 @@ data:
 
 
     def safe_name(asset):
-        stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
-        keep = "".join(c if c.isalnum() or c in " -_" else "-" for c in stem).strip() or "photo"
+        """Name the file after what the photo is, because Paperless titles from it.
+
+        Paperless's own AI is text-only. For a photographed receipt whose OCR comes back
+        empty it has nothing to work with and the title stays the camera filename; the
+        vision model already described the image, so the filename carries that instead.
+        """
         when = (asset.get("fileCreatedAt") or "")[:10] or datetime.date.today().isoformat()
+        stem = ((asset.get("exifInfo") or {}).get("description") or "").strip()
+        if not stem:
+            stem = pathlib.Path(asset.get("originalFileName") or "photo").stem
+        # 90 characters is a comfortable title; a paragraph helps nobody.
+        keep = "".join(c if c.isalnum() or c in " -_$" else "-" for c in stem).strip(" -_") or "photo"
         ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
         if ext not in SAFE_EXT:
-            return f"{when} immich {keep[:48]}.jpg"
-        return f"{when} immich {keep[:48]}{ext}"
+            return f"{when} {keep[:90]}.jpg"
+        return f"{when} {keep[:90]}{ext}"
 
 
     def tags_by_name():
