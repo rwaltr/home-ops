@@ -7,6 +7,13 @@
 # the Immich album named by IMMICH_ALBUM into Paperless's consume directory,
 # tagging it paperless-sent.
 #
+# "Look like a document" is a cascade, cheapest evidence first: CLIP smart search
+# for recall (free, over-suggests), Immich's stored OCR text for confirmation
+# (free, local), and only then a vision model through LiteLLM - which is NOT free
+# and does send the image to OpenRouter. MAX_VISION_CALLS caps that per run, and
+# the vision stage is skipped entirely once OCR has been backfilled, because most
+# assets then answer for themselves.
+#
 # The album is the only path into Paperless, deliberately - that archive is
 # permanent, so a human approves what enters it rather than a model. The job
 # never creates the album: an empty album simply means an empty review queue.
@@ -55,6 +62,13 @@ spec:
               # Tag applied after a successful handoff; also the idempotency key.
               SENT_TAG: paperless-sent
               CONSUME_DIR: /consume
+              # Vision confirm stage. LITELLM_API_KEY arrives with envFrom below.
+              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              VISION_MODEL: qwen3.8-omni-flash
+              # Immich OCR must beat this score to count as evidence of text.
+              MIN_OCR_SCORE: "0.5"
+              # Per run, so a 500-photo day cannot quietly run up a bill.
+              MAX_VISION_CALLS: "20"
             envFrom:
               - secretRef:
                   name: immich-paperless

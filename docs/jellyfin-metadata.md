@@ -152,18 +152,10 @@ Two things made this happen repeatedly:
 
 `recyclarr.yaml` now uses the Jellyfin presets: `jellyfin-tmdb` (movies) and
 `jellyfin-tvdb` (series), so new imports carry an id Jellyfin matches directly.
-This only affects new/renamed items — existing stuck rows still need the sweep
-below.
+This only affects new/renamed items — existing stuck rows need a forced refresh
+(no automatic sweep is deployed).
 
-### Fix (sweep)
-
-`metadata-sweep-cronjob.yaml` runs nightly at 04:45 and force-refreshes every
-Movie/Series with no provider id, so a future bad import heals itself. It reads
-the API key from the 1Password item `jellyfin` (`api_key` field) via the
-`jellyfin-metadata-sweep` ExternalSecret — create the key in
-Jellyfin → Dashboard → API Keys if the secret is empty.
-
-Manual one-off refresh for a single item:
+Forced refresh for a single item:
 
 ```bash
 curl -sf -X POST "${H[@]}" \
@@ -198,6 +190,4 @@ curl -s "${H[@]}" "${BASE}/Shows/${SERIES_ID}/Episodes"
   declared there; it is installed at runtime and captured by the Kopia backup).
 - Library repair notes for Thomas & Friends (mixed-folders / mislabelled files)
   are in the git history around 2026-09.
-- `metadata-sweep-cronjob.yaml` + `metadata-sweep-configmap.yaml` — nightly
-  unmatched-item sweep.
 - `recyclarr.yaml` — naming presets (Jellyfin presets since 2026-11).
