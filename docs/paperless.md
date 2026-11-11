@@ -234,13 +234,29 @@ Receipts photographed on a phone land in Immich and used to stay there.
 `immich-paperless` (`infra/k8s/kyz/apps/default/immich-paperless/`) is a
 CronJob that every 15 minutes:
 
-**classify** — every image added in the last 24 hours that carries none of the
-bridge's tags is scored against Immich's CLIP smart search (`DOC_QUERIES` in the
-script). Assets that come back for a document-ish query are tagged
-`paperless-maybe` so they can be reviewed in the UI. Immich's OCR text boxes are
-logged alongside as corroboration (`ocr_rows=N`), never as a gate: Immich only
-writes them once its OCR job has run, so anything added before OCR was enabled
-has none, and thresholding on them would silently classify nothing.
+**classify** — every image added in the last `WINDOW_HOURS` (24 by default) that
+carries none of the bridge's tags is offered to a three-stage cascade, cheapest
+first, so most assets never reach a model:
+
+1. **CLIP** — Immich's smart search (`DOC_QUERIES` in the script). This is a
+   recall net with no precision: it returns its best matches for a query, not
+   ones above a score, so a match only makes the asset a _candidate_.
+2. **Immich's local OCR** — an asset that already has OCR text is a document of
+   some kind, and is queued there and then. This stage is free, runs on the node,
+   and settles most candidates.
+3. **A vision model** — only for candidates OCR cannot judge. It is asked for a
+   JSON verdict: a yes queues the asset, a no writes `paperless-skip` instead.
+   **A failed call writes nothing**: an outage must not be recorded as a
+   permanent verdict, so the asset stays untagged and a later run re-asks.
+
+The vision model is `intel-vl`, a Qwen3-VL-8B on a friend's Intel Arc reached
+through our own LiteLLM alias, so the photo stays off a model provider. Any other
+name in `VISION_MODEL` (e.g. `qwen3.8-omni-flash`) sends it to OpenRouter.
+`MAX_VISION_CALLS` caps the model calls per run either way.
+
+The window is walked in pages of 200, newest first (`MAX_PAGES`), because Immich
+caps a metadata page at 200 and has no "everything since" call — without that, a
+candidate older than the newest page could never be examined at all.
 
 **send** — assets in the Immich album named `Paperless` are copied into the
 consume dropbox:
@@ -264,11 +280,11 @@ an Immich API key.
 The archive is permanent, so nothing enters it unreviewed — the automatic path
 only proposes.
 
-| Tag               | Set by  | Means                                     |
-| ----------------- | ------- | ----------------------------------------- |
-| `paperless-maybe` | the job | CLIP thinks this is a document; review it |
-| `paperless-sent`  | the job | already handed to Paperless               |
-| `paperless-skip`  | you     | never suggest this one again              |
+| Tag               | Set by         | Means                                                                  |
+| ----------------- | -------------- | ---------------------------------------------------------------------- |
+| `paperless-maybe` | the job        | CLIP thinks this is a document; review it                              |
+| `paperless-sent`  | the job        | already handed to Paperless                                            |
+| `paperless-skip`  | the job or you | declined: not a document (the vision model), or never suggest it again |
 
 To archive a suggestion: filter Immich by the `paperless-maybe` tag (the tag page
 is `/tags`), add the real documents to the `Paperless` album, and the next run
