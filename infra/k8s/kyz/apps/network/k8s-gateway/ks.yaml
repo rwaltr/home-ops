@@ -17,3 +17,16 @@ spec:
   dependsOn:
     - name: cilium
       namespace: kube-system
+  # Scope the health assessment to the HelmRelease. The chart index is a
+  # third-party source (Codeberg Pages, mirrored at kryptonian.kapsi.fi) which
+  # has been returning 502 since 2026-10-29; its HelmRepository is therefore
+  # Ready=False while the release itself stays Ready=True off the cached
+  # artifact. Left implicit, that external outage made this Kustomization report
+  # Ready=Unknown and page KustomizationReconciliationFailure hourly without the
+  # workload ever being unhealthy. The HelmRelease is the object that reflects
+  # the running workload; the index fetch is not a signal about it.
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: k8s-gateway
+      namespace: network
