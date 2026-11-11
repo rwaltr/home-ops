@@ -557,7 +557,8 @@ data:
             by_stem[pathlib.Path(safe_name(full)).stem] = full
         enriched = calls = 0
         for doc in docs:
-            if done_id and any(t["id"] == done_id for t in (doc.get("tags") or [])):
+            # Paperless returns tag ids here, not objects.
+            if done_id and done_id in (doc.get("tags") or []):
                 continue
             fname = doc.get("original_file_name") or ""
             asset = next((full for stem, full in by_stem.items() if stem in fname), None)
