@@ -235,7 +235,7 @@ data:
         return ids
 
 
-    def classify(tags, window_hours=None):
+    def classify(tags, window_hours=None, require_clip=True):
         # The sweep uses the configured window. The event path passes minutes instead,
         # so one upload is examined on its own rather than re-scanning the day.
         hours = WINDOW_HOURS if window_hours is None else window_hours
@@ -268,7 +268,11 @@ data:
             # vision model on an earlier run.
             if already_tagged(asset["id"], (SENT_TAG, MAYBE_TAG, SKIP_TAG)):
                 continue
-            if asset["id"] not in candidates:
+            # CLIP is a cheap prefilter for bulk backfill, but it is lossy: a real
+            # receipt came back from none of the five queries and was skipped forever,
+            # by the sweep as well as here. The live path asks about every upload
+            # instead, so nothing depends on CLIP's recall.
+            if require_clip and asset["id"] not in candidates:
                 continue
 
             boxes, score = ocr_text_evidence(asset["id"])
@@ -444,6 +448,9 @@ data:
     WORK = queue.Queue()
 
 
+    PENDING_CLASSIFY = threading.Event()
+
+
     def _worker():
         """Runs the slow work off the socket loop, which must keep answering pings."""
         while True:
@@ -453,12 +460,17 @@ data:
                     # Immich's own OCR lands after the upload event, so waiting is
                     # what makes the evidence real rather than absent.
                     time.sleep(UPLOAD_DEBOUNCE)
-                    classify(tags_by_name(), window_hours=EVENT_WINDOW_MINUTES / 60)
+                    classify(tags_by_name(), window_hours=EVENT_WINDOW_MINUTES / 60,
+                             require_clip=False)
                 else:
                     send(tags_by_name())
             except Exception as err:  # noqa: BLE001 - one bad event must not stop the rest
                 print("realtime: %s failed (%s)" % (kind, err), flush=True)
             finally:
+                # Cleared after the scan, not before: the window is captured when the
+                # scan starts, so uploads during the debounce are already covered and do
+                # not need a second pass. Seven uploads now scan once instead of six times.
+                PENDING_CLASSIFY.clear()
                 WORK.task_done()
 
 
@@ -472,7 +484,9 @@ data:
             print("realtime: on_upload_success %s" % ((data or {}).get("id") or "no id in payload"), flush=True)
             # The payload shape is not contractual, so the debounced classify
             # re-queries by time window instead of trusting an id it may not carry.
-            WORK.put(("classify", None))
+            if not PENDING_CLASSIFY.is_set():
+                PENDING_CLASSIFY.set()
+                WORK.put(("classify", None))
         elif name == "on_album_update":
             print("realtime: on_album_update -> send", flush=True)
             WORK.put(("send", None))
