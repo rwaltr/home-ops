@@ -83,6 +83,11 @@ data:
         for asset in assets:
             if any((t or {}).get("name") == SENT_TAG for t in (asset.get("tags") or [])):
                 continue
+            # Videos are not documents. Without this guard, a video in the album would
+            # be sent as a single fullsize JPEG frame and archived as a document.
+            if asset.get("type") == "VIDEO" or (asset.get("originalMimeType") or "").startswith("video/"):
+                print(f"skip {asset['id']}: video", flush=True)
+                continue
             ext = pathlib.Path(asset.get("originalFileName") or "").suffix.lower()
             if ext in SAFE_EXT:
                 path, suffix = f"/assets/{asset['id']}/original", ext
