@@ -578,6 +578,11 @@ data:
         for candidate in assets_with_tag(sent):
             full = api(f"/assets/{candidate['id']}")
             by_stem[pathlib.Path(safe_name(full)).stem] = full
+            # Two keys: the name send() would choose now, and the camera stem that files sent
+            # before the filename carried the description were named after.
+            legacy = pathlib.Path(full.get("originalFileName") or "").stem
+            if legacy:
+                by_stem[legacy] = full
         enriched = calls = 0
         for doc in docs:
             # Paperless returns tag ids here, not objects.
