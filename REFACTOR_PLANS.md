@@ -1987,6 +1987,26 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
+### 2026-11-12 (alert review) — one refused document must not fail the bridge run
+
+- **The `immich-paperless-bridge` CronJob crashed mid-run and left a Failed Job
+  behind.** The 02:00Z run enriched 113 documents, then `ensure_named` POSTed a
+  correspondent Paperless already held; the archive answered `400 Bad Request`,
+  and the uncaught `HTTPError` ended the process. Because the Job object then
+  persisted, `KubeJobFailed` fired on it and would re-notify every
+  `repeat_interval` — the object, not the failure, is what keeps the alert up.
+- **Fix:** `ensure_named` now treats a create-time 400 as "the archive already
+  holds this", re-asking the list endpoint with a full page before giving up; and
+  `enrich_all` wraps the per-document write so one document the archive will not
+  take is logged (`N refused`) and skipped instead of ending the run. A run in
+  which *every* document is refused still exits non-zero — systemic breakage
+  must keep failing.
+- **Seen in the same log, not fixed:** every `describe:` line reads
+  `Immich API returned 400 for PUT /assets/<id>: check the paperless-bridge
+  1Password item`. The Immich key the job holds is refused for the description
+  write, so no description lands. Soft failure, but the key's permissions in
+  Immich need checking.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

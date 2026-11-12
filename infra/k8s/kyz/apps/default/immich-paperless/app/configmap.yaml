@@ -422,13 +422,28 @@ data:
 
 
     def ensure_named(kind, name):
-        """The id of the Paperless object of this kind, created if this is the first."""
+        """The id of the Paperless object of this kind, created if this is the first.
+
+        The list filter is a substring match, so an exact hit can sit past the first
+        page and a create for a name the archive already holds comes back 400 ("must
+        be unique"). Re-ask with a full page on that 400 and return the existing
+        object instead of failing the run.
+        """
         name = name.strip()[:128]
         found = paperless("/%s/?name=%s" % (kind, urllib.parse.quote(name)))
         for item in found.get("results", []):
             if (item.get("name") or "").strip().lower() == name.lower():
                 return item["id"]
-        return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+        try:
+            return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+        except urllib.error.HTTPError as err:
+            if err.code != 400:
+                raise
+            again = paperless("/%s/?name=%s&page_size=200" % (kind, urllib.parse.quote(name)))
+            for item in again.get("results", []):
+                if (item.get("name") or "").strip().lower() == name.lower():
+                    return item["id"]
+            raise
 
 
     def ensure_custom_field(name, data_type):
@@ -599,7 +614,7 @@ data:
             legacy = pathlib.Path(full.get("originalFileName") or "").stem
             if legacy:
                 by_stem[legacy] = full
-        enriched = calls = 0
+        enriched = calls = refused = 0
         for doc in docs:
             # Paperless returns tag ids here, not objects.
             if done_id and done_id in (doc.get("tags") or []):
@@ -617,10 +632,21 @@ data:
                 # No answer: leave the document untouched so a later run asks again.
                 print(f"enrich: {doc['id']} untouched, no answer ({why})", flush=True)
                 continue
-            written = enrich_document(tags, doc, asset, answer)
+            try:
+                written = enrich_document(tags, doc, asset, answer)
+            except urllib.error.HTTPError as err:
+                # One document the archive will not take must not fail the run: an
+                # uncaught error here left a Failed Job behind, and that object held
+                # KubeJobFailed firing until it was deleted by hand. A run that
+                # enriches nothing at all is still a fault, and exits non-zero below.
+                refused += 1
+                print(f"enrich: {doc['id']} refused, {err.code} for {err.url}", flush=True)
+                continue
             enriched += 1
             print(f"enrich: {doc['id']} {written} field(s), title={answer.get('title')!r}", flush=True)
-        print(f"enrich: {enriched} document(s) enriched, {calls} vision call(s)", flush=True)
+        if refused and not enriched:
+            sys.exit(f"enrich: every document refused ({refused}): check the Paperless token and the archive")
+        print(f"enrich: {enriched} document(s) enriched, {refused} refused, {calls} vision call(s)", flush=True)
         return enriched
 
 
