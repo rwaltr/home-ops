@@ -45,7 +45,6 @@ data:
     ALBUM = os.environ.get("IMMICH_ALBUM", "Paperless")
     SENT_TAG = os.environ.get("SENT_TAG", "paperless-sent")
     MAYBE_TAG = os.environ.get("MAYBE_TAG", "paperless-maybe")
-    SKIP_TAG = os.environ.get("SKIP_TAG", "paperless-skip")
     CONSUME = pathlib.Path(os.environ.get("CONSUME_DIR", "/consume"))
 
     # Only look at recently added assets. createdAfter is when the asset entered the
@@ -100,7 +99,7 @@ data:
         "You are shown one photo. Answer with JSON only, no prose and no code fence, "
         "in exactly this shape: "
         '{"description": "one short sentence", "tags": ["casual", "person"], '
-        '"document": false, "confidence": 0.0, "kind": ""}'
+        '"document": false, "useful": true, "confidence": 0.0, "kind": ""}'
         "description must name what the thing IS. For a document that means the merchant "
         "and the purchase (\"H-E-B receipt for Evian water\"), never the room, table or "
         "lighting it was photographed on. For anything else describe what is happening. "
@@ -112,7 +111,11 @@ data:
         "animal or scenery is not a document, and neither is a screenshot of a chat, "
         "game, map or app UI. confidence is 0 to 1 for document. kind is one of "
         "receipt, invoice, bill, statement, tax, insurance, letter or other when "
-        "document is true, otherwise an empty string."
+        "document is true, otherwise an empty string. "
+        "useful: false when it is a document but junk with no lasting value - a discount "
+        "coupon, an advertisement, a flyer, a loyalty card, a promotional slip, or "
+        "something you cannot read at all. True when it is worth keeping, and true for "
+        "anything that is not a document."
     )
 
     # What Paperless can ingest. Everything else (notably HEIC from iPhones) is
@@ -308,8 +311,11 @@ data:
             return 0
 
         decided = ensure_tag(tags, DOC_TAG)
-        skip = ensure_tag(tags, SKIP_TAG)
         maybe = ensure_tag(tags, MAYBE_TAG)
+        # Junk is a decision, not a missing one, and it needs a tag so the next run does not
+        # ask again. This is the old skip tag under the name that means the same thing on
+        # both sides of the bridge, so junk is labelled in the same place it is judged.
+        junk = ensure_tag(tags, USELESS_TAG)
         album = ensure_album()
         documents = skipped = vision_calls = 0
         for asset in recent:
@@ -320,7 +326,7 @@ data:
             # the content tags this script writes. There is no skip tag - a photo that is not
             # a document needs no record, and its description and content tags are that record.
             # A tag the operator added by hand counts as their answer too.
-            if already_tagged(asset["id"], set(VOCAB) | {SENT_TAG, DOC_TAG}):
+            if already_tagged(asset["id"], set(VOCAB) | {SENT_TAG, DOC_TAG, USELESS_TAG}):
                 continue
             if vision_calls >= MAX_VISION_CALLS:
                 print(f"classify: {asset['id']} left for the next run, vision budget of {MAX_VISION_CALLS} spent", flush=True)
@@ -336,7 +342,10 @@ data:
                 wrote = describe(asset["id"], verdict, tags)
                 # One verdict, and maybe is cleared whichever way it went.
                 api(f"/tags/{maybe}/assets", "DELETE", {"ids": [asset["id"]]})
-                if verdict.get("document"):
+                # A document the model itself calls junk - a coupon, a flyer, an advert, a
+                # loyalty card - must never be tagged as one. The tag is what queues it for
+                # Paperless, and the point is that junk never gets there at all.
+                if verdict.get("document") and verdict.get("useful") is not False:
                     # Album first, tag second: the tag is what makes a later run skip this
                     # asset, so it must never be written before the album add succeeded.
                     api(f"/albums/{album}/assets", "PUT", {"ids": [asset["id"]]})
@@ -344,9 +353,10 @@ data:
                     documents += 1
                     print(f"classify: {asset['id']} -> {DOC_TAG}, {wrote} write(s), kind={verdict.get('kind') or '?'}, conf={verdict.get('confidence')}: {verdict.get('description') or '?'}", flush=True)
                 else:
-                    api(f"/tags/{skip}/assets", "PUT", {"ids": [asset["id"]]})
+                    api(f"/tags/{junk}/assets", "PUT", {"ids": [asset["id"]]})
                     skipped += 1
-                    print(f"classify: {asset['id']} -> {SKIP_TAG}, {wrote} write(s): {verdict.get('description') or '?'}", flush=True)
+                    reason = "junk" if verdict.get("document") else "not a document"
+                    print(f"classify: {asset['id']} -> {USELESS_TAG} ({reason}), {wrote} write(s): {verdict.get('description') or '?'}", flush=True)
             except SystemExit as err:
                 # api() exits on any non-2xx, so one asset that cannot be written would abort the
                 # run and strand every asset after it - which is exactly what the HEIC 400 did.
