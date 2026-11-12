@@ -637,7 +637,6 @@ data:
             if len(items) < 200:
                 break
         sent_tag = ensure_tag(tags, SENT_TAG)
-        assets = album.get("assets") or []
         sent = 0
         for asset in assets:
             if already_tagged(asset["id"], (SENT_TAG,)):
