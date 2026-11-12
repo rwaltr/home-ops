@@ -50,7 +50,7 @@ the same commit as the service.
 **Currently annotated:** everything user-facing, grouped by what the thing is
 rather than where it runs — Media (Jellyfin, Navidrome, Seerr), Media Ops (Radarr,
 Sonarr, Prowlarr, Bazarr, SABnzbd, Unmanic, slskd), Smart Home (Home Assistant,
-Zigbee2MQTT, Z-Wave JS UI, ESPHome, go2rtc), Household (HomeBox, KitchenOwl,
+Zigbee2MQTT, Z-Wave JS UI, ESPHome, go2rtc), Household (HomeBox,
 Radicale), Photos (Immich), Reading (FreshRSS), AI (LiteLLM, Hermes), Comms
 (Matrix, Element), Monitoring (Grafana, Prometheus, Alertmanager), Tools
 (degoog).

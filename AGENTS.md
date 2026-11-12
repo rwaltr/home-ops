@@ -91,7 +91,6 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/freshrss.md` — FreshRSS
 - `docs/navidrome.md` — Navidrome (Subsonic/OpenSubsonic)
 - `docs/homebox.md` — HomeBox home inventory
-- `docs/kitchenowl.md` — KitchenOwl grocery list + recipes
 - `docs/homepage.md` — Homepage service dashboard
 - `docs/hermes-agent.md` — Hermes agent
 - `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)
