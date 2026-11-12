@@ -11,3 +11,4 @@ resources:
   - ./external-dns/ks.yaml
   - ./k8s-gateway/ks.yaml
   - ./cloudflare-tunnel/ks.yaml
+  - ./tailscale-operator/ks.yaml

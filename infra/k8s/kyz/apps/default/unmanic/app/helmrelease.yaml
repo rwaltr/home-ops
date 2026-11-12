@@ -114,6 +114,12 @@ spec:
     route:
       app:
         annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Unmanic
+          gethomepage.dev/description: Library transcoding
+          gethomepage.dev/group: Media Ops
+          gethomepage.dev/icon: unmanic.png
           gatus.home-operations.com/endpoint: |-
             conditions: ["[STATUS] == 200"]
         hostnames:

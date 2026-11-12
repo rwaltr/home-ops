@@ -1,0 +1,158 @@
+---
+# Immich → Paperless bridge. docs/paperless.md has the review loop and the tag
+# vocabulary; this file only needs to stay true about what runs.
+#
+# Every 15 minutes it does two things: tags newly added photos that look like
+# documents (paperless-maybe) so they can be reviewed, and copies whatever is in
+# the Immich album named by IMMICH_ALBUM into Paperless's consume directory,
+# tagging it paperless-sent.
+#
+# "Look like a document" is a cascade, cheapest evidence first: CLIP smart search
+# for recall (free, over-suggests), Immich's stored OCR text for confirmation
+# (free, local), and only then a vision model through LiteLLM - which is NOT free
+# and does send the image to OpenRouter. MAX_VISION_CALLS caps that per run, and
+# the vision stage is skipped entirely once OCR has been backfilled, because most
+# assets then answer for themselves.
+#
+# The album is the only path into Paperless, deliberately - that archive is
+# permanent, so a human approves what enters it rather than a model. The job
+# never creates the album: an empty album simply means an empty review queue.
+#
+# No Paperless credential is needed, because the bridge only writes into the
+# consume dropbox. Its one secret is the Immich API key: 1Password item
+# paperless-bridge, field credential.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich-paperless
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: immich-paperless
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: immich-paperless
+    controllers:
+      bridge:
+        type: cronjob
+        cronjob:
+          # Backstop, not the primary path: uploads and album changes are handled by
+          # the realtime controller below within seconds. This catches whatever the
+          # socket missed, and backfills older photos.
+          schedule: "0 * * * *"
+          concurrencyPolicy: Forbid
+          # One attempt: a transient Immich/network failure is retried by the next
+          # 15-minute tick anyway, so backoff just delays the obvious.
+          backoffLimit: 1
+        containers:
+          bridge:
+            image:
+              repository: python
+              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+            command: ["python3", "/scripts/bridge.py"]
+            env:
+              IMMICH_URL: http://immich-server.default.svc.cluster.local:2283
+              # The album is the trigger. Rename here if you rename it in Immich.
+              IMMICH_ALBUM: Paperless
+              # Tag applied after a successful handoff; also the idempotency key.
+              SENT_TAG: paperless-sent
+              CONSUME_DIR: /consume
+              # Vision confirm stage. LITELLM_API_KEY arrives with envFrom below.
+              # intel-vl is Qwen3-VL-8B on Dan's Intel Arc, reached through our own
+              # LiteLLM alias - self-hosted, not a model provider. Anything else
+              # named here (e.g. qwen3.8-omni-flash) sends the photo to OpenRouter.
+              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              VISION_MODEL: intel-vl
+              # Immich OCR must beat this score to count as evidence of text.
+              # Per run, so a 500-photo day cannot quietly run up a bill.
+              MAX_VISION_CALLS: "20"
+            envFrom:
+              - secretRef:
+                  name: immich-paperless
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                # Downloads and writes one photo at a time; no need to hold more.
+                memory: 256Mi
+      realtime:
+        type: deployment
+        replicas: 1
+        strategy: Recreate
+        containers:
+          realtime:
+            image:
+              repository: python
+              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+            # Same script, different entry point: it holds Immich's websocket.
+            command: ["python3", "/scripts/bridge.py", "--realtime"]
+            env:
+              # Kept in step with the bridge container above by hand; app-template has
+              # no way to share one env block between controllers.
+              IMMICH_URL: http://immich-server.default.svc.cluster.local:2283
+              IMMICH_ALBUM: Paperless
+              SENT_TAG: paperless-sent
+              CONSUME_DIR: /consume
+              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              VISION_MODEL: intel-vl
+              MAX_VISION_CALLS: "20"
+              # Long enough for Immich's own OCR job to finish and become evidence.
+              UPLOAD_DEBOUNCE: "45"
+              # The event path looks at a few minutes, not the sweep's whole window.
+              EVENT_WINDOW_MINUTES: "15"
+            envFrom:
+              - secretRef:
+                  name: immich-paperless
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 192Mi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        # uid 1000 owns the consume hostPath (the Paperless image chowns it), and
+        # it is also what the written files should be readable by.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+    persistence:
+      script:
+        type: configMap
+        name: immich-paperless-script
+        globalMounts:
+          - path: /scripts
+            readOnly: true
+      # The same dropbox the Paperless consumer watches. A hostPath because
+      # Paperless keeps media and consume on tank, outside any PVC.
+      consume:
+        type: hostPath
+        hostPath: /var/tank/nas/paperless/consume
+        globalMounts:
+          - path: /consume
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

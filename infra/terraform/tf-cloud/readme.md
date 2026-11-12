@@ -17,4 +17,4 @@ terraform apply
 
 ## Migration Note
 
-A Pulumi stub exists at `infra/pulumi/tf-cloud/` for eventual migration. The Terraform workspace remains active in the meantime.
+This workspace stays on Terraform; OpenTofu is the intended future direction.

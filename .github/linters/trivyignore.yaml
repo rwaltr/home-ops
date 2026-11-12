@@ -1,0 +1,15 @@
+# zfs-vdev-exporter reads ZFS vdev stats from the host, so it needs a privileged
+# container with the host root mounted. The findings below are inherent to that.
+misconfigurations:
+  - id: KSV-0014
+    paths:
+      - infra/k8s/kyz/apps/o11y/zfs-vdev-exporter/app/cronjob.yaml
+    statement: zpool status needs the host root filesystem
+  - id: KSV-0017
+    paths:
+      - infra/k8s/kyz/apps/o11y/zfs-vdev-exporter/app/cronjob.yaml
+    statement: privileged is required to read ZFS vdev stats
+  - id: KSV-0121
+    paths:
+      - infra/k8s/kyz/apps/o11y/zfs-vdev-exporter/app/cronjob.yaml
+    statement: hostPath / is required to read ZFS vdev stats

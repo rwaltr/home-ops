@@ -19,6 +19,13 @@ spec:
       route:
         main:
           enabled: true
+          annotations:
+            # Listed on the Homepage dashboard — see docs/homepage.md.
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/name: Alertmanager
+            gethomepage.dev/description: Alert routing
+            gethomepage.dev/group: Monitoring
+            gethomepage.dev/icon: alertmanager.png
           hostnames:
             - alertmanager.waltr.tech
           parentRefs:
@@ -51,6 +58,13 @@ spec:
       route:
         main:
           enabled: true
+          annotations:
+            # Listed on the Homepage dashboard — see docs/homepage.md.
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/name: Prometheus
+            gethomepage.dev/description: Metrics and PromQL
+            gethomepage.dev/group: Monitoring
+            gethomepage.dev/icon: prometheus.png
           hostnames:
             - prometheus.waltr.tech
           parentRefs:

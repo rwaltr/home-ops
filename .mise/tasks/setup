@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Install git hooks (hk) for this clone"
+set -euo pipefail
+
+# Repo-local install. On a machine you own, prefer the one-time global install
+# instead, which covers every repo and no-ops where there is no hk.pkl:
+#   hk install --global --mise
+hk install --mise

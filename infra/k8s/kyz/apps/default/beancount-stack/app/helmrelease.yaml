@@ -1,0 +1,187 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# beancount-stack — Beancount v3 + Fava, the ledger and investment UI.
+#
+# The image is built in github.com/rwaltr/beancount-stack and pinned here:
+# beancount 3.2.3, fava 1.30.16, beanquery, beangulp,
+# beancount-reds-importers (chase/fidelity/etrade/vanguard/schwab/ibkr/...),
+# smart_importer and fava_investor. Bumping it means a new tag + digest there,
+# then editing this file — nothing else in home-ops references it.
+#
+# Internal-only (envoy-internal). This is a complete financial history: there is
+# deliberately no envoy-external parentRef, so it never reaches Cloudflare DNS
+# or the tunnel. Reachable on the LAN and, because the tailnet connector
+# advertises 10.10.100.0/24 with split DNS for waltr.tech, from any tailnet
+# device.
+#
+# The ledger lives on a PVC (kopiur snapshots it, H 17). That PVC is seeded
+# exactly once, from a ConfigMap example, by an initContainer that refuses to
+# touch a ledger that is already there.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: beancount-stack
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: beancount-stack
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: beancount-stack
+    controllers:
+      app:
+        # RWO PVC: never let an old pod and a new one hold the same volume.
+        strategy: Recreate
+        initContainers:
+          seed:
+            image: &image
+              repository: ghcr.io/rwaltr/beancount-stack
+              tag: 0.1.0@sha256:a6107433267a4c2f67f76867c8aac4c92a34b4d309eb7ebb290fee4b21c5f633
+            # Seeds the example ledger onto an EMPTY volume and never touches an
+            # existing one. The test guard is the whole point: a restart, an
+            # upgrade, or a rollout must not overwrite a real ledger.
+            command:
+              - /bin/sh
+              - -c
+              - |
+                if [ -f /data/ledger.beancount ]; then
+                  echo "ledger present at /data/ledger.beancount, not seeding"
+                  exit 0
+                fi
+                cp /seed/ledger.beancount /data/ledger.beancount
+                echo "seeded example ledger onto empty volume"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 16Mi
+              limits:
+                memory: 64Mi
+        containers:
+          app:
+            image: *image
+            env:
+              TZ: America/Chicago
+            probes:
+              # Fava answers / with a 302 to the ledger's income statement, so
+              # the probe path must tolerate 3xx (kubelet accepts 200-399).
+              # Probing the redirect target instead would tie the probe to the
+              # ledger's `option "title"` — which is exactly what sets that slug.
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &port 5000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Verified against the published image: with the ledger mounted
+              # read-only and tmpfs at /tmp and /home/beancount, Fava starts and
+              # serves with no write attempts anywhere else. The PVC itself is
+              # writable, so edits made through Fava do persist.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 128Mi
+              limits:
+                # Python + beancount + Fava over a small ledger, no plugins
+                # referenced by it. Bounded because this node has no swap.
+                memory: 512Mi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        # The image creates uid/gid 1000 for exactly this; it is also the uid
+        # the kopiur mover reads the PVC as.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: app
+        ports:
+          http:
+            appProtocol: http
+            port: *port
+    route:
+      app:
+        annotations:
+          # Fava redirects /, and Gatus does not follow redirects: assert the
+          # redirect rather than 200.
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 302"]
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Beancount
+          gethomepage.dev/description: Ledger + investment reports (Fava)
+          gethomepage.dev/group: Finance
+          gethomepage.dev/icon: fava.png
+        hostnames:
+          - beancount.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      # The live ledger. Plain text, so kopiur reads it directly; a snapshot is
+      # crash-consistent, which is the accepted cost of copyMethod: Direct on
+      # openebs-hostpath.
+      ledger:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: openebs-hostpath
+        # Pinned: the kopiur SnapshotPolicy refers to this exact PVC name.
+        forceRename: beancount-data
+        globalMounts:
+          - path: /data
+      # Seed only — mounted into the initContainer, never into the app container,
+      # so Fava cannot see or rewrite the example file that backstops it.
+      seed:
+        type: configMap
+        name: beancount-stack-example
+        advancedMounts:
+          app:
+            seed:
+              - path: /seed
+                readOnly: true
+      # readOnlyRootFilesystem is on, so Fava's $HOME cache and Python's /tmp
+      # need somewhere to live. Both are throwaway.
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+      home:
+        type: emptyDir
+        globalMounts:
+          - path: /home/beancount

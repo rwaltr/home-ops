@@ -4,10 +4,10 @@
 
 # home-ops
 
-### _Flatcar · k0s · Cilium — GitOps homelab, cloud-managed with Terraform/Pulumi_
+### _Flatcar · k0s · Cilium — GitOps homelab, cloud-managed with Terraform_
 
 [![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label=discord&logo=discord&logoColor=white)](https://discord.gg/k8s-at-home)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge)](https://github.com/pre-commit/pre-commit)
+[![hk](https://img.shields.io/badge/hk-enabled-brightgreen?style=for-the-badge)](https://github.com/jdx/hk)
 [![last-commit](https://img.shields.io/github/last-commit/rwaltr/home-ops?style=for-the-badge&logo=git&logoColor=white)](https://github.com/rwaltr/home-ops/commits/master)
 [![stars](https://img.shields.io/github/stars/rwaltr/home-ops?style=for-the-badge&logo=github)](https://github.com/rwaltr/home-ops/stargazers)
 [![k0s](https://img.shields.io/badge/k0s-v1.36-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://k0sproject.io/)
@@ -16,7 +16,7 @@
 
 ## 📖 Overview
 
-Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform (migrating to Pulumi). In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
+Monorepo for my personal homelab. The main host (**mouse**) runs Flatcar Container Linux (immutable OS) with a single-node k0s + Cilium cluster managed by Flux GitOps (`infra/k8s/kyz`); cloud resources are managed with Terraform. In-cluster: OpenEBS hostpath storage, kopiur + kopia backups to RustFS on the tank pool, 1Password Connect secrets, monitoring (o11y group).
 
 > 🗺️ Migration plan, decisions log, and lessons: **[REFACTOR_PLANS.md](REFACTOR_PLANS.md)**
 
@@ -26,14 +26,14 @@ Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
 
 ## 🗂️ Repository Structure
 
-| Path               | Purpose                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)        |
-| `infra/k0s/`       | k0sctl cluster definitions                                   |
-| `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks)    |
-| `infra/terraform/` | Cloudflare, Backblaze B2, Terraform Cloud (maintenance mode) |
-| `infra/shared/`    | Shared SOPS-encrypted config                                 |
-| `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)            |
+| Path               | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `infra/flatcar/`   | Butane → Ignition host configs (`base.bu` + per-host)     |
+| `infra/k0s/`       | k0sctl cluster definitions                                |
+| `infra/k8s/`       | Flux GitOps cluster config (`kyz` site: apps, groups, ks) |
+| `infra/terraform/` | Cloudflare, Porkbun registrar NS, Terraform Cloud         |
+| `fnox.toml`        | Project secret references (1Password via fnox)            |
+| `.mise/tasks/`     | Task automation (flatcar VM lifecycle, terraform)         |
 
 ## 🔧 Infrastructure
 
@@ -65,19 +65,17 @@ Key platform apps:
 
 ### 🌐 Terraform
 
-Cloud resources in maintenance mode — migrating to Pulumi:
+Cloud resources, managed with Terraform:
 
-- **Cloudflare** — DNS and domain management (`infra/terraform/cloudflare/`)
-- **Backblaze B2** — backup storage provisioning (`infra/terraform/backblaze/`)
+- **Cloudflare** — DNS, zones and zone settings (`infra/terraform/cloudflare/`)
+- **Porkbun** — registrar nameserver delegation, in the same workspace (`porkbun.tf`)
 - **Terraform Cloud** — workspace management (`infra/terraform/tf-cloud/`)
 
-### 🚀 Pulumi
+### 🔐 Secrets
 
-Planned migration target for cloud resources (Go). Early stubs were pruned; `infra/pulumi/` will be recreated when this migration becomes active.
-
-### 🔐 SOPS
-
-Age-based secrets management — sensitive values are encrypted inline alongside repository files.
+[1Password](https://1password.com) is the source of truth. Local and CI tooling reads it through
+[fnox](https://fnox.jdx.dev) (references in `fnox.toml`); in-cluster workloads get secrets via
+1Password Connect + External Secrets. No secrets are encrypted into this repository.
 
 ## 🖥️ Current Host
 
@@ -213,23 +211,36 @@ offsite leg (mirror to Backblaze B2) is planned via kopiur's
 
 ## 🧰 Tools
 
-| Tool       | Use                          | Status           |
-| ---------- | ---------------------------- | ---------------- |
-| Flatcar    | Operating System             | ✅               |
-| k0s        | Kubernetes (single-node)     | ✅               |
-| Cilium     | CNI (kube-proxy replacement) | ✅               |
-| Flux       | GitOps                       | ✅               |
-| OpenEBS    | Hostpath local storage       | ✅               |
-| kopiur     | PVC backups (kopia-native)   | ✅               |
-| RustFS     | S3-compatible Storage        | ✅               |
-| 1Password  | Secrets (Connect + ESO)      | ✅               |
-| ZFS        | Storage & Snapshots          | ✅               |
-| SOPS       | Secrets Management           | ✅               |
-| Terraform  | Cloud Resource Management    | ✅ (maintenance) |
-| Pulumi     | Cloud Resource Management    | 🚧 planned       |
-| Netdata    | System Monitoring            | 🚧 planned       |
-| mise       | Task Runner & Tool Mgmt      | ✅               |
-| Pre-commit | Code Quality Automation      | ✅               |
+| Tool      | Use                           | Status     |
+| --------- | ----------------------------- | ---------- |
+| Flatcar   | Operating System              | ✅         |
+| k0s       | Kubernetes (single-node)      | ✅         |
+| Cilium    | CNI (kube-proxy replacement)  | ✅         |
+| Flux      | GitOps                        | ✅         |
+| OpenEBS   | Hostpath local storage        | ✅         |
+| kopiur    | PVC backups (kopia-native)    | ✅         |
+| RustFS    | S3-compatible Storage         | ✅         |
+| 1Password | Secrets (Connect + ESO)       | ✅         |
+| ZFS       | Storage & Snapshots           | ✅         |
+| fnox      | Secret Resolution (1Password) | ✅         |
+| Terraform | Cloud Resource Management     | ✅         |
+| Netdata   | System Monitoring             | 🚧 planned |
+| mise      | Task Runner & Tool Mgmt       | ✅         |
+| hk        | Git Hooks & Linting           | ✅         |
+
+## 🛠️ Development
+
+Linting and formatting are defined once in `hk.pkl` and run through mise:
+
+```sh
+mise install
+hk install --global --mise   # once per machine; no-ops in repos without hk.pkl
+# or, for a single clone / container:
+mise run setup
+
+mise run lint   # hk check --all
+mise run fmt    # hk fix --all
+```
 
 ## 🖊️ TODOs
 

@@ -1,113 +1,134 @@
 resource "cloudflare_zone" "legacyfamily" {
-  zone       = local.my_domains["familylegacy"]
-  account_id = cloudflare_account.waltrtech.id
+  name = local.my_domains["familylegacy"]
+  account = {
+    id = cloudflare_account.waltrtech.id
+  }
 }
-
 
 # Email Records /
-resource "cloudflare_record" "familylegacy_MigaduVerify" {
+resource "cloudflare_dns_record" "familylegacy_MigaduVerify" {
   type    = "TXT"
   name    = "@"
-  value   = "hosted-email-verify=gl6knkig"
+  content = "hosted-email-verify=gl6knkig"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "familylegacy_MX1" {
+moved {
+  from = cloudflare_record.familylegacy_MigaduVerify
+  to   = cloudflare_dns_record.familylegacy_MigaduVerify
+}
+
+resource "cloudflare_dns_record" "familylegacy_MX1" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx1.migadu.com"
+  content  = "aspmx1.migadu.com"
   priority = 10
   zone_id  = cloudflare_zone.legacyfamily.id
+  ttl      = 1
 }
 
-resource "cloudflare_record" "familylegacy_MX2" {
+moved {
+  from = cloudflare_record.familylegacy_MX1
+  to   = cloudflare_dns_record.familylegacy_MX1
+}
+
+resource "cloudflare_dns_record" "familylegacy_MX2" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx2.migadu.com"
+  content  = "aspmx2.migadu.com"
   priority = 20
   zone_id  = cloudflare_zone.legacyfamily.id
+  ttl      = 1
 }
 
-resource "cloudflare_record" "familylegacy_DKIM1" {
+moved {
+  from = cloudflare_record.familylegacy_MX2
+  to   = cloudflare_dns_record.familylegacy_MX2
+}
+
+resource "cloudflare_dns_record" "familylegacy_DKIM1" {
   type    = "CNAME"
   name    = "key1._domainkey"
-  value   = "key1.rwwalter.com._domainkey.migadu.com."
+  content = "key1.rwwalter.com._domainkey.migadu.com"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "familylegacy_DKIM2" {
+moved {
+  from = cloudflare_record.familylegacy_DKIM1
+  to   = cloudflare_dns_record.familylegacy_DKIM1
+}
+
+resource "cloudflare_dns_record" "familylegacy_DKIM2" {
   type    = "CNAME"
   name    = "key2._domainkey"
-  value   = "key2.rwwalter.com._domainkey.migadu.com."
+  content = "key2.rwwalter.com._domainkey.migadu.com"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "familylegacy_DKIM3" {
+moved {
+  from = cloudflare_record.familylegacy_DKIM2
+  to   = cloudflare_dns_record.familylegacy_DKIM2
+}
+
+resource "cloudflare_dns_record" "familylegacy_DKIM3" {
   type    = "CNAME"
   name    = "key3._domainkey"
-  value   = "key3.rwwalter.com._domainkey.migadu.com."
+  content = "key3.rwwalter.com._domainkey.migadu.com"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "familylegacy_SPF" {
+moved {
+  from = cloudflare_record.familylegacy_DKIM3
+  to   = cloudflare_dns_record.familylegacy_DKIM3
+}
+
+resource "cloudflare_dns_record" "familylegacy_SPF" {
   type    = "TXT"
   name    = "@"
-  value   = "v=spf1 include:spf.migadu.com -all"
+  content = "v=spf1 include:spf.migadu.com -all"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "familylegacy_DMARC" {
+moved {
+  from = cloudflare_record.familylegacy_SPF
+  to   = cloudflare_dns_record.familylegacy_SPF
+}
+
+resource "cloudflare_dns_record" "familylegacy_DMARC" {
   type    = "TXT"
   name    = "_dmarc"
-  value   = "v=DMARC1; p=quarantine;"
+  content = "v=DMARC1; p=quarantine;"
   zone_id = cloudflare_zone.legacyfamily.id
 
+  ttl = 1
 }
 
-resource "cloudflare_record" "familylegacy_autoconfig" {
+moved {
+  from = cloudflare_record.familylegacy_DMARC
+  to   = cloudflare_dns_record.familylegacy_DMARC
+}
+
+resource "cloudflare_dns_record" "familylegacy_autoconfig" {
   type    = "CNAME"
   name    = "autoconfig"
-  value   = "autoconfig.migadu.com."
+  content = "autoconfig.migadu.com"
   zone_id = cloudflare_zone.legacyfamily.id
+  ttl     = 1
 }
 
-# / Email Records
+moved {
+  from = cloudflare_record.familylegacy_autoconfig
+  to   = cloudflare_dns_record.familylegacy_autoconfig
+}
 
-resource "cloudflare_zone_settings_override" "legacyfamily_domain_settings" {
-  zone_id = cloudflare_zone.legacyfamily.id
-  settings {
-    ssl                      = "strict"
-    always_use_https         = "on"
-    min_tls_version          = "1.2"
-    opportunistic_encryption = "on"
-    tls_1_3                  = "zrt"
-    automatic_https_rewrites = "on"
-    universal_ssl            = "on"
-    browser_check            = "on"
-    challenge_ttl            = 1800
-    privacy_pass             = "on"
-    security_level           = "medium"
-    brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
-    rocket_loader       = "off"
-    always_online       = "off"
-    development_mode    = "off"
-    http3               = "on"
-    zero_rtt            = "on"
-    ipv6                = "on"
-    websockets          = "on"
-    opportunistic_onion = "on"
-    pseudo_ipv4         = "off"
-    ip_geolocation      = "on"
-    email_obfuscation   = "on"
-    server_side_exclude = "on"
-    hotlink_protection  = "off"
-    security_header {
-      enabled = false
-    }
-  }
+resource "cloudflare_zone_setting" "legacyfamily" {
+  for_each   = local.zone_settings
+  zone_id    = cloudflare_zone.legacyfamily.id
+  setting_id = each.key
+  value      = each.value
 }

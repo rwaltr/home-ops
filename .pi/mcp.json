@@ -1,0 +1,47 @@
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "terraform-mcp-server",
+      "args": ["stdio"],
+      "exposure": "codemode",
+      "description": "Terraform Registry + HCP Terraform (auto-reads TFE_TOKEN from ~/.terraform.d/credentials.tfrc.json)"
+    },
+    "arr": {
+      "command": "npx",
+      "args": ["-y", "mcp-arr-server"],
+      "env": {
+        "RADARR_URL": "http://127.0.0.1:7878",
+        "RADARR_API_KEY": "!fnox get RADARR_API_KEY",
+        "SONARR_URL": "http://127.0.0.1:8989",
+        "SONARR_API_KEY": "!fnox get SONARR_API_KEY"
+      },
+      "exposure": "codemode",
+      "description": "Radarr/Sonarr media management (loopback via homelab-portforward)"
+    },
+    "mqtt": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "exposure": "codemode",
+      "description": "MQTT broker inspection/control (mosquitto via homelab-portforward)"
+    },
+    "grafana": {
+      "command": "mcp-grafana",
+      "args": ["-t", "stdio"],
+      "env": {
+        "GRAFANA_URL": "https://grafana.waltr.tech",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "!fnox get GRAFANA_TOKEN"
+      },
+      "exposure": "codemode",
+      "description": "Grafana dashboards, datasources, metrics, and Loki queries"
+    },
+    "homebox": {
+      "command": "uvx",
+      "args": ["homebox-mcp"],
+      "env": {
+        "HOMEBOX_URL": "https://homebox.waltr.tech",
+        "HOMEBOX_TOKEN": "!fnox get HOMEBOX_TOKEN"
+      },
+      "exposure": "codemode",
+      "description": "HomeBox home inventory Q&A and intake (dgahagan/homebox-mcp)"
+    }
+  }
+}

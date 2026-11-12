@@ -1,0 +1,27 @@
+---
+# The cluster's door to the tailnet: a subnet router that advertises the Cilium
+# LoadBalancer VIP range, so tailnet clients reach envoy-internal and
+# envoy-external at the same addresses LAN clients use. Nothing about the
+# existing routes changes — this sits under them.
+#
+# Why a subnet router and not a Tailscale Ingress per app: one device and one CR
+# instead of a proxy pod per exposed app, it keeps the 26 HTTPRoutes and their
+# hostnames authoritative (an Ingress would bypass envoy and serve
+# <app>.<tailnet>.ts.net instead), and it covers both gateways at once. The cost
+# is granularity: every device in the tailnet gets the whole range, where per-app
+# Ingress would let the ACL decide app by app.
+#
+# The routes are auto-approved by policy.hujson (autoApprovers.routes), and the
+# device is tagged tag:k8s by the operator's proxyConfig.
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: cluster
+spec:
+  # Defaults to <name>-connector; named for the host so the tailnet device list
+  # reads as where the traffic lands.
+  hostname: mouse-connector
+  subnetRouter:
+    advertiseRoutes:
+      - 10.10.100.0/24
+      - fdad:207a:f1ab:100::/64

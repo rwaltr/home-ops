@@ -141,6 +141,29 @@ Onboarding a restricted zone's service = one accept in the shared chain
 (e.g. `add chain=k8s-vips comment="cameras -> frigate vip" action=accept
 dst-address=10.10.100.21 in-interface=vlan40-cameras`).
 
+### Cast back-channel: clients → mouse (TV → HA)
+
+2026-11-09: the Google TV Streamer (clients `10.20.0.100`) casts the HA
+Reolink camera feed and its Cast channel opens reverse TCP connections to
+the node from source port 8009 — e.g. `10.20.0.100:8009 ->
+10.10.0.10:<ephemeral>`. Those arrive `connection-state:new`, so
+established/related + fasttrack do not cover them and the `any -> any`
+default deny ate them as ZONEDENY, tearing the session down. HA's cast
+egress SNATs to the node's mgmt IP (the pod's default route is `eth0`; the
+multus macvlan policy routes only match an already-chosen source), so the
+`clients → mgmt` pair has to be allowed for this one flow.
+
+```routeros
+/ip/firewall/filter
+add action=accept chain=forward comment="clients -> mouse: cast back-channel (TV:8009 -> HA)" \
+    dst-address=10.10.0.10 in-interface=vlan20-clients out-interface=vlan10-mgmt protocol=tcp src-port=8009
+add action=accept chain=forward comment="clients -> mouse: cast control (HA -> TV:8009 return)" \
+    dst-address=10.10.0.10 in-interface=vlan20-clients out-interface=vlan10-mgmt protocol=tcp dst-port=8009
+```
+
+Both sit before the default deny. `mouse` here is the Flatcar node's mgmt
+IP, not a k8s VIP, so rule 51 (`clients -> k8s vips`) does not cover it.
+
 ### Same-VLAN v6 hairpin: the conntrack exception
 
 Cilium LB uses DSR: replies leave the node **directly at L2** to the client.

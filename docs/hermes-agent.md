@@ -134,7 +134,7 @@ structural, not prompt-based.
   review, dismiss stale reviews, no force-push, no direct pushes.
 - **The bot cannot approve or self-merge.** Branch protection enforces this
   regardless of the token it holds.
-- **Flow:** `git switch -c hermes/<slug>` → edit → `mise run lint:all` →
+- **Flow:** `git switch -c hermes/<slug>` → edit → `mise run lint` →
   conventional commit → `gh pr create` with a body that states what changed,
   what was verified, and what is left → stop. rwaltr reviews and merges; Flux
   reconciles `master` as usual.

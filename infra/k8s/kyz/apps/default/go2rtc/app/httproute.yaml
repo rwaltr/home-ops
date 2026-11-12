@@ -5,6 +5,12 @@ kind: HTTPRoute
 metadata:
   name: go2rtc
   annotations:
+    # Listed on the Homepage dashboard — see docs/homepage.md.
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: go2rtc
+    gethomepage.dev/description: Camera streaming and WebRTC
+    gethomepage.dev/group: Smart Home
+    gethomepage.dev/icon: go2rtc.png
     gatus.home-operations.com/endpoint: |-
       conditions: ["[STATUS] == 200"]
 spec:

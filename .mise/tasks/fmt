@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Format yaml/json/markdown files with oxfmt"
+#MISE description="Format yaml/json/markdown files (hk fix --all)"
 set -euo pipefail
 
-oxfmt .
+hk fix --all

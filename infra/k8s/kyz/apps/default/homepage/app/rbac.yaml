@@ -1,0 +1,60 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/rbac.authorization.k8s.io/clusterrole_v1.json
+# Homepage's cluster-wide read access. It has no write verbs anywhere: the only
+# thing it does with this is list the routing objects it turns into dashboard
+# entries, plus pods/nodes for the CPU-memory widgets.
+#
+# This is the upstream ClusterRole (gethomepage.dev/installation/k8s) with one
+# addition, noted below. The ServiceAccount itself is rendered by the chart
+# (serviceAccount.homepage in the HelmRelease), not declared here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: homepage
+rules:
+  # Pods + nodes feed the CPU/memory widgets; namespaces is used to reason about
+  # which namespace a discovered route belongs to.
+  - apiGroups: [""]
+    resources: ["namespaces", "pods", "nodes"]
+    verbs: ["get", "list"]
+  # The metrics-server API, for the actual CPU/memory *numbers*. Without it the
+  # widgets render with no data.
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+  # Gateway API — the only reason discovery works in this cluster. Every app here
+  # publishes an HTTPRoute; nothing creates Ingress objects.
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes", "gateways"]
+    verbs: ["get", "list"]
+  # Not used here, but kept so the upstream manifest and this one stay
+  # diff-able, and so adding a Traefik-style or legacy Ingress later does not
+  # silently produce an empty dashboard.
+  - apiGroups: ["extensions", "networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list"]
+  - apiGroups: ["traefik.io"]
+    resources: ["ingressroutes"]
+    verbs: ["get", "list"]
+  # ADDED beyond upstream. Homepage probes for the HTTPRoute CRD before enabling
+  # Gateway discovery (src/utils/config/kubernetes.js -> checkCRD ->
+  # readCustomResourceDefinitionStatus). A 403 there is caught and logged as a
+  # warning, then treated as "CRD absent" — i.e. Gateway discovery silently
+  # switches itself off. The upstream ClusterRole does not grant this group, so
+  # the dashboard comes up empty with only a log line to explain it. get only.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: homepage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: homepage
+subjects:
+  - kind: ServiceAccount
+    name: homepage
+    namespace: default

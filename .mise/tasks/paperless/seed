@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="Seed Paperless-ngx document types, tags, fields and auto-classification workflows (idempotent)"
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+for c in fnox python3; do
+  command -v "$c" >/dev/null || die "$c not found on PATH"
+done
+
+# Same discipline as the tf:* and secrets:* tasks: resolve only the credential
+# this needs. An already-exported token wins, so this works in CI and from a
+# shell that already has it.
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  OP_SERVICE_ACCOUNT_TOKEN="$(fnox get OP_SERVICE_ACCOUNT_TOKEN)" ||
+    die "could not resolve OP_SERVICE_ACCOUNT_TOKEN (see docs/secrets.md)"
+  export OP_SERVICE_ACCOUNT_TOKEN
+fi
+
+PAPERLESS_API_TOKEN="$(fnox get PAPERLESS_API_TOKEN)" ||
+  die "could not resolve PAPERLESS_API_TOKEN (1Password item 'paperless', field 'api_token')"
+export PAPERLESS_API_TOKEN
+
+python3 "${MISE_PROJECT_ROOT}/scripts/paperless_seed.py"

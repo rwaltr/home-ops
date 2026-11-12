@@ -1,126 +1,161 @@
 resource "cloudflare_zone" "prof_domain" {
-  zone       = local.my_domains["prof"]
-  account_id = cloudflare_account.waltrtech.id
+  name = local.my_domains["prof"]
+  account = {
+    id = cloudflare_account.waltrtech.id
+  }
 }
 
-resource "cloudflare_record" "prof_root" {
+resource "cloudflare_dns_record" "prof_root" {
   type    = "CNAME"
   name    = "@"
-  value   = "rwaltr.github.io"
+  content = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_www" {
+moved {
+  from = cloudflare_record.prof_root
+  to   = cloudflare_dns_record.prof_root
+}
+
+resource "cloudflare_dns_record" "prof_www" {
   type    = "CNAME"
   name    = "www"
-  value   = "rwaltr.github.io"
+  content = "rwaltr.github.io"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_githubverify" {
+moved {
+  from = cloudflare_record.prof_www
+  to   = cloudflare_dns_record.prof_www
+}
+
+resource "cloudflare_dns_record" "prof_githubverify" {
   type    = "TXT"
   name    = "_github-pages-challenge-rwaltr"
-  value   = "8697f334fc9261ca5d28a65ce0544e"
+  content = "8697f334fc9261ca5d28a65ce0544e"
   zone_id = cloudflare_zone.prof_domain.id
 
+  ttl = 1
 }
+
+moved {
+  from = cloudflare_record.prof_githubverify
+  to   = cloudflare_dns_record.prof_githubverify
+}
+
 # Email Records /
-resource "cloudflare_record" "prof_MigaduVerify" {
+resource "cloudflare_dns_record" "prof_MigaduVerify" {
   type    = "TXT"
   name    = "@"
-  value   = "hosted-email-verify=mtm4pnvs"
+  content = "hosted-email-verify=mtm4pnvs"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_MX1" {
+moved {
+  from = cloudflare_record.prof_MigaduVerify
+  to   = cloudflare_dns_record.prof_MigaduVerify
+}
+
+resource "cloudflare_dns_record" "prof_MX1" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx1.migadu.com"
+  content  = "aspmx1.migadu.com"
   priority = 10
   zone_id  = cloudflare_zone.prof_domain.id
+  ttl      = 1
 }
 
-resource "cloudflare_record" "prof_MX2" {
+moved {
+  from = cloudflare_record.prof_MX1
+  to   = cloudflare_dns_record.prof_MX1
+}
+
+resource "cloudflare_dns_record" "prof_MX2" {
   type     = "MX"
   name     = "@"
-  value    = "aspmx2.migadu.com"
+  content  = "aspmx2.migadu.com"
   priority = 20
   zone_id  = cloudflare_zone.prof_domain.id
+  ttl      = 1
 }
 
-resource "cloudflare_record" "prof_DKIM1" {
+moved {
+  from = cloudflare_record.prof_MX2
+  to   = cloudflare_dns_record.prof_MX2
+}
+
+resource "cloudflare_dns_record" "prof_DKIM1" {
   type    = "CNAME"
   name    = "key1._domainkey"
-  value   = "key1.rwalt.pro._domainkey.migadu.com."
+  content = "key1.rwalt.pro._domainkey.migadu.com"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_DKIM2" {
+moved {
+  from = cloudflare_record.prof_DKIM1
+  to   = cloudflare_dns_record.prof_DKIM1
+}
+
+resource "cloudflare_dns_record" "prof_DKIM2" {
   type    = "CNAME"
   name    = "key2._domainkey"
-  value   = "key2.rwalt.pro._domainkey.migadu.com."
+  content = "key2.rwalt.pro._domainkey.migadu.com"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_DKIM3" {
+moved {
+  from = cloudflare_record.prof_DKIM2
+  to   = cloudflare_dns_record.prof_DKIM2
+}
+
+resource "cloudflare_dns_record" "prof_DKIM3" {
   type    = "CNAME"
   name    = "key3._domainkey"
-  value   = "key3.rwalt.pro._domainkey.migadu.com."
+  content = "key3.rwalt.pro._domainkey.migadu.com"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_SPF" {
+moved {
+  from = cloudflare_record.prof_DKIM3
+  to   = cloudflare_dns_record.prof_DKIM3
+}
+
+resource "cloudflare_dns_record" "prof_SPF" {
   type    = "TXT"
   name    = "@"
-  value   = "v=spf1 include:spf.migadu.com -all"
+  content = "v=spf1 include:spf.migadu.com -all"
   zone_id = cloudflare_zone.prof_domain.id
+  ttl     = 1
 }
 
-resource "cloudflare_record" "prof_DMARC" {
+moved {
+  from = cloudflare_record.prof_SPF
+  to   = cloudflare_dns_record.prof_SPF
+}
+
+resource "cloudflare_dns_record" "prof_DMARC" {
   type    = "TXT"
   name    = "_dmarc"
-  value   = "v=DMARC1; p=quarantine;"
+  content = "v=DMARC1; p=quarantine;"
   zone_id = cloudflare_zone.prof_domain.id
 
+  ttl = 1
 }
 
-# / Email Records
+moved {
+  from = cloudflare_record.prof_DMARC
+  to   = cloudflare_dns_record.prof_DMARC
+}
 
-resource "cloudflare_zone_settings_override" "prof_domain" {
-  zone_id = cloudflare_zone.prof_domain.id
-  settings {
-    ssl                      = "strict"
-    always_use_https         = "on"
-    min_tls_version          = "1.2"
-    opportunistic_encryption = "on"
-    tls_1_3                  = "zrt"
-    automatic_https_rewrites = "on"
-    universal_ssl            = "on"
-    browser_check            = "on"
-    challenge_ttl            = 1800
-    privacy_pass             = "on"
-    security_level           = "medium"
-    brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
-    rocket_loader       = "off"
-    always_online       = "off"
-    development_mode    = "off"
-    http3               = "on"
-    zero_rtt            = "on"
-    ipv6                = "on"
-    websockets          = "on"
-    opportunistic_onion = "on"
-    pseudo_ipv4         = "off"
-    ip_geolocation      = "on"
-    email_obfuscation   = "on"
-    server_side_exclude = "on"
-    hotlink_protection  = "off"
-    security_header {
-      enabled = false
-    }
-  }
+resource "cloudflare_zone_setting" "prof_domain" {
+  for_each   = local.zone_settings
+  zone_id    = cloudflare_zone.prof_domain.id
+  setting_id = each.key
+  value      = each.value
 }

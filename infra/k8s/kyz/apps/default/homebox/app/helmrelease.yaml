@@ -1,0 +1,166 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# HomeBox — home inventory (items, locations, labels, custom fields). Go binary
+# + SQLite + embedded UI; ~50MB idle.
+#
+# The FORK, not `hay-kot/homebox`: upstream was archived 2024-06-11 and
+# `homebox.software` is served by `sysadminsmedia/homebox`, which is where
+# 0.26+/0.27 (API keys, label templates, the newer entity model) actually land.
+# Deploying the archived image would mean deploying a dead project.
+#
+# Internal-only (envoy-internal). This is a complete inventory of everything in
+# the house — serial numbers, purchase prices, photos — so it is the one app on
+# this list that has no business being internet-reachable.
+#
+# API keys are the integration surface, and they are why this is deployed at
+# all: `hb_…` tokens are issued from Profile → API Keys and are what
+# homebox-companion (vision auto-cataloguing) and homebox-mcp (agent Q&A)
+# authenticate with. Both are out of scope here — see docs/homebox.md.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: homebox
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: homebox
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: homebox
+    controllers:
+      homebox:
+        # RWO PVC + SQLite in WAL mode: never run two pods against the DB.
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            # -rootless: the same binary with a `homebox` user created (uid
+            # 65532) so it can be held to runAsNonRoot. The plain tag, and the
+            # -hardened (distroless) tag, both run as root; -hardened also has
+            # no shell, which makes it a dead end if this ever needs debugging.
+            image:
+              repository: ghcr.io/sysadminsmedia/homebox
+              tag: 0.27.1-rootless@sha256:6bb4472e91d3084d292ce654772e26df765d01aa0d38aa7077a7bb07b7d44ac7
+            env:
+              TZ: America/Chicago
+              # Opt out of the vendor's usage ping (already the default; set
+              # explicitly so a future upstream flip is a visible diff).
+              HBOX_OPTIONS_ALLOW_ANALYTICS: "false"
+              # Envoy terminates TLS and sets X-Forwarded-Proto. Without this
+              # HomeBox builds absolute URLs against the request scheme it sees
+              # (http), which breaks any absolute link the UI generates.
+              HBOX_OPTIONS_TRUST_PROXY: "true"
+              # Closed now that the owner account exists. This does NOT stop you
+              # adding users: HandleUserRegistration() only refuses when there is
+              # also no group token — `!allowRegistration && GroupToken == ""` —
+              # so the Collection → Invites flow keeps working with signup shut.
+              # See docs/homebox.md → Accounts.
+              HBOX_OPTIONS_ALLOW_REGISTRATION: "false"
+            envFrom:
+              - secretRef:
+                  name: homebox-secret
+            probes:
+              # The image's own HEALTHCHECK path (`/api/v1/status`): no auth,
+              # answers before any user exists, so it is safe for the startup
+              # gate on a cold database.
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/v1/status
+                    port: &port 7745
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/v1/status
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Safe here, and verified against the image: HomeBox writes only
+              # under /data. The image sets HBOX_DATABASE_SQLITE_PATH=/data/…
+              # and HBOX_STORAGE_CONN_STRING=file:/// with
+              # HBOX_STORAGE_PREFIX_PATH=data, which resolves attachments to the
+              # same /data mount ("…or /data in the docker container", storage
+              # docs). Nothing touches /app.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                # SQLite + a Go HTTP server; image scans of a large inventory
+                # are throwaway memory. Bounded because this node has no swap.
+                memory: 256Mi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        # uid/gid 65532 is the `homebox` user the -rootless image creates; the
+        # docs chown /data to exactly this pair.
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: homebox
+        ports:
+          http:
+            appProtocol: http
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+          # Discovered by Homepage: it lists HTTPRoutes carrying this annotation
+          # and derives href from the hostname below — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: HomeBox
+          gethomepage.dev/description: Home inventory
+          gethomepage.dev/group: Household
+          gethomepage.dev/icon: homebox.png
+        hostnames:
+          - homebox.waltr.tech
+        parentRefs:
+          # Internal only: deliberately no envoy-external parentRef, so the
+          # cloudflare tunnel cannot reach the inventory. Adding that second
+          # parentRef is the whole publish step if it is ever wanted.
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      # SQLite DB (/data/homebox.db, WAL) plus uploaded item photos and
+      # generated labels. This is the entire application state.
+      data:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC
+        # exists, and the kopiur policy refers to this exact name.
+        forceRename: homebox-data
+        globalMounts:
+          - path: /data

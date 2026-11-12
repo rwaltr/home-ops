@@ -1,0 +1,162 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+# Every file Homepage looks for in /app/config is listed here — all nine from
+# upstream's src/skeleton — with the five it does not need yet (custom.css,
+# custom.js, docker.yaml, proxmox.yaml, settings.yaml) as empty strings. That is not tidiness: Homepage copies a default into place for any
+# config file it cannot find, and /app/config is a read-only ConfigMap, so a
+# missing key becomes a failed write at startup. The upstream manifest mounts
+# exactly this set.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+data:
+  # --- cluster discovery -------------------------------------------------
+  # The discovery connection itself. `cluster` means "use the mounted service
+  # account token", which is why the HelmRelease sets
+  # automountServiceAccountToken: true (the repo default elsewhere is false).
+  kubernetes.yaml: |
+    mode: cluster
+    # Everything in this cluster publishes an HTTPRoute, so the default ingress
+    # watcher has nothing to read. Gateway API is the sole discovery source.
+    ingress: false
+    gateway: true
+
+  # --- static entries ----------------------------------------------------
+  # Filled in for the things that are NOT in the cluster. Anything that is in
+  # the cluster arrives by annotation on its HTTPRoute instead — see
+  # docs/homepage.md. Discovered entries render above these.
+  services.yaml: |
+    - External:
+        - Cloudflare:
+            icon: cloudflare.png
+            href: https://dash.cloudflare.com/
+            description: DNS, tunnel, Zero Trust
+
+        - Terraform Cloud:
+            icon: terraform.png
+            href: https://app.terraform.io/
+            description: Remote state + workspaces
+
+        - GitHub:
+            icon: github.png
+            href: https://github.com/rwaltr
+            description: rwaltr
+
+    - Network:
+        # The MikroTik router, the one piece of this estate that is definitively
+        # not in the cluster. Uncomment and set the real address. Note that
+        # siteMonitor makes an unauthenticated HEAD/GET, so it reports the login
+        # page's status, not the router's health.
+        # - RouterOS:
+        #     icon: mikrotik.png
+        #     href: http://mikrotik/
+        #     description: Edge router
+        #     siteMonitor: http://mikrotik/
+        #     ping: 10.10.0.1
+        - RouterOS:
+            icon: mikrotik.png
+            href: http://10.10.0.1/
+            description: Edge router (set the real address)
+            ping: 10.10.0.1
+
+  bookmarks.yaml: |
+    - Reference:
+        - Homepage config:
+            - abbr: HC
+              href: https://gethomepage.dev/configs/services/
+        - 1Password:
+            - abbr: 1P
+              href: https://my.1password.com/
+
+  # --- top strip ---------------------------------------------------------
+  # Cluster stats come from PROMETHEUS, not from the built-in `kubernetes` and
+  # `resources` widgets. Those read the metrics.k8s.io API, this cluster has no
+  # metrics-server, and so they rendered "API Error" on every refresh — three
+  # failing blocks, ~14 log lines per 45s. Prometheus and node-exporter are
+  # already here, so the numbers come from the same source Grafana uses.
+  #
+  # POST with a form body rather than a GET query string: PromQL in a URL has to
+  # be percent-encoded and stops being reviewable in git. The generic proxy
+  # sends a *string* requestBody through verbatim, so the query stays legible.
+  # (An object requestBody would be JSON.stringify'd, which Prometheus rejects.)
+  #
+  # `format: percent` is Intl percent style, i.e. it multiplies by 100 — so the
+  # queries return a 0-1 RATIO and deliberately do not include `* 100`.
+  widgets.yaml: |
+    - customapi:
+        label: Cluster CPU
+        icon: mdi-cpu-64-bit
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # PromQL: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
+        requestBody: 'query=1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))'
+        mappings:
+          - field: data.result.0.value.1
+            label: used
+            format: percent
+
+    - customapi:
+        label: Cluster RAM
+        icon: mdi-memory
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # PromQL: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+        requestBody: 'query=1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes'
+        mappings:
+          - field: data.result.0.value.1
+            label: used
+            format: percent
+
+    # Total disk IOPS on the host. Summed across every block device, which is
+    # what "cluster" means for the CPU and RAM widgets above; dm-* is left in
+    # because it currently contributes ~0 and excluding it made the number no
+    # easier to reason about. The split is worth knowing: the Kingston NVMe
+    # (openebs-hostpath) does ~150 IOPS where the whole 6-disk tank pool does
+    # ~24, so this number is really an NVMe number wearing a cluster costume.
+    - customapi:
+        label: Cluster IOPS
+        icon: mdi-harddisk
+        href: https://grafana.waltr.tech/
+        url: http://kube-prometheus-stack-prometheus.o11y.svc.cluster.local:9090/api/v1/query
+        method: POST
+        headers:
+          Content-Type: application/x-www-form-urlencoded
+        refreshInterval: 30000
+        # The + is %2B deliberately. This body is form-encoded, so a bare + means
+        # a SPACE: Prometheus receives "...[5m])   rate(..." and rejects it with
+        # `parse error: unexpected identifier "rate" in aggregation`. Homepage
+        # turns that into a bare 400 "HTTP Error" and logs nothing useful — which
+        # is why the CPU and RAM queries, having no +, were fine and this failed.
+        # Same trap for any PromQL containing +, % or &.
+        # PromQL: sum(rate(node_disk_reads_completed_total[5m]) + rate(node_disk_writes_completed_total[5m]))
+        requestBody: 'query=sum(rate(node_disk_reads_completed_total[5m]) %2B rate(node_disk_writes_completed_total[5m]))'
+        mappings:
+          - field: data.result.0.value.1
+            label: iops
+            format: number
+
+    - search:
+        provider: duckduckgo
+        target: _blank
+
+  # --- unused, but must exist (see header) --------------------------------
+  # This set is not a judgement call: it is upstream's src/skeleton listing.
+  # Leaving any one out produced a startup error rather than a missing feature —
+  # Homepage tried to copy that file's default into /app/config and got EROFS,
+  # because a ConfigMap is read-only:
+  #   Failed to initialize required config: /app/config/proxmox.yaml
+  #   Reason: EROFS: read-only file system, copyfile '/app/src/skeleton/proxmox.yaml'
+  settings.yaml: ""
+  docker.yaml: ""
+  proxmox.yaml: ""
+  custom.css: ""
+  custom.js: ""

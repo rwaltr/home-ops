@@ -1,0 +1,123 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Parakeet TDT 0.6B v3 (STT) — Assist's ears, replacing wyoming-whisper.
+#
+# Why Parakeet over whisper small-int8: CC BY 4.0, 25 European languages with
+# auto-detection, punctuation + capitalisation built in, word/segment
+# timestamps, and a lower WER than whisper-large-v3 at CPU speed. INT8 is
+# ~639MB (fp32 is 2.43GB) and loses nothing measurable — published WER is
+# 1.67% int8 vs 1.72% fp32.
+#
+# One container serves BOTH protocols, which is the point:
+#   tcp://parakeet.default.svc.cluster.local:10300   Wyoming  -> Home Assistant
+#   http://parakeet.default.svc.cluster.local:10301/v1/audio/transcriptions
+#                                                    OpenAI   -> litellm, if wanted
+# So HA does not need a Wyoming->OpenAI shim, and litellm can drop the whisper
+# copy from speaches when its `whisper` model_list entry is repointed here.
+#
+# The image is a community build (gargomoma/parakeet-docker) around the
+# istupakov ONNX export; it is digest-pinned below. It runs as root by default
+# — non-root and read-only-rootfs have NOT been verified the way
+# wyoming-whisper's were, so only escalation/privileges are locked down here.
+#
+# Model weights land in /models (the image sets XDG_CACHE_HOME=/models) on
+# first start, ~639MB, which the startup probe budget covers. Weights are
+# re-downloadable, so no kopiur backup.
+#
+# NOT enabled, worth knowing:
+#   -q none          fp32 weights (2.43GB) — no accuracy gain in published WER
+#   --openai-uri none   disable the OpenAI port entirely
+#   --max-audio-seconds, default 30 — longer audio is trimmed
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: parakeet
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: parakeet
+  values:
+    fullnameOverride: parakeet
+    controllers:
+      parakeet:
+        strategy: Recreate # single RWO models PVC
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/gargomoma/parakeet-docker
+              tag: latest@sha256:99363e05766919726fbae4b91657c1ad22a77df0a3768320476216c45cdbf4eb
+            # All of these are the image defaults; they are passed explicitly so
+            # the quantization the PVC is sized against is visible in the diff.
+            args:
+              - --uri
+              - tcp://0.0.0.0:10300
+              - --openai-uri
+              - http://0.0.0.0:10301
+              - --quantization
+              - int8
+            env:
+              TZ: America/Chicago
+              PYTHONDONTWRITEBYTECODE: "1"
+            probes:
+              # Wyoming is a TCP protocol, not HTTP — the chart's default
+              # httpGet probe would crash-loop the pod.
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: &port 10300
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: *port
+                  # Generous: the first start downloads ~639MB of weights.
+                  failureThreshold: 60
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 1
+                memory: 512Mi
+              limits:
+                # int8 encoder + decoder resident (~639MB) plus onnxruntime
+                # scratch. fp32 (2.43GB) would need this raised.
+                memory: 2Gi
+    service:
+      app:
+        controller: parakeet
+        ports:
+          wyoming:
+            port: *port
+          # OpenAI-compatible transcriptions; unused until litellm is repointed.
+          openai:
+            port: 10301
+    persistence:
+      models:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 2Gi
+        storageClass: openebs-hostpath
+        globalMounts:
+          - path: /models
+      tmp:
+        type: emptyDir

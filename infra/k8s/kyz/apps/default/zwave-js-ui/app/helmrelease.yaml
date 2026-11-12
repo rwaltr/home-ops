@@ -75,6 +75,12 @@ spec:
     route:
       app:
         annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: Z-Wave JS UI
+          gethomepage.dev/description: Z-Wave to MQTT bridge
+          gethomepage.dev/group: Smart Home
+          gethomepage.dev/icon: zwavejs2mqtt.png
           gatus.home-operations.com/endpoint: |-
             conditions: ["[STATUS] == 200"]
         hostnames:

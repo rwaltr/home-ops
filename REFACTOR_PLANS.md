@@ -626,6 +626,23 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 
 ## Session log
 
+### 2026-11-09 — litellm proxy memory ceiling raised from its measured peak
+
+- **litellm's `app` container OOMKilled under concurrent chat load** (2026-11-09
+  03:02 UTC), restarting twice in 32h. `container_memory_working_set_bytes` over
+  30d read p95 **507Mi** and peak **511Mi** against a **512Mi** limit — the
+  ceiling sat ~1MiB above the observed peak, so a request burst tripped it. This
+  is the same shape as the reloader page (#974/#975): a limit authored as a
+  round number, never re-measured against the workload's own demand.
+- **Fix**: request 256Mi -> **512Mi** (the p95), limit 512Mi -> **1Gi** (2x the
+  peak). `docs/local-llm.md` carries the numbers; the manifest comment records
+  them where the next digest bump will read them.
+- **The 512Mi cap already had a history**: the 2026-10-12 `main-stable` digest
+  (`c169fb3`) OOMKilled at startup against it; the pinned `625981c` survived
+  start-up but not steady-state load. A future digest bump must re-measure, not
+  assume the old headroom.
+- Routine alert review; one pushover send in the window, within the 3/day target.
+
 ### 2026-09-11 — Tesla key host, Matter VLAN presence, VIP firewall fix, Frigate
 
 - **Tesla Fleet integration live**: keypair (EC P-256) in 1P `tesla-fleet` +
@@ -811,6 +828,23 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   reverted back to the slim stack. Revisit later (try a fresh node/containerd
   or `crictl rmi`/GC the stuck ingest).
 - **Public exposure relies on Immich's own auth** (no CF Access in front).
+- **Video playback hung for external users** (2026-11-10). Two independent
+  faults were involved.
+  - **The real one — gateway route timeout.** Untimed HTTPRoutes inherit Envoy's
+    15 s default route timeout, so any response that streams longer than 15 s is
+    silently truncated. Measured: a 1.33 GB video died at exactly 15.0 s through
+    `envoy-internal` when throttled (and via CF), while sub-15 s media
+    completed — hence "some videos" failing. Fixed by `timeout.http.requestTimeout:
+    0s` on the shared `BackendTrafficPolicy/envoy` (`envoy.yaml`); the stream
+    idle timeout still reaps dead connections.
+  - **QUIC connector stalls.** The cloudflared connector also used the default
+    QUIC edge protocol, whose connection-level flow-control credit (`MAX_DATA`)
+    intermittently stalls while the edge keeps routing requests to it
+    (cloudflared#1767, #1519; signature `stream N canceled by remote with error
+    code 0` + repeated QUIC reconnects). Forced `--protocol http2` in the
+    cloudflare-tunnel args; verify with `grep protocol=` (expect `protocol=http2`).
+  - LAN traffic never touches the tunnel, but it *does* cross the gateway — the
+    timeout affected internal playback too.
 
 ### 2026-09-22 — OTBR moved in-cluster; HA zeroconf needed per-VLAN enablement
 
@@ -1785,6 +1819,213 @@ intent and a per-name list of implementation on RouterOS — worth knowing befor
 the approach is written into a runbook, not after. And a deliberate blackhole
 beats a silent one: an unreachable route fails fast and falls back, a route that
 swallows packets turns a lost alert into a 12-second stall and a lost page.
+
+### 2026-11-10 — Paperless-ngx deployed (paperless.waltr.tech, internal only)
+
+New document archive in `apps/default/paperless`: app + valkey broker +
+gotenberg + tika, SQLite, `media`/`consume` on tank hostPaths, `data` (SQLite
+DB + index) on a kopia-backed PVC. Internal-only on purpose — email and
+personal documents have no business being internet-reachable. Full notes in
+`docs/paperless.md`.
+
+Decisions worth recording:
+
+- **Paperless does not require Postgres.** SQLite is upstream's default and
+  Postgres is only *recommended* for multi-user/high-throughput installs.
+  Chose SQLite for the same reason as FreshRSS (2026-10-08): no database
+  service to keep, back up and reconcile.
+- **It is not a one-way door.** `document_exporter`/`document_importer` switch
+  engines; the catches are that versions must match exactly and the import
+  target must be empty. Recorded so a future CNPG move doesn't read as a
+  rebuild.
+- **Tika + Gotenberg are mandatory here, not optional.** They are what ingests
+  email (`.eml`), one of the three primary inputs (email, PDF, images). PDFs
+  and images alone would not need them. Both endpoints live under the Tika
+  namespace — `PAPERLESS_TIKA_GOTENBERG_ENDPOINT`, not
+  `PAPERLESS_GOTENBERG_ENDPOINT`; the wrong name fails silently.
+- **The CNPG/shared-postgres detour was researched and declined for now.** If a
+  second app needs Postgres, CNPG with the 1.29+ extension-image mechanism
+  (`tensorchord/vchord-scratch:pg17-v1.1.1` + a standard pg17 image, plus a
+  declarative `Database.extensions`) can host immich's vectorchord DB without a
+  custom image or superuser. That still means a 153MB pg_dump/restore and
+  moving immich's backups off the kopia PVC policy onto CNPG/Barman — not worth
+  it for one database.
+- **Gotchas:**
+  - The admin env (`PAPERLESS_ADMIN_USER`/`PAPERLESS_ADMIN_PASSWORD`) creates
+    the superuser **once** — the image skips it if any superuser exists, and it
+    does not reset the password on restart. The 1P value is a first-run record,
+    not a live credential.
+  - `PAPERLESS_URL` is required behind the gateway or the login POST fails CSRF
+    verification; it seeds ALLOWED_HOSTS, CORS and CSRF origins in one setting.
+  - hostPaths use `DirectoryOrCreate` and the root entrypoint chowns them to
+    1000:1000, so there is no manual host `mkdir` step (unlike immich's
+    library).
+
+### 2026-11-10 (later) — Paperless AI: Qwen3-32B generation, local embeddings
+
+Turned on Paperless' native AI (3.0+) and recorded the decisions:
+
+- **Generation on `nvidia-llama`** (self-hosted **Qwen3-32B**, 151k ctx) via the
+  local LiteLLM → Dan Manners' shared gateway. `deepseek-v4.1-flash` was only
+  the path of least resistance; Qwen3-32B is a stronger instruction model and
+  costs nothing. Verified it returns valid suggestion JSON with its thinking
+  separated into `reasoning_content`.
+- **Embeddings local** (`huggingface`, `all-MiniLM-L6-v2`) in-process — the
+  image ships torch/sentence-transformers, so no second backend, no key, and
+  document text stays in the cluster for the RAG index. Cache on the tank, not
+  the kopia-backed data PVC (weights are re-downloadable; ~90MB).
+- **Checked the friend's gateway before sending documents.** Content is *not*
+  retained (`store_prompts_in_spend_logs` unset → false; rows return
+  `messages={}`), but metadata is retained forever
+  (`maximum_spend_logs_retention_period` unset). Details in `docs/local-llm.md`.
+- **The key is admin-level** on his proxy (global `/spend/logs`, `/config/list`
+  both answer). Metadata exposure was accepted; worth scoping to a virtual key
+  if that ever changes.
+
+### 2026-11-11 — Paperless: keep everything, no triage, seed the accounting config
+
+Three decisions, and the seed that implements them:
+
+- **Retention = permanent.** No retention field, no expiry, no scheduled deletes.
+  The "is this one important?" burden comes from the inbox-triage pattern, not
+  from retention, so that pattern is not adopted at all — no `inbox` tag, no
+  review pass. Search is the filing system.
+- **Paperless config lives in the DB, not Git.** Document types, tags, custom
+  fields and workflows survive restarts but not a config wipe. `mise run
+  paperless:seed` (`scripts/paperless_seed.py`) re-applies them through the REST
+  API, idempotently by name — the same lesson as Sonarr's release profiles, but
+  handled instead of written down.
+- **Only invoice/receipt marking is automated**, because that is the one thing
+  the Beancount bridge needs (issue #988): two `Document Added` workflows match
+  the OCR text and assign the document type + `accounting/inbox` tag. Receipt
+  runs after invoice so a receipt that also says "invoice" lands as `Receipt`.
+  Custom fields are *not* auto-filled — the AI-suggestion action does not cover
+  them, so `Total`/`Invoice Number` come from the bridge or by hand.
+
+### 2026-11-11 (later) — Paperless tags: a provenance trail, not decoration
+
+The first pass was too thin (document types plus one `accounting/inbox` tag).
+Revised to a provenance trail across two namespaces after grilling the model:
+
+- **`status/*` is processing, `accounting/*` is ledger.** `status/inbox` is a
+  real `is_inbox_tag`, stamped on every new document and removed by the
+  classification workflow _in the same consume_ — deliberately transient, so it
+  is an error signal (a workflow failed), not a to-do list.
+  `status/ai-enriched` marks documents the LLM classified.
+- **The AI is the primary classifier.** The rules only catch invoices and
+  receipts, so everything else goes to the LLM, which types it from a nine-type
+  list and creates correspondents as needed. `ai_create_missing` is global (it
+  can invent a type too) — accepted, since it is the only way to get
+  correspondents at all.
+- **Paperless sets `accounting/unlinked`; the bridge owns the match.** Workflow
+  mutations do not re-fire `document_updated`, so a follow-up Added/Updated
+  workflow cannot catch AI-typed financial documents. The rules tag unlinked
+  immediately and a scheduled (hourly) workflow sweeps the rest by type. The
+  bridge only removes `unlinked` and adds `beancounted` on a match (issue #988).
+- **No OCR tag.** Paperless stores no "was OCRed" flag; it would need a
+  post-consume script comparing the original against the OCR'd archive.
+  Deferred.
+- **Transient inbox, no backstop.** If the LLM is down the document keeps
+  `status/inbox`; there is no retry. Accepted for now.
+- **The AI action is asynchronous.** It queues `apply_ai_suggestions`, so
+  `status/ai-enriched` is assigned when the workflow _dispatches_ the AI, not
+  when it finishes. A failed AI task leaves `ai-enriched` with no document type.
+  The task deliberately does not fire `document_updated` (`documents/tasks.py:793`,
+  "to avoid loop"), so there is no hook to tag on completion — the optimistic
+  assignment is the pragmatic choice.
+
+Still permanent retention, still no manual triage. The superseded
+`accounting/inbox`/`accounting/attached` tags are deleted by the seed.
+
+### 2026-11-11 (later still) — Paperless receipt metadata: call the AI directly
+
+- **Paperless' AI action cannot write custom fields.** `AISuggestionField` stops
+  at `created`, and `documents/workflows/ai.py` never touches
+  `document.custom_fields`. So "let the AI extract the total" is not a setting —
+  it is our own LLM call. A 5-minute CronJob (`paperless-extract`) asks
+  `nvidia-llama` for total/currency/card/reference and PATCHes the document. It
+  skips documents that already have a `Total`, so it only fills blanks.
+- **Qwen3-32B is a reasoning model.** With the default chat template it spent
+  the whole token budget on reasoning and returned `content: null` for a receipt
+  whose OCR read `TOTAL: $155. uu`. `chat_template_kwargs.enable_thinking=false`
+  fixes it (46 tokens, valid JSON).
+- **Fields reworked:** `Invoice Number` → `Reference` (invoice or transaction
+  id), `Date Paid` dropped (the document `created` date already holds the
+  transaction date), `Payment method` added.
+- **No separate `Currency` field.** Paperless monetary fields carry the currency
+  in the value (`CAD155.11`) and expose a generated amount, so `Currency` was
+  redundant and is deleted by the seed.
+- **In-cluster jobs use the service URL** (`paperless-app.default.svc.cluster.local`),
+  not the ingress name: the AAAA is unreachable from the LAN and Python has no
+  Happy Eyeballs.
+
+### 2026-11-10 (later) — Homebox intake: MCP server, Companion, and which vision model to trust
+
+Homebox had an API-key integration surface and nothing using it. Added both, and
+measured the models before picking one.
+
+- **homebox-mcp is not a cluster workload.** pi spawns `dgahagan/homebox-mcp`
+  (`uvx`) over stdio from `.pi/mcp.json`, with `HOMEBOX_URL` + `HOMEBOX_TOKEN`
+  from fnox (1P `homebox-mcp`/`API_KEY`). 39 tools, verified live against
+  0.27.1 — `list_locations`, `list_tags`, `inventory_stats` all answer. It can
+  also write (`create_item`, `delete_item`, `import_csv`), which is the point
+  and also the risk.
+- **A separate 1P item, not a field on `homebox`.** That item holds
+  `api_key_pepper` — the HMAC secret every issued key is hashed with. Rotating
+  it invalidates every key; adding a client credential next to it invites
+  exactly that mistake.
+- **homebox-companion runs internal-only with an emptyDir `/app/data`.** Its
+  `docs` warn that anyone who can reach the UI acts as its Homebox key's owner,
+  and it writes inventory — so no `envoy-external` parentRef, and its own
+  `hb_…` key (1P `homebox-companion`, field `credential` — it is an API
+  Credential item, and guessing `api_key` cost a `secrets:verify` round trip)
+  so revocation is independent of the MCP server's. EmptyDir because its only
+  persistent state is UI-saved model/field preferences, and those would
+  disagree with git.
+- **Measured on a real 49s walkthrough (49 frames @1fps, 720px) plus one native
+  video call**, same prompt, `qwen3.8-omni-flash` vs `gpt-5.6-luna`:
+
+  |                              | qwen3.8-omni-flash | gpt-5.6-luna |
+  | ---------------------------- | ------------------ | ------------ |
+  | frames parsed (fair budget)  | 49/49              | 49/49        |
+  | book titles vs the covers    | 3/3 exact          | 2/3 + 0.95   |
+  | frame ISBN-13 check digits   | 3/4 valid          | 3/4 valid    |
+  | avg / worst frame            | 19.3s / 96.7s      | 9.0s / 18.1s |
+  | tokens over 49 frames        | 121,565            | 84,106       |
+  | native video (with audio)    | 20 items, 1 call   | HTTP 404     |
+
+  Chose qwen for companion (titles exact, cheaper output, and the only one that
+  can take video/audio) despite the latency, and added both aliases to
+  `litellm-config` so Settings can switch without a deploy.
+- **One native-video call beat 49 image calls**: 26,745 tokens (~$0.004) for the
+  whole clip, 20 items, versus 121.5k/84.1k tokens for the frame passes. It also
+  read the narration — prices and "tag removed" — which no frame contains. That
+  is the shape of the walkthrough-intake route: video → items → `import_csv`.
+- **Lessons, in the order they bit:**
+  - **An output-token cap looks exactly like a model failure.** Capping at 700
+    tokens truncated JSON in 19 frames (luna) and 3 (qwen); with 2500 both are
+    49/49. Check the budget before concluding a model can't produce structured
+    output.
+  - **Low resolution makes anything hallucinate.** Reading a 240px contact
+    sheet, I called *Da Freebooterz Code* (Justin Woolley) "Da Freedom Code" by
+    "Justin Kojima" — invented author, wrong title. At 720px both models read it
+    correctly. Frame size is a correctness setting, not a bandwidth one.
+  - **Model priors fill fields the image never showed.** qwen attributed the
+    book to "Callisto Publishing"; the imprint on the cover is Rockridge Press
+    and the ISBN resolves to Rockridge. Treat `manufacturer`/publisher as
+    suspect unless the frame shows it.
+  - **Barcodes are readable but not reliable** — and ISBN-13 gives an objective
+    test. Both models produced one bad check digit from frames; the video pass
+    validated 3/3. Validate, then prefer the video for identifiers.
+  - **The audio track is where serials and prices live.** A narrated walkthrough
+    is unreadable from stills alone; check for an audio stream
+    (`ffprobe`) before deciding a clip is only worth frames.
+
+**Field names are part of the interface.** The companion key lives in 1Password
+item `homebox-companion`, field **`credential`** — an API Credential item, so
+that is the field the UI gives you. An ExternalSecret pointing at a field the
+item does not have fails only as an empty Secret at runtime, but
+`mise run secrets:verify` catches it before the cluster does.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 

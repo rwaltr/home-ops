@@ -1,0 +1,65 @@
+# home-ops project secrets — references only, never values.
+#
+# Layers over the global ~/.config/fnox/config.toml, which defines the providers
+# (op, keychain) and the machine-wide secrets. Put a secret here only when it is
+# used exclusively by home-ops project tooling; keep general ones global.
+
+# Read by the Cloudflare provider (CLOUDFLARE_API_TOKEN) via `fnox exec` in the
+# tf:* mise tasks. Deliberately not in [mcp].secrets — only terraform needs it.
+[secrets.CLOUDFLARE_API_TOKEN]
+provider = "op"
+value = "cloudflare/CLOUDFLARE_ACCOUNT_TOKEN"
+description = "Scoped Cloudflare API token for Terraform"
+
+# The trust credential the tailscale and bootstrap workspaces log in with. Made
+# by hand once in the Tailscale admin console — Terraform cannot create the
+# credential it authenticates as — then stored in 1Password like everything else.
+[secrets.TAILSCALE_OAUTH_CLIENT_ID]
+provider = "op"
+value = "tailscale-bootstrap/client_id"
+description = "Tailscale OAuth client ID for Terraform"
+
+[secrets.TAILSCALE_OAUTH_CLIENT_SECRET]
+provider = "op"
+value = "tailscale-bootstrap/client_secret"
+description = "Tailscale OAuth client secret for Terraform"
+
+[secrets.PORKBUN_API_KEY]
+provider = "op"
+value = "porkbun/apikey"
+description = "Porkbun API key (Terraform nameserver delegation)"
+
+[secrets.PORKBUN_SECRET_KEY]
+provider = "op"
+value = "porkbun/secretkey"
+description = "Porkbun secret API key (Terraform nameserver delegation)"
+
+[secrets.RADARR_API_KEY]
+provider = "op"
+value = "arr/radarr"
+description = "Radarr API key (mcp-arr-server)"
+
+[secrets.SONARR_API_KEY]
+provider = "op"
+value = "arr/sonarr"
+description = "Sonarr API key (mcp-arr-server)"
+
+[secrets.GRAFANA_TOKEN]
+provider = "op"
+value = "grafana/GRAFANA_TOKEN"
+description = "Grafana service account token (mcp-grafana)"
+
+# `mise run paperless:seed`. Paperless keeps document types, tags, custom
+# fields and workflows in its database, not Git, so the seed is re-applied
+# through the API rather than depending on remembered clicks.
+[secrets.PAPERLESS_API_TOKEN]
+provider = "op"
+value = "paperless/api_token"
+description = "Paperless-ngx API token (paperless:seed)"
+# Client credential, not server config: the `homebox` item holds the API key
+# pepper the server HMACs keys with, and adding this key there would invite
+# rotating the wrong field. Issued one-time in HomeBox Profile → API Keys.
+[secrets.HOMEBOX_TOKEN]
+provider = "op"
+value = "homebox-mcp/API_KEY"
+description = "HomeBox API key (hb_…) for the agent MCP server"

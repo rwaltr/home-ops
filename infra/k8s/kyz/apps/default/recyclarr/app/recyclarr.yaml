@@ -38,7 +38,11 @@ sonarr:
         rename: true
         standard: default
       season: default
-      series: plex-imdb
+      # jellyfin-tvdb, not plex-imdb: Jellyfin only reads provider ids in
+      # square brackets ([tvdbid-...]); the Plex {imdb-...} form is what it
+      # reserves for {edition-...}, so matching falls back to title parsing and
+      # a bad parse leaves an item with no metadata forever. See jellyfin-metadata.md.
+      series: jellyfin-tvdb
     quality_definition:
       type: series
     quality_profiles:
@@ -175,8 +179,10 @@ radarr:
     media_naming:
       movie:
         rename: true
-        standard: plex-imdb
-      folder: plex-imdb
+        # jellyfin-tmdb: folder/file carry [tmdbid-...], which Jellyfin matches
+        # by id instead of by title. See the sonarr note above.
+        standard: jellyfin-tmdb
+      folder: jellyfin-tmdb
     quality_definition:
       type: movie
     quality_profiles:

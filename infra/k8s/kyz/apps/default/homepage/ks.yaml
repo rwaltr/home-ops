@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: homepage
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/homepage/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  # No PVC and no dependsOn on openebs: every config file is a ConfigMap and the
+  # only writable path is an emptyDir for logs. Nothing here is state, so nothing
+  # here needs a kopiur component either — this is the one app whose entire
+  # desired state is the git repo it is declared in.
+  wait: false

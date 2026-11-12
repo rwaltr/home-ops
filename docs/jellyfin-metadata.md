@@ -129,6 +129,48 @@ curl -sf -X POST "${H[@]}" -H "Content-Type: application/json" \
 Note `GET /Items/{id}` returns nothing useful here; use
 `/Users/{userId}/Items/{id}` to fetch the DTO.
 
+## Items that never match (blank metadata)
+
+Jellyfin only retries a provider match on the **first** import. If that first
+match fails, the item keeps the raw folder name as its title, gets no
+`ProviderIds`, and every later scan/refresh repeats the same failed lookup
+(refresh reuses the stored name; it does not re-parse the path). The item stays
+blank forever unless a **forced** refresh runs.
+
+Two things made this happen repeatedly:
+
+1. **Naming.** Radarr/Sonarr were set to the Plex preset
+   (`{Movie CleanTitle} ({Release Year}) {imdb-…}`). Jellyfin's provider-id
+   syntax is square brackets (`[tmdbid-…]`, `[tvdbid-…]`); the `{…}` form is what
+   it reserves for `{edition-…}`, so Jellyfin has no id to match on and falls
+   back to parsing the title — which includes the year and id token when the
+   parse goes wrong.
+2. **No retry.** A transient TMDb failure on first import leaves the item stuck
+   with no self-healing path.
+
+### Fix (durable)
+
+`recyclarr.yaml` now uses the Jellyfin presets: `jellyfin-tmdb` (movies) and
+`jellyfin-tvdb` (series), so new imports carry an id Jellyfin matches directly.
+This only affects new/renamed items — existing stuck rows need a forced refresh
+(no automatic sweep is deployed).
+
+Forced refresh for a single item:
+
+```bash
+curl -sf -X POST "${H[@]}" \
+  "${BASE}/Items/${ITEM_ID}/Refresh?metadataRefreshMode=FullRefresh&imageRefreshMode=Default&replaceAllMetadata=true&replaceAllImages=false&regenerateTrickplay=false"
+```
+
+### Audio track defaulting
+
+Related gotcha: Jellyfin's per-user **"Play default audio track regardless of
+language"** (`PlayDefaultAudioTrack`) makes it honour the _file's_ flagged
+default track. Multi-audio releases often flag the foreign dub as default, so a
+non-English track plays even when an English one exists. Unset it and set
+`AudioLanguagePreference` to `eng` per user (Dashboard → Playback) — at the cost
+of foreign films with an English dub playing the dub.
+
 ## Verifying alignment
 
 Compare Jellyfin episodes against Sonarr per season/episode. Ignoring
@@ -148,3 +190,4 @@ curl -s "${H[@]}" "${BASE}/Shows/${SERIES_ID}/Episodes"
   declared there; it is installed at runtime and captured by the Kopia backup).
 - Library repair notes for Thomas & Friends (mixed-folders / mislabelled files)
   are in the git history around 2026-09.
+- `recyclarr.yaml` — naming presets (Jellyfin presets since 2026-11).

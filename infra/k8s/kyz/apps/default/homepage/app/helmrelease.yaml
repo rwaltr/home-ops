@@ -1,0 +1,176 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Homepage — the dashboard for everything in this cluster, plus the handful of
+# things that are not.
+#
+# Discovery is ANNOTATION-driven, not automatic: Homepage lists HTTPRoutes and
+# renders the ones carrying `gethomepage.dev/enabled: "true"`. An unannotated
+# route is invisible. That is the point — the dashboard's contents are declared
+# next to each route in git, so a service cannot appear on the dashboard without
+# someone deciding it should. docs/homepage.md has the annotation contract.
+#
+# Internal-only (envoy-internal). Homepage reads the cluster with the pod's
+# service account token and, once HOMEPAGE_MCP_ENABLED is set, can read every
+# configured service credential — it must not be internet-reachable.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: homepage
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: homepage
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: homepage
+    # The chart renders the ServiceAccount; rbac.yaml binds the ClusterRole to
+    # this exact name. A single enabled serviceAccount is picked up by the
+    # controller automatically.
+    serviceAccount:
+      homepage:
+        enabled: true
+        forceRename: homepage
+    controllers:
+      homepage:
+        annotations:
+          # Bumps here (not strictly needed): config lives in the ConfigMap this
+          # repo owns, so a config change should not wait for a pod roll.
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/gethomepage/homepage
+              tag: v2.7.0@sha256:19c5c09184458a41b7b5915e71463a39f36cd33540f41bdbed008791b8182d5f
+            env:
+              TZ: America/Chicago
+              MY_POD_IP:
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+              # The pod's own IP has to be in this list because the kubelet probe
+              # reaches :3000 by pod IP and the Host check runs on every request;
+              # the second entry is the browser's.
+              #
+              # `dependsOn` is load-bearing, not decoration. app-template renders
+              # an env *map* in alphabetical order (Helm sorts dict keys), so
+              # without it HOMEPAGE_ALLOWED_HOSTS renders BEFORE MY_POD_IP,
+              # $(MY_POD_IP) never expands, the value stays literal, and the
+              # probe fails host validation with a 400 — the pod then never goes
+              # Ready. dependsOn invokes the chart's Kahn sort to force the order.
+              HOMEPAGE_ALLOWED_HOSTS:
+                dependsOn: MY_POD_IP
+                value: "$(MY_POD_IP):3000,homepage.waltr.tech"
+              # Default writes to stdout AND a file. File is pointless here and
+              # is why there is an emptyDir at /app/config/logs — kubectl logs
+              # is where a homelab reads them.
+              LOG_TARGETS: stdout
+            probes:
+              # /api/healthcheck is the image's own HEALTHCHECK target.
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/healthcheck
+                    port: &port 3000
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 5
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/healthcheck
+                    port: *port
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Safe because every config file is supplied and logs go to an
+              # emptyDir. Homepage copies a default into place for any config
+              # file it cannot find, and /app/config is a read-only ConfigMap —
+              # so a missing key is a startup error, not a blank dashboard. Every
+              # one of upstream's nine src/skeleton files is therefore both a
+              # ConfigMap key AND a mount below. See the ConfigMap header.
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+                memory: 128Mi
+              limits:
+                # Next.js standalone server; no CPU limit (page renders are
+                # bursty and a quota throttles below 100% on a node with no swap).
+                memory: 512Mi
+    defaultPodOptions:
+      # Was false in every other app here for good reason: nothing else talks to
+      # the API. Homepage's `mode: cluster` reads the token this mounts, and the
+      # ClusterRole above is read-only, so the blast radius is "can list routes".
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: homepage
+        ports:
+          http:
+            appProtocol: http
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+        hostnames:
+          - homepage.waltr.tech
+        parentRefs:
+          # Internal only: no envoy-external parentRef. See the header.
+          - name: envoy-internal
+            namespace: network
+    persistence:
+      # Mounted per file rather than as a directory: shadowing /app/config
+      # wholesale would hide whatever the image ships there.
+      config:
+        type: configMap
+        name: homepage-config
+        globalMounts:
+          - path: /app/config/kubernetes.yaml
+            subPath: kubernetes.yaml
+          - path: /app/config/services.yaml
+            subPath: services.yaml
+          - path: /app/config/bookmarks.yaml
+            subPath: bookmarks.yaml
+          - path: /app/config/widgets.yaml
+            subPath: widgets.yaml
+          - path: /app/config/settings.yaml
+            subPath: settings.yaml
+          - path: /app/config/docker.yaml
+            subPath: docker.yaml
+          - path: /app/config/proxmox.yaml
+            subPath: proxmox.yaml
+          - path: /app/config/custom.css
+            subPath: custom.css
+          - path: /app/config/custom.js
+            subPath: custom.js
+      # Nested inside the config dir on purpose: this is the only path Homepage
+      # writes to at runtime.
+      logs:
+        type: emptyDir
+        globalMounts:
+          - path: /app/config/logs

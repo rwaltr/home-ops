@@ -1,0 +1,153 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/configmap
+# Example ledger — not real finances, and not "close enough to be mistaken for
+# real". It exists so the UI has something in every view: opening balances, five
+# months of payroll and spending, one VTI purchase with cost basis, a price
+# series, and a closing balance assertion that actually checks something.
+#
+# `option "title"` is not cosmetic: Fava derives the first URL path segment from
+# it, so the UI lives at /beancount/. Set it deliberately when the real ledger
+# lands, or every URL changes underneath you.
+#
+# Replacing this file is how the real ledger gets deployed, once that decision
+# is made. See docs/beancount-stack.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: beancount-stack-example
+data:
+  ledger.beancount: |
+    option "title" "beancount"
+    option "operating_currency" "USD"
+
+    1980-01-01 commodity USD
+    2020-01-01 commodity VTI
+
+    2026-01-01 open Equity:Opening-Balances
+    2026-01-01 open Assets:US:Chase:Checking      USD
+    2026-01-01 open Assets:US:Fidelity:Brokerage  USD,VTI
+    2026-01-01 open Income:US:Acme:Salary         USD
+    2026-01-01 open Income:US:Fidelity:Dividends  USD
+    2026-01-01 open Expenses:Food:Groceries       USD
+    2026-01-01 open Expenses:Food:Restaurants     USD
+    2026-01-01 open Expenses:Home:Utilities       USD
+    2026-01-01 open Expenses:Financial:Fees       USD
+
+    ; opening balances
+    2026-01-01 * "Opening balance" "checking"
+      Assets:US:Chase:Checking                12500.00 USD
+      Equity:Opening-Balances                -12500.00 USD
+
+    2026-01-01 * "Opening balance" "brokerage, 40 shares at cost"
+      Assets:US:Fidelity:Brokerage               40 VTI {250.00 USD}
+      Equity:Opening-Balances                -10000.00 USD
+
+    ; payroll, monthly
+    2026-06-30 * "Acme Corp" "Payroll"
+      Assets:US:Chase:Checking                 6200.00 USD
+      Income:US:Acme:Salary                   -6200.00 USD
+
+    2026-07-31 * "Acme Corp" "Payroll"
+      Assets:US:Chase:Checking                 6200.00 USD
+      Income:US:Acme:Salary                   -6200.00 USD
+
+    2026-08-31 * "Acme Corp" "Payroll"
+      Assets:US:Chase:Checking                 6200.00 USD
+      Income:US:Acme:Salary                   -6200.00 USD
+
+    2026-09-30 * "Acme Corp" "Payroll"
+      Assets:US:Chase:Checking                 6200.00 USD
+      Income:US:Acme:Salary                   -6200.00 USD
+
+    2026-10-30 * "Acme Corp" "Payroll"
+      Assets:US:Chase:Checking                 6200.00 USD
+      Income:US:Acme:Salary                   -6200.00 USD
+
+    ; groceries
+    2026-07-03 * "Whole Foods" "Groceries"
+      Expenses:Food:Groceries                   412.55 USD
+      Assets:US:Chase:Checking                 -412.55 USD
+
+    2026-07-18 * "H Mart" "Groceries"
+      Expenses:Food:Groceries                   288.40 USD
+      Assets:US:Chase:Checking                 -288.40 USD
+
+    2026-08-04 * "Whole Foods" "Groceries"
+      Expenses:Food:Groceries                   397.12 USD
+      Assets:US:Chase:Checking                 -397.12 USD
+
+    2026-08-21 * "H Mart" "Groceries"
+      Expenses:Food:Groceries                   301.66 USD
+      Assets:US:Chase:Checking                 -301.66 USD
+
+    2026-09-05 * "Whole Foods" "Groceries"
+      Expenses:Food:Groceries                   423.90 USD
+      Assets:US:Chase:Checking                 -423.90 USD
+
+    2026-09-19 * "H Mart" "Groceries"
+      Expenses:Food:Groceries                   275.18 USD
+      Assets:US:Chase:Checking                 -275.18 USD
+
+    2026-10-06 * "Whole Foods" "Groceries"
+      Expenses:Food:Groceries                   431.05 USD
+      Assets:US:Chase:Checking                 -431.05 USD
+
+    2026-10-20 * "H Mart" "Groceries"
+      Expenses:Food:Groceries                   296.77 USD
+      Assets:US:Chase:Checking                 -296.77 USD
+
+    ; dining out
+    2026-07-25 * "Pho Saigon" "Dinner"
+      Expenses:Food:Restaurants                  68.40 USD
+      Assets:US:Chase:Checking                  -68.40 USD
+
+    2026-08-15 * "Sushi Kyu" "Dinner"
+      Expenses:Food:Restaurants                  94.15 USD
+      Assets:US:Chase:Checking                  -94.15 USD
+
+    2026-09-27 * "Pho Saigon" "Dinner"
+      Expenses:Food:Restaurants                  71.80 USD
+      Assets:US:Chase:Checking                  -71.80 USD
+
+    ; utilities
+    2026-07-10 * "City Electric" "Electricity"
+      Expenses:Home:Utilities                   142.31 USD
+      Assets:US:Chase:Checking                 -142.31 USD
+
+    2026-08-11 * "City Electric" "Electricity"
+      Expenses:Home:Utilities                   168.05 USD
+      Assets:US:Chase:Checking                 -168.05 USD
+
+    2026-09-11 * "City Electric" "Electricity"
+      Expenses:Home:Utilities                   151.44 USD
+      Assets:US:Chase:Checking                 -151.44 USD
+
+    2026-10-12 * "City Electric" "Electricity"
+      Expenses:Home:Utilities                   133.98 USD
+      Assets:US:Chase:Checking                 -133.98 USD
+
+    ; brokerage
+    2026-07-09 * "Fidelity" "Buy 10 VTI"
+      Assets:US:Fidelity:Brokerage               10 VTI {260.00 USD}
+      Expenses:Financial:Fees                     4.95 USD
+      Assets:US:Chase:Checking                -2604.95 USD
+
+    2026-07-15 * "Fidelity" "VTI dividend"
+      Assets:US:Fidelity:Brokerage                0 VTI
+      Assets:US:Chase:Checking                    88.20 USD
+      Income:US:Fidelity:Dividends              -88.20 USD
+
+    2026-10-15 * "Fidelity" "VTI dividend"
+      Assets:US:Fidelity:Brokerage                0 VTI
+      Assets:US:Chase:Checking                   102.35 USD
+      Income:US:Fidelity:Dividends             -102.35 USD
+
+    ; prices
+    2026-06-30 price VTI 252.11 USD
+    2026-07-31 price VTI 261.84 USD
+    2026-08-31 price VTI 258.02 USD
+    2026-09-30 price VTI 268.47 USD
+    2026-10-30 price VTI 271.09 USD
+
+    ; assertions
+    2026-11-06 balance Assets:US:Fidelity:Brokerage    50 VTI

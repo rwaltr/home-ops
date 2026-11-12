@@ -196,6 +196,13 @@ spec:
             port: 4443
     route:
       app:
+        annotations:
+          # Listed on the Homepage dashboard — see docs/homepage.md.
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: degoog
+          gethomepage.dev/description: Web search without tracking
+          gethomepage.dev/group: Tools
+          gethomepage.dev/icon: degoog.png
         hostnames:
           - search.waltr.tech
         parentRefs:

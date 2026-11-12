@@ -1,0 +1,20 @@
+# gitleaks config for home-ops.
+#
+# Default ruleset plus an allowlist for the only hits the full-history scan
+# reports. Both groups are pre-2023 content in paths that were deleted from the
+# tree years ago: commented-out key material in the old kyz0 k0sctl cluster
+# specs, and a minecraft Secret manifest. Reviewed 2026-11-09 and intentionally
+# left in history — rewriting 3000+ commits (and invalidating every open PR)
+# is not worth it for dead content. Pinned by commit SHA, so anything new still
+# fails the scan.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deleted 2021-2022 content: kyz0 k0sctl specs + minecraft Secret manifests"
+commits = [
+  "2fd132603ed2b49cc34c3aeebe347ae479cbf84e",
+  "9e9e08af8705fe8c6f6d8885e1c78e541a8abc09",
+  "a1f2cce577094e44f65ee3f89f487173c394b042",
+  "cd2d540e52ddb536f2f500f8a52c875f3d5aabc1",
+]

@@ -1,0 +1,33 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: homebox
+spec:
+  components:
+    - ../../../../components/kopiur/backup
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/homebox/app
+  postBuild:
+    substitute:
+      APP: homebox
+      PVC: homebox-data
+      # The -rootless image runs as 65532, not 1000, so the mover needs the same
+      # uid to read the SQLite DB off the live PVC. Without this the snapshot
+      # fails with EACCES rather than a permissions error.
+      KOPIUR_RUNAS: "65532"
+      # Distinct hour (1-13 are taken by the media/calendar apps): the mover
+      # reads the live PVC — openebs-hostpath has no CSI snapshots — so one
+      # mover Job per hour avoids two of them racing for the same node.
+      KOPIUR_CRON: "H 14 * * *"
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  dependsOn:
+    - name: openebs # data PVC on the openebs-hostpath storage class
+      namespace: openebs
+  wait: false

@@ -1,0 +1,84 @@
+// Example/default ACLs for unrestricted connections.
+{
+    // Declare static groups of users. Use autogroups for all users or users with a specific role.
+    // "groups": {
+    //   "group:example": ["alice@example.com", "bob@example.com"],
+    // },
+
+    // Define the tags which can be applied to devices and by which users.
+    // "tagOwners": {
+    //   "tag:example": ["autogroup:admin"],
+    // },
+
+    // Define access control lists for users, groups, autogroups, tags,
+    // Tailscale IP addresses, and subnet ranges.
+    "acls": [
+        // Allow all connections.
+        // Comment this section out if you want to define specific restrictions.
+        {
+            "action": "accept",
+            "src":    ["*"],
+            "dst":    ["*:*"],
+        },
+    ],
+
+    // Define users and devices that can use Tailscale SSH.
+    "ssh": [
+        // Allow all users to SSH into their own devices in check mode.
+        // Comment this section out if you want to define specific restrictions.
+        {
+            "action": "check",
+            "src":    ["autogroup:member"],
+            "dst":    ["autogroup:self"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+    ],
+
+    "nodeAttrs": [
+        {
+            // Funnel policy, which lets tailnet members control Funnel
+            // for their own devices.
+            // Learn more at https://tailscale.com/kb/1223/tailscale-funnel/
+            "target": ["autogroup:member"],
+
+            "attr": ["funnel"],
+        },
+    ],
+
+    "disableIPv4": false,
+
+    "tagOwners": {
+        "tag:k8s-operator": ["autogroup:admin"],
+        // tag:k8s-operator must own tag:k8s, not just autogroup:admin: the
+        // Kubernetes operator creates the devices that carry this tag, and a tag
+        // can only be applied by one of its owners. Without it the operator
+        // installs cleanly and then fails at device creation.
+        "tag:k8s":          ["tag:k8s-operator", "autogroup:admin"],
+    },
+
+    // Lets the operator approve the tailnet services it exposes, instead of
+    // needing a manual approval for each one.
+    "autoApprovers": {
+        "services": {
+            "tag:k8s": ["tag:k8s"],
+        },
+        // The k8s operator's Connector advertises the cluster's LoadBalancer VIP
+        // range. Without this, its subnet routes sit unapproved until somebody
+        // clicks them in the console — which would make the operator's own
+        // capability depend on a human. tag:k8s is what the Connector device
+        // carries (the operator tags its proxies with it).
+        "routes": {
+            "10.10.100.0/24": ["tag:k8s"],
+            "fdad:207a:f1ab:100::/64": ["tag:k8s"],
+        },
+    },
+
+    // Test access rules every time they're saved.
+    // "tests": [
+    //   {
+    //       "src": "alice@example.com",
+    //       "accept": ["tag:example"],
+    //       "deny": ["100.101.102.103:443"],
+    //   },
+    // ],
+}

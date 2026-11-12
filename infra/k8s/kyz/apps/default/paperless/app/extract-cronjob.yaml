@@ -1,0 +1,86 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/batch/cronjob_v1.json
+#
+# Fills Total / Currency / Payment method / Reference on Invoice and Receipt
+# documents. Paperless' AI suggestion action cannot write custom fields —
+# AISuggestionField stops at the created date and documents/workflows/ai.py
+# never touches them — so this job asks the same LLM directly (nvidia-llama on
+# Dan's gateway via LiteLLM) and PATCHes the document through the API.
+#
+# Idempotent: a document that already has a Total is skipped, so a re-run only
+# fills blanks. The script lives in paperless_extract.py (configMapGenerator).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: paperless-extract
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: paperless-extract
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+            - name: extract
+              image: python:3.12-slim
+              command:
+                - python3
+                - /scripts/paperless_extract.py
+              env:
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+                - name: PAPERLESS_URL
+                  value: http://paperless-app.default.svc.cluster.local:8000
+                - name: PAPERLESS_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-secret
+                      key: PAPERLESS_API_TOKEN
+                - name: LITELLM_BASE_URL
+                  value: http://litellm.default.svc.cluster.local:4000/v1
+                - name: LITELLM_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: litellm-secret
+                      key: LITELLM_MASTER_KEY
+                - name: LITELLM_MODEL
+                  value: nvidia-llama
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: script
+              configMap:
+                name: paperless-extract
+                defaultMode: 0555
+            - name: tmp
+              emptyDir: {}

@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>immich-paperless — event-driven flow</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --you: #7ee787; --immich: #58a6ff; --bridge: #d2a8ff; --vision: #f0883e;
+    --paperless: #ffa657; --ledger: #79c0ff; --store: #3fb950; --host: #8b949e;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #ffffff; --panel: #f6f8fa; --line: #d0d7de; --text: #1f2328;
+            --muted: #59636e; --you: #1a7f37; --immich: #0969da; --bridge: #8250df;
+            --vision: #bc4c00; --paperless: #953800; --ledger: #0550ae; --store: #1a7f37; --host: #59636e; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding: 14px 20px 12px;
+  }
+  h1 { margin: 0 0 2px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .lat { margin: 2px 0 12px; color: var(--muted); font-size: 12.5px; }
+  .lat b { color: var(--you); }
+  .plan { background: rgba(240,136,62,0.16); color: var(--vision); border: 1px solid var(--vision);
+          border-radius: 999px; padding: 1px 8px; font-size: 11px; margin-left: 6px; white-space: nowrap; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select {
+    font: inherit; font-size: 12.5px; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--muted); }
+  button.on { border-color: var(--immich); color: var(--immich); }
+  button[aria-pressed="true"] { border-color: var(--immich); color: var(--immich); }
+  .play { display: flex; gap: 6px; align-items: center; }
+  .play button { border-radius: 8px; padding: 4px 10px; }
+  .lbl { color: var(--muted); font-size: 12.5px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 0; align-items: start; }
+  #wrap { overflow: auto; padding: 8px; }
+  /* Fit to the column by default: the whole flow at once is the point of a
+     workflow diagram, and the detail lives in the side panel. Zoom to read. */
+  svg { display: block; width: 100%; height: auto; }
+  aside {
+    position: sticky; top: 118px; margin: 8px 12px 24px 0; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    max-height: calc(100vh - 150px); overflow: auto; font-size: 13px;
+  }
+  aside h2 { margin: 0 0 2px; font-size: 14px; }
+  aside .who { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  aside p { margin: 0 0 10px; }
+  aside ul { margin: 0 0 10px; padding-left: 18px; }
+  aside li { margin-bottom: 4px; }
+  code { background: rgba(127,127,127,0.16); padding: 1px 5px; border-radius: 5px;
+         font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .status { min-height: 40px; border-top: 1px solid var(--line); padding-top: 9px; color: var(--muted); }
+  .status b { color: var(--text); font-weight: 600; }
+  .node { cursor: pointer; }
+  .node:focus-visible { outline: none; }
+  .node:focus-visible .box { stroke-width: 3; }
+  .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+  .node text { fill: var(--text); }
+  .n-title { font-size: 12.5px; font-weight: 600; }
+  .n-sub { font-size: 10.5px; fill: var(--muted); }
+  .n-actor { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .port { fill: var(--line); }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.4; }
+  .elabel { font-size: 10px; fill: var(--muted); text-anchor: middle;
+            paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+  .dim { opacity: 0.14; }
+  .on .box { stroke-width: 2.4; }
+  .hit { filter: drop-shadow(0 0 7px currentColor); }
+  .edge.hit { stroke-width: 2.4; }
+  .badge { font-size: 9px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } aside { position: static; margin: 8px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>immich-paperless <small>receipt photo → Paperless → ledger, event-driven</small>
+    <span class="plan">plan · not built yet</span></h1>
+  <p class="lat">album add → copied: <b>was 0–15 min</b> (sweep was the only path) · <b>now seconds</b> (event-driven) · the routing signal is an <b>extracted field</b>, not a confidence score ·
+     verified against Immich <b>v3.2.4</b>, gateway <code>/api/socket.io</code>, websocket-only, <code>x-api-key</code> auth</p>
+  <div class="bar">
+    <span class="lbl">Flows</span>
+    <div class="chips" id="chips" role="group" aria-label="Filter by flow"></div>
+    <span class="lbl">Play</span>
+    <div class="play">
+      <button id="prev" title="previous step (←)">◀</button>
+      <button id="play" title="play end to end (space)">▶ play</button>
+      <button id="next" title="next step (→)">▶</button>
+      <button id="clear" title="clear (esc)">clear</button>
+    </div>
+    <span class="lbl">Zoom</span>
+    <div class="play">
+      <button id="zfit" aria-pressed="true">fit</button>
+      <button id="z100">100%</button>
+      <button id="z150">150%</button>
+    </div>
+    <span class="lbl">What if</span>
+    <select id="failure" aria-label="Failure scenario"></select>
+  </div>
+</header>
+
+<main>
+  <div id="wrap"><svg id="dia" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <aside>
+    <h2 id="p-title">How to read this</h2>
+    <div class="who" id="p-who">—</div>
+    <div id="p-body">
+      <p>Click any box. Filter by flow. Play the end-to-end path, then try <em>What if</em>.</p>
+      <p>The spine is the machine pipeline: deterministic, seconds. A confident receipt leaves it at <em>auto-add</em> and
+         never sees a person; only the genuinely ambiguous reach the right column, and the left column is the hourly
+         backstop that makes a socket bug cost latency instead of correctness.</p>
+    </div>
+    <p class="status" id="status">Ready.</p>
+  </aside>
+</main>
+
+<script>
+"use strict";
+
+/* ---------- actor palette ---------- */
+const ACTOR = {
+  you:       { label: "you",        c: "var(--you)" },
+  immich:    { label: "immich",     c: "var(--immich)" },
+  bridge:    { label: "bridge",     c: "var(--bridge)" },
+  dan:       { label: "dan's arc",  c: "var(--vision)" },
+  paperless: { label: "paperless",  c: "var(--paperless)" },
+  ledger:    { label: "ledger",     c: "var(--ledger)" },
+  host:      { label: "host",       c: "var(--host)" }
+};
+
+const FLOWS = [
+  { id: "upload",   label: "upload → classify" },
+  { id: "human",    label: "human gate" },
+  { id: "send",     label: "album → send" },
+  { id: "ledger",   label: "ledger" },
+  { id: "backstop", label: "backstop sweep" }
+];
+
+/* ---------- nodes: col 0 is the spine; -1 left backstop; +1/+2 right ---------- */
+const NODES = [
+  { id: "photo", col: 0, row: 0, title: "Receipt photo", actor: "you", flows: ["upload"],
+    sub: "phone camera",
+    detail: "Start of the flow. Nothing here is automatic — photos enter through the normal Immich app." },
+
+  { id: "upload", col: 0, row: 1, title: "Immich app upload", actor: "immich", flows: ["upload"],
+    detail: "Immich stores the asset and emits <code>on_upload_success</code> on its realtime gateway." },
+
+  { id: "stored", col: 0, row: 2, title: "Asset stored", actor: "immich", flows: ["upload"],
+    sub: "seconds",
+    detail: "The asset is queryable through <code>/api/assets/{id}</code> the moment this returns. Everything downstream treats API reads as the truth and events only as hints." },
+
+  { id: "jobs", col: 0, row: 3, title: "Immich jobs", actor: "immich", flows: ["upload"],
+    sub: "CLIP embeddings + OCR",
+    detail: "Immich's own CLIP embeddings and OCR run <b>after</b> the upload event, not before. This is the single most important detail in the design: it is why classify debounces instead of acting instantly, and why most assets settle for free." },
+
+  { id: "gw", col: 0, row: 4, title: "Realtime gateway", actor: "immich", flows: ["upload", "send"],
+    sub: "/api/socket.io · websocket-only",
+    detail: "engine.io v4: <code>pingInterval=25000</code>, <code>pingTimeout=20000</code>, no polling transport. Events of interest: <code>on_upload_success</code>, <code>on_album_update</code>, <code>on_asset_update</code>.<br><br>Immich v3.2.4 exposes <b>no webhooks</b> — the 192-path spec contains zero occurrences of the word — so the socket is the only push path." },
+
+  { id: "sock", col: 0, row: 5, title: "Bridge Deployment", actor: "bridge", flows: ["upload", "send"],
+    sub: "stdlib socket · reconnects",
+    detail: "One long-running pod holding the socket, written with nothing but <code>socket</code>, <code>struct</code> and <code>base64</code> — no image, no dependency, no new secret.<br><br>Authenticates with <code>x-api-key</code> on the upgrade request. Verified: the header is accepted and real event frames arrive; the query string, <code>Authorization: Bearer</code>, the access-token cookie and every socket.io connect payload are all rejected with <code>unauthorized</code>." },
+
+  { id: "classify", col: 0, row: 6, title: "classify_one(asset)", actor: "bridge", flows: ["upload", "backstop"],
+    sub: "one asset, on demand",
+    detail: "The sweep classified up to 1000 assets a tick; this classifies one, the moment it is uploaded.<br><br>It still debounces until Immich's OCR lands — not to dodge the model call, but because OCR boxes are the strongest cheap evidence the rule has. Asking before they exist is asking the model to guess." },
+
+  { id: "d-clip", col: 0, row: 7, title: "CLIP candidate?", actor: "bridge", flows: ["upload", "backstop"],
+    kind: "decision",
+    detail: "Immich's smart search returns its best matches for a query, not matches above a score — a recall net with no precision. A match only makes the asset a candidate." },
+
+  { id: "ignore", col: 1.6, row: 7, title: "ignore", actor: "bridge", flows: ["upload", "backstop"],
+    sub: "not document-like",
+    kind: "quiet",
+    detail: "No further work. Most of a photo library ends here, at zero cost." },
+
+  { id: "evidence", col: 0, row: 8, title: "gather free evidence", actor: "bridge", flows: ["upload", "backstop"],
+    sub: "OCR boxes · CLIP rank · filename",
+    detail: "Everything that costs nothing: how many queries CLIP matched it for and its rank in each, Immich's OCR box count and best score, and the filename — a screen capture is rarely a receipt.<br><br>This is <b>evidence now, not a gate</b>. It used to short-circuit and tag on OCR alone; instead it feeds the confidence rule, which is what lets a screenshot full of text be judged rather than waved through." },
+
+  { id: "vision", col: 0, row: 9, title: "intel-vl vision", actor: "dan", flows: ["upload", "backstop"],
+    sub: "Qwen3-VL-8B, temperature 0",
+    detail: "Asked for structured JSON: <code>document</code>, <code>confidence</code>, <code>kind</code>, whatever fields it can actually read — <code>merchant</code>, <code>date</code>, <code>amount</code> — and a one-line reason. The gateway accepts <code>response_format: json_object</code>, so unparsable output can be made structurally impossible.<br><br>Two changes from today: <b>temperature 0</b> (nothing sets a temperature now, so classification is not even deterministic), and the fields, which are free on a call we were making anyway.<br><br>The fields are a routing signal, not data to trust: a Starbucks coupon was read as a receipt from 'B&amp;N Cafe' for 1.00, the coupon's own value. The model reports; the rule decides; your eye supplies anything that ends up in the ledger." },
+
+  { id: "d-conf", col: 0, row: 10.5, title: "grounding rule", actor: "bridge", flows: ["upload", "backstop"],
+    kind: "decision",
+    sub: "document + one readable field",
+    detail: "<code>auto-add</code> needs <code>document=true</code> and at least one field it could actually read — a merchant, a date or an amount. A confident <em>no</em> becomes <code>paperless-skip</code>; anything else queues.<br><br><b>No confidence threshold, because it was measured and it does not work.</b> Over 50 calls on labelled data every document scored exactly <code>0.95</code> — an ceiling, not a measurement — while non-documents scored <code>0.98</code> to <code>1.00</code>. It is inverted: any threshold either rejects the receipts or accepts everything.<br><br>The fields separate cleanly instead: 26 photos, 7 receipts all grounded, 19 non-documents (dogs, a baby, a toddler, a kitchen) all rejected. The score is logged, never gated on." },
+  { id: "auto", col: 1.75, row: 10.5, title: "auto-add to the album", actor: "bridge", flows: ["upload", "send"],
+    sub: "and tag paperless-auto",
+    detail: "A grounded receipt skips the human entirely and goes into the album, which the send path already treats as the instruction.<br><br>Every machine decision is tagged <code>paperless-auto</code>, so <em>what did it file without asking me?</em> is one filter, and each decision is logged with the fields it read. Post-hoc audit replaces pre-hoc review." },
+  { id: "retry", col: 1.6, row: 9.5, title: "write nothing", actor: "bridge", flows: ["upload", "backstop"],
+    sub: "stays untagged",
+    kind: "quiet",
+    detail: "A failed or unparsable answer is never recorded as a verdict. An outage must not become permanent — the asset stays untagged so a later run re-asks.<br><br>This is also why a proxy restart costs a retry rather than a wrong tag." },
+
+  { id: "tags", col: 2.6, row: 8, title: "Tags in Immich", actor: "immich", flows: ["upload", "human", "send"],
+    kind: "store", h: 92,
+    sub: "maybe · auto · skip · sent",
+    detail: "State lives here, not in a volume. The tag is the idempotency key: the socket path and the sweep can both run without coordinating, and a duplicated event is a no-op.<br><br>Counts from the database as of the last run: <code>paperless-maybe</code> 29, <code>paperless-skip</code> 4, <code>paperless-auto</code> 0 — the auto tag does not exist yet." },
+
+  { id: "human", col: 2.6, row: 10.5, title: "You review /tags", actor: "you", flows: ["human"],
+    kind: "human",
+    sub: "only the genuinely ambiguous",
+    detail: "No longer the main road: confident receipts never arrive here. This holds only what the rule refused to call, and it is <b>opt-in</b> — ignoring it costs nothing, because nothing enters the archive until you say so.<br><br>Friction work, with your library metadata deliberately untouched: the queue is small because the rule carries the easy cases, Immich's multi-select adds many at once, and the tag page is one bookmark away. Every decision is logged with the confidence and the fields behind it, so an override doubles as a label for tuning the threshold." },
+
+  { id: "album", col: 2.6, row: 12.5, title: "Album: Paperless", actor: "immich", flows: ["human", "send"],
+    kind: "store",
+    sub: "the send instruction",
+    detail: "Still the only path into Paperless, and its change still emits <code>on_album_update</code> — but it now has two authors: you, and the confidence rule. The <code>paperless-auto</code> tag is what keeps those apart." },
+
+  { id: "send", col: 0, row: 12.5, title: "send()", actor: "bridge", flows: ["send", "backstop"],
+    sub: "skip paperless-sent and videos",
+    detail: "Reused unchanged from the sweep: list the album's assets, skip any already tagged <code>paperless-sent</code> and any video (a video would arrive as a single JPEG frame).<br><br>Stateless, so it needs no memory of what it has already done." },
+
+  { id: "download", col: 0, row: 13.5, title: "download original", actor: "bridge", flows: ["send"],
+    sub: "or fullsize JPEG for HEIC",
+    detail: "Paperless cannot read HEIC straight off an iPhone, and its consumer would fail the file rather than convert it — so the bridge hands it a JPEG instead." },
+
+  { id: "consume", col: 0, row: 14.5, title: "write into consume dropbox", actor: "host", flows: ["send"],
+    sub: "0644 · the consume dropbox",
+    detail: "The only edge into Paperless, and the reason the bridge needs no Paperless credential at all: it writes a file into the dropbox and lets the consumer pick it up." },
+
+  { id: "paperless", col: 0, row: 15.5, title: "Paperless-ngx", actor: "paperless", flows: ["send"],
+    sub: "consume → its own OCR → workflows",
+    detail: "Everything from here is Paperless's normal behaviour: OCR, then workflows assigning the document type and the <code>accounting/inbox</code> tag." },
+
+  { id: "docid", col: 0, row: 16.5, title: "Paperless document id", actor: "paperless", flows: ["ledger"],
+    sub: "the numeric id — it is the URL",
+    detail: "The join key, replacing the archive serial number. Nothing to enable or assign: the id is already on every document, and <code>/documents/1234/</code> opens it, so the ledger line and the archive entry point at each other.<br><br>One caveat: the id is a database key. A restore from backup keeps it; a <b>re-import</b> would assign new ones and break every link. That is exactly what ASN would have been stable against." },
+
+  { id: "beancount", col: 0, row: 17.5, title: "beancount link", actor: "ledger", flows: ["ledger"],
+    sub: "^paperless-1234 in the link",
+    detail: "Verified against beancount 3.2.3: <code>^1234</code> parses and so does <code>^paperless-1234</code>, and you query it with <code>where \"paperless-1234\" in links</code>. Two traps to avoid: <code>metadata()</code> and <code>links ~ \"...\"</code> both crash bean-query.<br><br>The prefix is not decoration — a bare id says nothing to a reader and collides with every other link scheme in the ledger." },
+
+  { id: "fava", col: 0, row: 18.5, title: "Fava / beancount-stack", actor: "ledger", flows: ["ledger"],
+    sub: "read-only view", kind: "end",
+    detail: "The ledger is served internally only, on a PVC, backed up by kopiur. Complete financial history never leaves the house." },
+
+  { id: "sweep", col: -2.2, row: 9.5, title: "CronJob, hourly", actor: "bridge", flows: ["backstop"],
+    kind: "backstop", h: 300, w: 190,
+    sub: "same functions, newest first",
+    detail: "Demoted from the only path to a backstop. It calls the same two functions the socket calls, so the two can never disagree.<br><br>It recovers what events cannot: a pod restart mid-flight, a dropped socket, a model outage, and backfill of older photos. This is what makes ~120 lines of hand-rolled protocol acceptable — a missed event costs latency, not correctness.<br><br>Same rule as the live path, one difference: the sweep caps model calls per pass, because the backlog is hundreds of candidates and the model lives on a friend's GPU. A capped candidate queues rather than auto-adds — fail closed." }
+];
+
+/* ---------- edges ---------- */
+const EDGES = [
+  { from: "photo", to: "upload", flows: ["upload"] },
+  { from: "upload", to: "stored", flows: ["upload"] },
+  { from: "stored", to: "jobs", flows: ["upload"] },
+  { from: "stored", to: "gw", flows: ["upload"], label: "on_upload_success", side: "right" },
+  { from: "gw", to: "sock", flows: ["upload", "send"], label: "events · x-api-key auth" },
+  { from: "sock", to: "classify", flows: ["upload"], label: "on_upload_success · debounce" },
+  { from: "classify", to: "d-clip", flows: ["upload", "backstop"] },
+  { from: "d-clip", to: "ignore", flows: ["upload", "backstop"], label: "no", side: "right" },
+  { from: "d-clip", to: "evidence", flows: ["upload", "backstop"], label: "yes" },
+  { from: "evidence", to: "vision", flows: ["upload", "backstop"], label: "ask, with evidence" },
+  { from: "vision", to: "d-conf", flows: ["upload", "backstop"], label: "structured verdict" },
+  { from: "d-conf", to: "auto", flows: ["upload", "send"], label: "extremely confident", side: "right" },
+  { from: "d-conf", to: "tags", flows: ["upload", "backstop"], label: "document, not certain", side: "right" },
+  { from: "d-conf", to: "retry", flows: ["upload", "backstop"], label: "no answer", side: "right" },
+  { from: "auto", to: "album", flows: ["send"], label: "machine add", side: "right" },
+  { from: "auto", to: "tags", flows: ["upload"], label: "tag paperless-auto", side: "right" },
+  { from: "tags", to: "human", flows: ["human"], label: "read the queue", side: "right" },
+  { from: "human", to: "album", flows: ["human"], label: "add real documents", side: "right" },
+  { from: "human", to: "tags", flows: ["human"], label: "replace with -skip", side: "left" },
+  { from: "album", to: "send", flows: ["send"], label: "on_album_update", side: "left" },
+  { from: "send", to: "download", flows: ["send"] },
+  { from: "download", to: "consume", flows: ["send"] },
+  { from: "consume", to: "paperless", flows: ["send"] },
+  { from: "send", to: "tags", flows: ["send"], label: "tag paperless-sent", side: "right" },
+  { from: "paperless", to: "docid", flows: ["ledger"] },
+  { from: "docid", to: "beancount", flows: ["ledger"] },
+  { from: "beancount", to: "fava", flows: ["ledger"] },
+  { from: "sweep", to: "classify", flows: ["backstop"], label: "re-asks anything missed", dashed: true, side: "right" },
+  { from: "sweep", to: "send", flows: ["backstop"], label: "backfill", dashed: true, side: "right" }
+];
+
+/* ---------- end-to-end play sequence ---------- */
+const SEQ = [
+  ["photo", "A receipt is photographed."],
+  ["upload", "Uploaded through the Immich app."],
+  ["stored", "Immich stores the asset. Milliseconds."],
+  ["jobs", "Immich's own CLIP and OCR jobs run — after the upload event, not before."],
+  ["gw", "on_upload_success is emitted on the realtime gateway. Seconds."],
+  ["sock", "Our Deployment holds the socket: stdlib, x-api-key, reconnects on drop."],
+  ["classify", "classify_one debounces until Immich's OCR lands, so the rule has real evidence to weigh."],
+  ["d-clip", "Not document-like at all? It stops here at zero cost — most of a library does."],
+  ["evidence", "Otherwise gather what is free: OCR boxes and score, how many CLIP queries matched, the filename."],
+  ["vision", "One call to intel-vl at temperature 0, returning a confidence and whatever fields it can actually read."],
+  ["d-conf", "The rule decides: a document verdict plus one field it could actually read. The confidence score is logged and ignored — measured, it is inverted."],
+  ["auto", "Grounded enough: it goes into the album itself, tagged paperless-auto so you can audit what it filed."],
+  ["human", "Had it not been confident it would wait here instead, and this queue is opt-in — ignoring it costs nothing."],
+  ["album", "Album membership is the send instruction, whether a person or the rule put it there."],
+  ["send", "on_album_update → send(): skip anything already sent, and skip videos."],
+  ["download", "Download the original, or a fullsize JPEG for HEIC."],
+  ["consume", "Written into the consume dropbox, mode 0644. No Paperless credential involved."],
+  ["paperless", "Paperless consumes it, runs its own OCR, and its workflows assign the type and accounting/inbox."],
+  ["docid", "It has a document id, which is also its URL — the join key into the books."],
+  ["beancount", "The ledger links it as ^paperless-1234: eligibility in the account path, claims in a tag."],
+  ["fava", "Fava renders it. End to end, with no human step at all."]
+];
+
+/* ---------- failure scenarios ---------- */
+const FAILURES = [
+  { id: "none", label: "nothing", caption: "Pick a scenario to see how the design answers it.", on: [] },
+  { id: "outage", label: "vision model is down", on: ["vision", "retry", "sweep", "classify"],
+    caption: "The call fails → nothing is written → the next hourly sweep re-asks. An outage can never become a permanent verdict." },
+  { id: "dup", label: "event delivered twice", on: ["sock", "classify", "tags", "send", "gw"],
+    caption: "Handlers only read an event as a hint and re-query the API, and the tag is the idempotency key — so a duplicate delivery is a no-op." },
+  { id: "drop", label: "socket drops", on: ["sock", "sweep", "classify", "send"],
+    caption: "Reconnect with backoff. Anything that happened while disconnected is recovered by the sweep — the pull path never depended on the stream." },
+  { id: "late", label: "Immich OCR is late", on: ["jobs", "classify", "evidence", "vision"],
+    caption: "Classify debounces until the OCR evidence exists, then asks with it. It matters in the other direction too: OCR alone already tagged five of these photos as documents that the model then rejected." },
+  { id: "wrong", label: "it files a non-document", on: ["d-conf", "auto", "album", "send", "tags", "human"],
+    caption: "A wrong auto-add is the real cost: the archive is permanent, so recovery is two steps — tag it paperless-skip and delete it in Paperless. Measured on 26 photos it got all 26 right, but that is one window on one library: paperless-auto keeps every machine decision auditable in one filter." },
+  { id: "gpu", label: "backfill would flood Dan's GPU", on: ["sweep", "classify", "vision", "d-conf"],
+    caption: "The sweep caps model calls per pass and queues the remainder instead of auto-adding it — fail closed. Live uploads are a handful of calls and always get one." },
+  { id: "rename", label: "Immich renames an event", on: ["gw", "sock", "sweep"],
+    caption: "An unknown event is ignored and the sweep still runs, so it degrades to the old behaviour rather than breaking. One-line fix when noticed." },
+  { id: "before", label: "the old 15-minute sweep", on: ["sweep", "classify", "send", "tags"],
+    caption: "Previously the only path: your photo sat up to 15 minutes. It is now the backstop, and the live path is the socket." }
+];
+
+/* ---------- layout ---------- */
+const COL = 300, ROW = 88, X0 = 700, Y0 = 70, W = 230, H = 58;
+const px = (col) => X0 + col * COL;
+const py = (row) => Y0 + row * ROW;
+const nodeById = {};
+NODES.forEach((n) => { nodeById[n.id] = n; n.w = n.w || W; n.h = n.h || H; });
+
+function port(node, side) {
+  const x = px(node.col), y = py(node.row);
+  if (side === "left") return [x - node.w / 2, y + node.h / 2];
+  if (side === "right") return [x + node.w / 2, y + node.h / 2];
+  if (side === "top") return [x, y - node.h / 2];
+  return [x, y + node.h / 2];
+}
+
+function route(e) {
+  const a = nodeById[e.from], b = nodeById[e.to];
+  if (!a || !b) return "";
+  const rightish = px(b.col) > px(a.col) + 40;
+  const leftish = px(b.col) < px(a.col) - 40;
+  let out, inn;
+  if (rightish) { out = port(a, "right"); inn = port(b, e.side === "left" ? "left" : "left"); }
+  else if (leftish) { out = port(a, "left"); inn = port(b, "right"); }
+  else { out = port(a, "bottom"); inn = port(b, "top"); }
+  const [x1, y1] = out, [x2, y2] = inn;
+  if (Math.abs(y1 - y2) < 1) return "M" + x1 + " " + y1 + "H" + x2;
+  if (Math.abs(x1 - x2) < 1) return "M" + x1 + " " + y1 + "V" + y2;
+  if (rightish || leftish) { const mx = (x1 + x2) / 2; return "M" + x1 + " " + y1 + "H" + mx + "V" + y2 + "H" + x2; }
+  const my = (y1 + y2) / 2;
+  return "M" + x1 + " " + y1 + "V" + my + "H" + x2 + "V" + y2;
+}
+
+function labelPoint(e) {
+  const a = nodeById[e.from], b = nodeById[e.to];
+  if (px(b.col) > px(a.col) + 40 || px(b.col) < px(a.col) - 40) {
+    return [((port(a, px(b.col) > px(a.col) ? "right" : "left")[0]) + (port(b, px(b.col) > px(a.col) ? "left" : "right")[0])) / 2,
+            (py(a.row) + py(b.row)) / 2];
+  }
+  return [px(a.col), (py(a.row) + py(b.row)) / 2];
+}
+
+/* ---------- build svg ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("dia");
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(n);
+  return n;
+}
+function build() {
+  /* viewBox from the real node bounds, so there is no dead space padding the page */
+  let bx1 = Infinity, by1 = Infinity, bx2 = -Infinity, by2 = -Infinity;
+  NODES.forEach((n) => {
+    const x = px(n.col), y = py(n.row);
+    bx1 = Math.min(bx1, x - n.w / 2); bx2 = Math.max(bx2, x + n.w / 2);
+    by1 = Math.min(by1, y - n.h / 2); by2 = Math.max(by2, y + n.h / 2);
+  });
+  const PAD = 30;
+  const vb = [bx1 - PAD, by1 - PAD, bx2 - bx1 + PAD * 2, by2 - by1 + PAD * 2];
+  svg.setAttribute("viewBox", vb.map((v) => Math.round(v)).join(" "));
+  svg.dataset.w = Math.round(vb[2]);
+  svg.dataset.vx = Math.round(vb[0]);
+  svg.dataset.vy = Math.round(vb[1]);
+
+  const defs = el("defs", {});
+  const mk = el("marker", { id: "arw", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  el("path", { d: "M0 1 L9 5 L0 9 z", fill: "var(--line)" }, mk);
+
+  const gEdges = el("g", {}), gLabels = el("g", {}), gNodes = el("g", {}), gEdgeHit = el("g", {});
+  EDGES.forEach((e, i) => {
+    const d = route(e);
+    if (!d) return;
+    e._el = el("path", { d: d, class: "edge", "marker-end": "url(#arw)", "data-edge": i }, gEdges);
+    if (e.label) {
+      const [lx, ly] = labelPoint(e);
+      e._lab = el("text", { x: lx, y: ly - 4, class: "elabel" }, gLabels);
+      e._lab.textContent = e.label;
+    }
+  });
+
+  NODES.forEach((n) => {
+    const x = px(n.col), y = py(n.row);
+    const g = el("g", { class: "node", tabindex: "0", role: "button", "data-id": n.id }, gNodes);
+    n._g = g; n._box = el("rect", {
+      x: x - n.w / 2, y: y - n.h / 2, width: n.w, height: n.h, rx: n.kind === "decision" ? 4 : 9,
+      class: "box", "stroke-dasharray": n.kind === "decision" ? "5 3" : (n.kind === "backstop" ? "7 4" : "none")
+    }, g);
+    n._box.style.color = ACTOR[n.actor].c;
+    n._box.style.stroke = ACTOR[n.actor].c;
+    n._box.style.opacity = n.kind === "quiet" ? 0.75 : 1;
+    /* actor bar */
+    el("rect", { x: x - n.w / 2, y: y - n.h / 2, width: 4, height: n.h, rx: 2, fill: ACTOR[n.actor].c, opacity: 0.85 }, g);
+    const t = el("text", { x: x - n.w / 2 + 14, y: y - n.h / 2 + (n.sub ? 20 : 26), class: "n-title" }, g);
+    t.textContent = n.title;
+    if (n.sub) { const s = el("text", { x: x - n.w / 2 + 14, y: y - n.h / 2 + 36, class: "n-sub" }, g); s.textContent = n.sub; }
+    const a = el("text", { x: x + n.w / 2 - 10, y: y + n.h / 2 - 8, class: "n-actor", "text-anchor": "end", fill: ACTOR[n.actor].c }, g);
+    a.textContent = ACTOR[n.actor].label + (n.kind === "decision" ? " ?" : "");
+    el("title", {}, g).textContent = n.title;
+  });
+}
+build();
+
+/* ---------- interaction ---------- */
+const state = { flows: new Set(FLOWS.map((f) => f.id)), sel: null, seq: -1, timer: null, failure: "none" };
+const panel = { title: document.getElementById("p-title"), who: document.getElementById("p-who"), body: document.getElementById("p-body") };
+const statusEl = document.getElementById("status");
+
+function setPanel(title, who, html) { panel.title.textContent = title; panel.who.textContent = who || ""; panel.body.innerHTML = html; }
+
+function render() {
+  const active = state.flows;
+  NODES.forEach((n) => {
+    const inFlow = n.flows.some((f) => active.has(f));
+    n._g.classList.toggle("dim", !inFlow);
+    n._g.classList.toggle("on", state.sel === n.id);
+    n._g.style.color = ACTOR[n.actor].c;
+  });
+  EDGES.forEach((e) => {
+    if (!e._el) return;
+    const inFlow = e.flows.some((f) => active.has(f));
+    e._el.classList.toggle("dim", !inFlow);
+    if (e._lab) e._lab.classList.toggle("dim", !inFlow);
+  });
+}
+
+function focusSet(ids, caption) {
+  const s = new Set(ids);
+  NODES.forEach((n) => n._g.classList.toggle("hit", s.has(n.id)));
+  EDGES.forEach((e) => { if (e._el) e._el.classList.toggle("hit", s.has(e.from) && s.has(e.to)); });
+  if (caption) statusEl.innerHTML = caption;
+}
+function clearFocus() {
+  NODES.forEach((n) => n._g.classList.remove("hit"));
+  EDGES.forEach((e) => { if (e._el) e._el.classList.remove("hit"); });
+}
+
+function select(id) {
+  clearFocus();
+  state.sel = id;
+  const n = nodeById[id];
+  const who = ACTOR[n.actor].label + (n.kind ? " · " + n.kind : "") + " · flows: " + n.flows.join(", ");
+  setPanel(n.title, who, "<p>" + n.detail + "</p>");
+  render();
+  statusEl.innerHTML = "Selected <b>" + n.title + "</b>.";
+}
+
+function stepTo(i) {
+  if (i < 0) i = SEQ.length - 1;
+  if (i >= SEQ.length) { stop(); i = SEQ.length - 1; }
+  state.seq = i;
+  const [id, cap] = SEQ[i];
+  const n = nodeById[id];
+  const ids = [id];
+  if (i > 0) { ids.push(SEQ[i - 1][0]); }
+  focusSet(ids, "<b>Step " + (i + 1) + "/" + SEQ.length + "</b> — " + cap);
+  state.sel = id;
+  setPanel(n.title, ACTOR[n.actor].label + " · step " + (i + 1) + " of " + SEQ.length, "<p>" + n.detail + "</p><p>" + cap + "</p>");
+  render();
+}
+function start() {
+  if (state.timer) return;
+  document.getElementById("play").textContent = "⏸ pause";
+  state.timer = setInterval(() => stepTo(state.seq + 1), 2600);
+  stepTo(Math.max(state.seq, 0));
+}
+function stop() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").textContent = "▶ play";
+}
+
+/* flow chips */
+const chips = document.getElementById("chips");
+FLOWS.forEach((f) => {
+  const b = document.createElement("button");
+  b.textContent = f.label; b.setAttribute("aria-pressed", "true"); b.dataset.flow = f.id;
+  b.addEventListener("click", () => {
+    const on = state.flows.has(f.id);
+    if (on) state.flows.delete(f.id); else state.flows.add(f.id);
+    b.setAttribute("aria-pressed", String(!on));
+    render();
+    statusEl.innerHTML = (on ? "Hid" : "Showing") + " flow <b>" + f.label + "</b>.";
+  });
+  chips.appendChild(b);
+});
+
+/* failure select */
+const fsel = document.getElementById("failure");
+FAILURES.forEach((f) => { const o = document.createElement("option"); o.value = f.id; o.textContent = f.label; fsel.appendChild(o); });
+fsel.addEventListener("change", () => {
+  const f = FAILURES.find((x) => x.id === fsel.value);
+  state.failure = f.id;
+  stop();
+  if (f.on.length) { focusSet(f.on, "<b>" + f.label + "</b> — " + f.caption); }
+  else { clearFocus(); statusEl.innerHTML = f.caption; }
+  render();
+});
+
+/* svg clicks */
+svg.addEventListener("click", (ev) => {
+  const g = ev.target.closest(".node");
+  if (g) select(g.dataset.id);
+  else { clearFocus(); state.sel = null; render(); statusEl.textContent = "Ready."; }
+});
+svg.addEventListener("keydown", (ev) => {
+  const g = ev.target.closest(".node");
+  if (g && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); select(g.dataset.id); }
+});
+document.getElementById("play").addEventListener("click", () => (state.timer ? stop() : start()));
+document.getElementById("next").addEventListener("click", () => stepTo(state.seq + 1));
+document.getElementById("prev").addEventListener("click", () => stepTo(state.seq - 1));
+/* zoom: fit is the default; the diagram is 1.3:1 so fit shows the whole flow at once */
+function setZoom(mode) {
+  svg.style.width = mode === "fit" ? "100%" : (Number(svg.dataset.w) * mode) + "px";
+  ["zfit", "z100", "z150"].forEach((id) => {
+    const b = document.getElementById(id);
+    const on = (id === "zfit" && mode === "fit") || (id === "z100" && mode === 1) || (id === "z150" && mode === 1.5);
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+document.getElementById("zfit").addEventListener("click", () => setZoom("fit"));
+document.getElementById("z100").addEventListener("click", () => setZoom(1));
+document.getElementById("z150").addEventListener("click", () => setZoom(1.5));
+
+document.getElementById("clear").addEventListener("click", () => {
+  stop(); clearFocus(); state.sel = null; state.seq = -1; render();
+  setPanel("How to read this", "—", "<p>Click any box. Filter by flow. Play the end-to-end path, then try <em>What if</em>.</p>");
+  statusEl.textContent = "Ready.";
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.matches("input, select, textarea")) return;
+  if (ev.key === " ") { ev.preventDefault(); state.timer ? stop() : start(); }
+  else if (ev.key === "ArrowRight") stepTo(state.seq + 1);
+  else if (ev.key === "ArrowLeft") stepTo(state.seq - 1);
+  else if (ev.key === "Escape") document.getElementById("clear").click();
+});
+render();
+</script>
+</body>
+</html>

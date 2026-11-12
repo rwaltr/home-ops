@@ -15,9 +15,7 @@ task.timings = true
 # installing and running flux 2.10.0 with mise 2026.10.21.
 "github:fluxcd/flux2" = "latest"
 kubectl = "latest"
-sops = "latest"
 terraform = "latest"
-terragrunt = "latest"
 "github:derailed/k9s" = "latest"
 "github:k0sproject/k0sctl" = "latest"
 
@@ -38,16 +36,31 @@ actionlint = "latest"
 zizmor = "latest"
 oxfmt = "0.71.0"
 shellcheck = "latest"
+editorconfig-checker = "latest"
 "npm:markdownlint-cli2" = "latest"
 "pipx:yamllint" = "latest"
-"pipx:pre-commit" = "latest"
+typos = "latest"
+
+# Security & IaC analysis — hk.pkl `slow` steps and CI
+tflint = "latest"
+trivy = "latest"
+gitleaks = "latest"
+
+# Dev loop: `mise watch` runs tasks under watchexec, `mise daemons` under pitchfork
+watchexec = "latest"
+pitchfork = "latest"
+
+# Git hooks (hk.pkl) — hk needs pkl to evaluate its config.
+# hk is pinned to match the version hk.pkl amends; bump both together.
+hk = "1.45.0"
+pkl = "latest"
 
 # Tasks are file-based tasks in .mise/tasks/ — `mise tasks` is the index.
 # Shared shell helpers live in .mise/lib/common.sh.
 # Tips:
 #   - View dependency tree: mise tasks deps flatcar:bootstrap
 #   - Watch for changes:   mise watch flatcar:build
-#   - Pass extra args to underlying tools: mise run tf:plan cloudflare -target=x
+#   - Pass extra args to underlying tools: mise run tf:plan cloudflare -- -target=x
 #   - Destructive tasks (flatcar:clean, tf:apply) prompt for confirmation
 
 [env]
