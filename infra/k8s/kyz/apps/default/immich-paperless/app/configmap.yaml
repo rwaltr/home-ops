@@ -421,14 +421,39 @@ data:
         return json.loads(raw) if raw.strip() else {}
 
 
+    def find_named(kind, name):
+        """The id of an existing Paperless object with this name, or None.
+
+        Paperless pages its list endpoints at 25 and its name filter matches loosely, so the
+        exact match can sit on a later page. Without walking them an existing correspondent is
+        invisible and the create below is rejected as a duplicate - which is what failed the
+        hourly job and fired KubeJobFailed.
+        """
+        for page in range(1, 11):
+            found = paperless("/%s/?name=%s&page_size=200&page=%d" % (kind, urllib.parse.quote(name), page))
+            for item in found.get("results", []):
+                if (item.get("name") or "").strip().lower() == name.lower():
+                    return item["id"]
+            if not found.get("next"):
+                break
+        return None
+
+
     def ensure_named(kind, name):
         """The id of the Paperless object of this kind, created if this is the first."""
         name = name.strip()[:128]
-        found = paperless("/%s/?name=%s" % (kind, urllib.parse.quote(name)))
-        for item in found.get("results", []):
-            if (item.get("name") or "").strip().lower() == name.lower():
-                return item["id"]
-        return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+        known = find_named(kind, name)
+        if known:
+            return known
+        try:
+            return paperless("/%s/" % kind, "POST", {"name": name})["id"]
+        except urllib.error.HTTPError:
+            # Lost a race, or a name differing only by a character we cannot see. Look it up
+            # once more rather than failing the document over it.
+            known = find_named(kind, name)
+            if known:
+                return known
+            raise
 
 
     def ensure_custom_field(name, data_type):
@@ -617,7 +642,13 @@ data:
                 # No answer: leave the document untouched so a later run asks again.
                 print(f"enrich: {doc['id']} untouched, no answer ({why})", flush=True)
                 continue
-            written = enrich_document(tags, doc, asset, answer)
+            try:
+                written = enrich_document(tags, doc, asset, answer)
+            except (SystemExit, urllib.error.HTTPError) as err:
+                # One document Paperless refuses must not end the run. A duplicate
+                # correspondent name did exactly that every hour and fired KubeJobFailed.
+                print(f"enrich: {doc['id']} write refused, left alone ({err})", flush=True)
+                continue
             enriched += 1
             print(f"enrich: {doc['id']} {written} field(s), title={answer.get('title')!r}", flush=True)
         print(f"enrich: {enriched} document(s) enriched, {calls} vision call(s)", flush=True)
