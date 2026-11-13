@@ -47,9 +47,11 @@ spec:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
-      limits:
-        # Uncapped it sat at ~860Mi steady / 925Mi peak (audit 2026-09-24).
-        # 1.5Gi leaves headroom over the observed peak without letting it
-        # grow unbounded on a swap-less node.
         memory: 1536Mi
+      limits:
+        # The 2026-09-24 audit sized this at 1.5Gi from a ~925Mi peak; the
+        # workload has grown past it (30d p95 1482Mi, max 1484Mi), so the
+        # container has been pinned at its own ceiling and OOMKilled on the
+        # 2026-11-11 cold-start resync. Request = the 30d p95; limit = ~2x the
+        # observed peak so a resync (scanner cycle + kopia listing) clears.
+        memory: 3072Mi
