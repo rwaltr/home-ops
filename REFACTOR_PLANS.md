@@ -626,6 +626,30 @@ at a time (console log only shows `res=failed`; detail stays in the journal).
 
 ## Session log
 
+### 2026-11-11 — k8s-gateway: a dead chart index no longer pages as a Flux failure
+
+- **`network/k8s-gateway` reported `Ready=Unknown` and paged
+  `KustomizationReconciliationFailure`** (hourly, and again on every retry) while
+  the workload was healthy: the HR was `Ready=True` on chart 3.7.4 and the pod
+  had been serving DNS for 39d. The Kustomization has `wait: true`, so its health
+  assessment covered every object in the inventory — including the
+  `HelmRepository`, whose `Ready` had been **False since 2026-10-29** because the
+  chart index it mirrors is gone (see below). One external outage, one page per
+  hour, indefinitely.
+- **Fix**: `spec.healthChecks` on the Kustomization naming the HelmRelease only,
+  so the assessment tracks the workload (which the release's own rollout covers)
+  and not the third-party index fetch. Same shape as `cert-manager` and
+  `onepassword-connect`, which already scope their assessments this way.
+- **Why the index is gone**: k8s-gateway's project lives on Codeberg
+  (`codeberg.org/k8s-gateway/k8s_gateway`, app 1.8.3) and its chart index is
+  Codeberg Pages, which **returns 502** — measured from in-cluster, alongside the
+  mirror at `k8s-gateway.kryptonian.kapsi.fi` (502, AAAA dial blackhole). The
+  GitHub Pages index that the project left behind serves only chart **2.4.0**
+  (app 0.4.0), so repointing there would be an app downgrade, not a fix. The
+  cached artifact keeps the release running; nothing else regressed.
+- Where the chart should come from next is an open decision — a URL swap needs a
+  source that exists.
+
 ### 2026-11-09 — litellm proxy memory ceiling raised from its measured peak
 
 - **litellm's `app` container OOMKilled under concurrent chat load** (2026-11-09
