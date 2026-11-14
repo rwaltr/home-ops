@@ -2256,6 +2256,34 @@ Fourth item of the bjw-s parity series. Giant Swarm's `silence-operator` 0.22.0 
 
 Operating section: `docs/alerting.md` → "Silences".
 
+### 2026-11-14 (later still) — the MCP token arrives by Terraform, not by hand
+
+Deploying MikroMCP turned up the case the `bootstrap` workspace exists for. The
+server needs an inbound bearer token that nothing upstream issues, and the first
+two attempts to get it were both "rwaltr adds a field to the item" — a *generated*
+credential being requested as if it were a consumer credential. rwaltr's answer
+was to point at `infra/terraform/bootstrap/`, which is right: that workspace is
+the one thing in the repo that writes to 1Password, and a value invented in a
+vendor console exists in exactly one place with no record of what it is for.
+
+- **A generated value belongs in `bootstrap`**, alongside the Tailscale OAuth
+  client and the Cloudflare DNS tokens. `random_password` + `onepassword_item`,
+  value in the login's `password` field.
+- **Top-level fields only.** The 1Password provider can only write custom fields
+  *inside* a section, and External Secrets resolves the two-level `item/field`
+  reference every other secret here uses — so `username`/`password` is the shape
+  that works, and a field labelled `mcptoken` on a hand-made item cannot be added
+  by Terraform anyway.
+- **Its own item, not the hand-made one.** `microtik` (router username, password,
+  confirmation secret) stays rwaltr's: adopting it would put unreviewed fields —
+  his router password among them — under Terraform's control. The MCP's
+  ExternalSecret therefore reads two items, which is fine.
+- **The apply is still a human command**, because this sandbox has neither fnox
+  nor Terraform Cloud credentials (`terraform plan` fails at backend init for want
+  of an API token). The declaration is the agent's work; the trust credential is
+  not. Documented non-interactive form: `MISE_YES=1
+  TF_CLI_ARGS_apply=-auto-approve mise run tf:apply bootstrap`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

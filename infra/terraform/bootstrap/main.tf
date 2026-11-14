@@ -40,6 +40,13 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "5.28.1"
     }
+    # Random, for credentials nothing upstream issues — the MikroTik MCP
+    # server's inbound bearer token is invented here because no vendor mints it
+    # and a hand-pasted value would exist in exactly one place, unrotated.
+    random = {
+      source  = "hashicorp/random"
+      version = "3.9.1"
+    }
   }
 }
 
