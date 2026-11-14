@@ -19,7 +19,7 @@ references in `fnox.toml` and values in 1Password — never in git.
 | Written by                                  | Examples                                                                                                                      |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **You**, by hand in 1Password               | the Cloudflare account token, the OpenRouter key, the Pushover user key, the GitHub App keys, the Reolink and Soulseek logins |
-| **Terraform**, `infra/terraform/bootstrap/` | the Tailscale operator's OAuth client, the cluster's Cloudflare DNS tokens                                                    |
+| **Terraform**, `infra/terraform/bootstrap/` | the Tailscale operator's OAuth client, the cluster's Cloudflare DNS tokens, the MikroTik MCP server's bearer token            |
 
 `bootstrap` is the only project that holds `OP_SERVICE_ACCOUNT_TOKEN`, and the
 only thing in the repo that writes to 1Password. It cannot create the credential

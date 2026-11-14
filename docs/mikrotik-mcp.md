@@ -51,8 +51,11 @@ contract in `app/externalsecret.yaml`:
 - `password` → `ROUTER_MOUSE_PASS`
 - `confirmsecret` → `MIKROMCP_CONFIRMATION_SECRET` (HMAC key for destructive action
   confirmations — required in HTTP mode even read-only)
-- `mcptoken` → `MIKROMCP_CLIENT_TOKEN` (the bearer token a client presents;
-  regenerate with `openssl rand -hex 32` if it leaks — the pod hashes it at start)
+- `mcptoken` is **not** on this item. The inbound bearer token is a _generated_
+  credential, so it is minted by Terraform into its own item `microtik-mcp`
+  (`infra/terraform/bootstrap/mikrotik-mcp.tf`), where it lives in the login's
+  `password` field — the only top-level shape the 1Password provider can write and
+  External Secrets can read back. The ExternalSecret reads both items.
 
 The item's `website` field (`10.10.0.1`) is deliberately **not** mapped: 1Password
 Connect exposes a Login's URL under `urls`, not `fields`, so an ExternalSecret
