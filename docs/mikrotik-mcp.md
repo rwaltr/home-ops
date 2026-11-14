@@ -51,10 +51,14 @@ contract in `app/externalsecret.yaml`:
 - `password` → `ROUTER_MOUSE_PASS`
 - `confirmsecret` → `MIKROMCP_CONFIRMATION_SECRET` (HMAC key for destructive action
   confirmations — required in HTTP mode even read-only)
-- `website` → `ROUTER_HOST` (informational; the address actually dialled is in the
-  ConfigMap)
 - `mcptoken` → `MIKROMCP_CLIENT_TOKEN` (the bearer token a client presents;
   regenerate with `openssl rand -hex 32` if it leaks — the pod hashes it at start)
+
+The item's `website` field (`10.10.0.1`) is deliberately **not** mapped: 1Password
+Connect exposes a Login's URL under `urls`, not `fields`, so an ExternalSecret
+cannot read it — asking for it fails with
+`expected one 1Password ItemField matching: 'website' in 'microtik', got 0`. The
+address that matters is the one in the ConfigMap's `routers.yaml`.
 
 Renaming a label in 1Password silently costs the pod that variable, and a missing
 _item_ fails the whole ExternalSecret rather than one key, so change both sides in
