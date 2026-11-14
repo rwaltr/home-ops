@@ -1,0 +1,132 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# MikroMCP — MikroTik RouterOS MCP server (AliKarami/MikroMCP), HTTP transport,
+# read-only.
+#
+# Router side, verified from the cluster before writing this: the RB5009
+# (gateway-132l, 10.10.0.1) answers REST on plain `www` port 80
+# (`GET /rest/system/resource` -> 401 without credentials) and refuses 443,
+# so `www-ssl` is not enabled and there is no certificate on the router.
+# Hence `tls.enabled: false`, `port: 80` below: the REST call works today.
+# That means the API user's password crosses the management LAN in the clear.
+# The fix, when wanted, is router-side: issue a cert, enable
+# `/ip service set www-ssl certificate=... disabled=no`, restrict
+# `address=10.10.0.10/32`, then flip this to `tls.enabled: true, port: 443`.
+# Also note `api-ssl` (8729) is open but irrelevant — MikroMCP speaks REST,
+# not the binary API.
+#
+# Identity: HTTP transport requires identities.yaml with a bcrypt-hashed
+# bearer token, so an initContainer derives it from the raw token in the
+# Secret and writes it into an emptyDir. The raw token therefore never
+# appears in git, and the hash is regenerated on every pod start.
+# Role `readonly`: this deployment can inspect the router and nothing else.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mikrotik-mcp
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: mikrotik-mcp
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      mikrotik-mcp:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          identity:
+            image:
+              repository: ghcr.io/alikarami/mikromcp
+              tag: 1.9.0
+            command:
+              - /bin/sh
+              - -c
+              - |
+                set -eu
+                cd /app
+                hash=$(node -e 'require("bcryptjs").hash(process.env.MIKROMCP_CLIENT_TOKEN, 12).then(h => console.log(h))')
+                cp /cm/routers.yaml /config/routers.yaml
+                printf 'identities:\n  agentgateway:\n    token: "%s"\n    role: readonly\n    allowedRouters: []\n    allowedToolPatterns: []\n' "$hash" > /config/identities.yaml
+        containers:
+          app:
+            image:
+              repository: ghcr.io/alikarami/mikromcp
+              tag: 1.9.0
+            env:
+              MIKROMCP_TRANSPORT: http
+              MIKROMCP_PORT: "3000"
+              # Defaults to 127.0.0.1, which would only listen on the pod's loopback.
+              MIKROMCP_BIND_HOST: 0.0.0.0
+              MIKROMCP_CONFIG_PATH: /config/routers.yaml
+              MIKROMCP_IDENTITIES_PATH: /config/identities.yaml
+              MIKROMCP_DEFAULT_ROUTER: mouse-router
+              MIKROMCP_LOG_LEVEL: info
+              TZ: America/Chicago
+            envFrom:
+              # ROUTER_MOUSE_USER / ROUTER_MOUSE_PASS (per routers.yaml envPrefix),
+              # MIKROMCP_CONFIRMATION_SECRET, MIKROMCP_CLIENT_TOKEN
+              - secretRef:
+                  name: mikrotik-mcp-secret
+            ports:
+              - name: http
+                containerPort: 3000
+                protocol: TCP
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: http
+                  initialDelaySeconds: 15
+                  periodSeconds: 30
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: http
+                  periodSeconds: 10
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                # Memory capped because this node has no swap; no CPU limit.
+                memory: 256Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+    defaultPodOptions:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+    persistence:
+      config:
+        type: emptyDir
+        globalMounts:
+          - path: /config
+      cm:
+        type: configMap
+        name: mikrotik-mcp
+        globalMounts:
+          - path: /cm
+            readOnly: true
+    service:
+      app:
+        controller: mikrotik-mcp
+        ports:
+          http:
+            port: 3000
+            targetPort: http

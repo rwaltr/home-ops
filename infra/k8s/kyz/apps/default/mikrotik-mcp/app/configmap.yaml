@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/core/configmap_v1.json
+# MikroMCP router registry. No secrets here: credentials come from the
+# environment (`credentials.source: env` -> ROUTER_MOUSE_USER / _PASS).
+#
+# `rosVersion` selects the REST paths MikroMCP uses; it is deliberately a
+# required field upstream because a wrong value changes which endpoints are
+# called. Confirm it against the router's `/system/resource` once the first
+# read tool runs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mikrotik-mcp
+data:
+  routers.yaml: |
+    routers:
+      mouse-router:
+        host: "10.10.0.1"
+        port: 80
+        tls:
+          enabled: false
+          rejectUnauthorized: true
+        credentials:
+          source: "env"
+          envPrefix: "ROUTER_MOUSE"
+        tags: ["core", "bgp", "k8s-gateway"]
+        rosVersion: "7.16"
