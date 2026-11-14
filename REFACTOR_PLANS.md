@@ -1987,10 +1987,10 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
-### 2026-11-14 — Books and audiobooks: Chaptarr + Kavita + Audiobookshelf, and slskd re-enabled
+### 2026-11-14 — Books and audiobooks: Chaptarr + Kavita + Audiobookshelf
 
 The tank already had the collection. Three new workloads over
-`/var/tank/nas/library/books` and the commented-out Soulseek client back on.
+`/var/tank/nas/library/books`. Soulseek was scoped, then deliberately left off.
 Runbook: `docs/books.md`.
 
 - **The dataset inventory was readable before the contents were.** The
@@ -2011,30 +2011,47 @@ Runbook: `docs/books.md`.
 - **Mount the dataset root, pick the root folder in the UI.** Committing
   `ebooks/` + `audiobooks/` subpaths would have baked in a guess about a layout
   nobody could read; one mount plus in-app root folders is layout-agnostic.
-- **Re-enabling a commented-out app is not just uncommenting it.** slskd carried
-  two latent faults that never fired because it was off: its music hostPath
-  pointed at `/var/tank/nas/library/media/music`, which is not a path on the tank
-  (kubelet creates a missing hostPath empty, so it silently shared nothing), and
-  its kopiur `PVC:` substitution named `slskd-app-data` when app-template renders
-  the claim as plain `slskd`. Read the rendered claim name before trusting the
-  app's own naming, especially on an app that has never reconciled.
+- **Re-enabling a commented-out app is not just uncommenting it.** slskd was
+  scoped for a re-enable and carried two latent faults that never fired because it
+  had never run: its music hostPath pointed at
+  `/var/tank/nas/library/media/music`, which is not a path on the tank (kubelet
+  creates a missing hostPath empty, so it silently shared nothing), and its kopiur
+  `PVC:` substitution named `slskd-app-data` when app-template renders the claim as
+  plain `slskd`. Both were fixed in place even though the app stays off, so a
+  later re-enable is one line and no traps. Read the rendered claim name before
+  trusting the app's own naming.
+- **Soulseek was then dropped for a connectivity reason, not a software one.**
+  The site is CGNAT with no port forwards, so slskd's listening port has no
+  inbound route: outbound search/download works, but peers cannot connect *to* us,
+  which is the whole upload half of a network that expects reciprocity. A
+  permanently low-connectivity peer is worse than no client, so the entry stays
+  commented out. It needs a tailnet path or a port forward before it is worth
+  re-enabling.
+- **Usenet was validated against real content and does not carry this class.**
+  Prowlarr searches (via rwaltr — the arr key is in 1Password item `arr` and this
+  agent holds no secrets) returned nothing for *Vagabond Squadron* and *Da
+  Freebooterz Code* (both Black Library / Games Workshop) and were slim for
+  Infected Mushroom. That is one indexer (NZBgeek) speaking, so read it as "usenet
+  is the movies/TV engine, not the books engine" rather than a proof of absence.
+  Prowlarr's book coverage is thin in general: of 584 indexer definitions only
+  EBookBay (public, ebooks), ABtorrents (private, audiobooks) and BookTracker
+  (RU) are book-related, and **MyAnonaMouse has no definition at all** — it would
+  need Jackett or a hand-written one.
 - **Audiobookshelf keeps state in two PVCs, so it gets a hand-written kopiur
   policy** (`config` + `metadata`) — the component templates one `${PVC}` and
   Flux substitution is string-level. Same exception as FreshRSS and HA; its
   verification block is duplicated with the component and has to be kept in step.
 - **Hour slots:** movers already occupied 1-17, so 18 (chaptarr), 19 (kavita) and
-  20 (audiobookshelf) were taken; slskd keeps its 10.
+  20 (audiobookshelf) were taken.
 - **Unverified at merge and stated as such in the doc:** container ports come from
   the images' `ExposedPorts`/READMEs (8789/5000/80) with the chart's default
   `tcpSocket` probes rather than an invented health path — no docker daemon here
   to run the images. All three default to root and are pinned `runAsNonRoot`
   `1000:1000` with fsGroup-owned PVCs; if an entrypoint insists on root the
   remedy is `runAsUser: 0` in that app's `defaultPodOptions`.
-- **Out-of-band follow-ups for rwaltr:** confirm the 1Password item `slskd`
-  (`soulseek_username`/`soulseek_password`) exists — the pod will not start
-  without it; and note the `books` dataset is a hostPath, so kopiur does **not**
-  cover it — a Chaptarr bug is unrecoverable without a host-side snapshot of
-  `tank/nas/library`.
+- **Out-of-band follow-up for rwaltr:** the `books` dataset is a hostPath, so
+  kopiur does **not** cover it — a Chaptarr bug is unrecoverable without a
+  host-side snapshot of `tank/nas/library`.
 
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
