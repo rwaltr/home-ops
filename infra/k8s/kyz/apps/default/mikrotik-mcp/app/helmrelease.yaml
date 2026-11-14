@@ -53,9 +53,23 @@ spec:
               - |
                 set -eu
                 cd /app
+                if [ -z "${MIKROMCP_CLIENT_TOKEN:-}" ]; then
+                  echo "MIKROMCP_CLIENT_TOKEN is not set on the identity initContainer" >&2
+                  exit 1
+                fi
                 hash=$(node -e 'require("bcryptjs").hash(process.env.MIKROMCP_CLIENT_TOKEN, 12).then(h => console.log(h))')
                 cp /cm/routers.yaml /config/routers.yaml
                 printf 'identities:\n  agentgateway:\n    token: "%s"\n    role: readonly\n    allowedRouters: []\n    allowedToolPatterns: []\n' "$hash" > /config/identities.yaml
+            # The initContainer does not inherit the app container's envFrom, so the
+            # token has to be injected here explicitly: without it bcryptjs is handed
+            # `undefined` and the container crashloops on
+            # `Error: Illegal arguments: undefined, number` before the app ever starts.
+            env:
+              - name: MIKROMCP_CLIENT_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: mikrotik-mcp-secret
+                    key: MIKROMCP_CLIENT_TOKEN
         containers:
           app:
             image:

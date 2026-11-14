@@ -2256,6 +2256,27 @@ Fourth item of the bjw-s parity series. Giant Swarm's `silence-operator` 0.22.0 
 
 Operating section: `docs/alerting.md` → "Silences".
 
+### 2026-11-14 (later still) — mikrotik-mcp: the initContainer's own env
+
+Fifth item of the bjw-s parity series, and the first one that paged. The
+`identity` initContainer derives the bearer token's bcrypt hash at pod start, but
+it was written with no `env` of its own — an initContainer does not inherit the
+app container's `envFrom`, so `process.env.MIKROMCP_CLIENT_TOKEN` was `undefined`
+and bcryptjs threw `Error: Illegal arguments: undefined, number` in
+`Init:CrashLoopBackOff`, which surfaced as `KubePodNotReady` +
+`KubeDeploymentReplicasMismatch` + `HelmReleaseReconciliationFailure`.
+
+- **Fix**: `env` + `secretKeyRef` for `MIKROMCP_CLIENT_TOKEN` on the initContainer,
+  plus a non-empty guard so the failure names the variable instead of bcrypt.
+- **Lesson for the rest of the series**: any secret the *initContainer* needs has
+  to be listed on the initContainer. `envFrom` on `containers.app` is invisible to
+  it, and the resulting error mentions the library that consumed the undefined
+  value, not the wiring that omitted it.
+- The ExternalSecret itself was also un-synced at the time (`SecretSyncedError`,
+  `expected one 1Password ItemField matching: 'mcptoken' in 'microtik', got 0`),
+  so the pod could not have started with or without this manifest fix; the
+  `mcptoken` field is rwaltr's to add.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

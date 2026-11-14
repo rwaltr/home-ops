@@ -87,6 +87,14 @@ an initContainer hashes `MIKROMCP_CLIENT_TOKEN` at pod start with the image's ow
 `routers.yaml`. The raw token exists only in the Secret; the hash is regenerated
 every start.
 
+The token is injected into the initContainer **explicitly** (`env` +
+`secretKeyRef` on `mikrotik-mcp-secret`). An initContainer does not inherit the
+app container's `envFrom`, so relying on that leaves
+`process.env.MIKROMCP_CLIENT_TOKEN` undefined and bcryptjs fails with
+`Error: Illegal arguments: undefined, number` — a stack trace that names bcrypt
+and hides the missing variable. The initContainer also guards on the variable
+being non-empty so the same mistake reports itself plainly.
+
 Identity role is `readonly`: read tools, and confirmation required for anything
 destructive.
 
