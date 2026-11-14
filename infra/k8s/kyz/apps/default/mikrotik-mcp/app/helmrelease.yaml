@@ -47,6 +47,17 @@ spec:
             image:
               repository: ghcr.io/alikarami/mikromcp
               tag: 1.9.0
+            # `envFrom` on the app container does NOT reach an initContainer:
+            # env and envFrom are per-container, so the token has to be named
+            # here as well. Without it the hash step fails with bcryptjs's
+            # "Illegal arguments: undefined, number" and the pod never starts.
+            # Only the one variable, not the whole Secret — this container has
+            # no business holding the router credentials.
+            env:
+              MIKROMCP_CLIENT_TOKEN:
+                secretKeyRef:
+                  name: mikrotik-mcp-secret
+                  key: MIKROMCP_CLIENT_TOKEN
             command:
               - /bin/sh
               - -c
