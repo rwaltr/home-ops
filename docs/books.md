@@ -1,18 +1,19 @@
 # Books, audiobooks and music downloads
 
-Three new workloads over the **existing** tank `books` dataset, plus the Soulseek
-client re-enabled. Acquisition and reading are deliberately split:
+Three new workloads over the **existing** tank `books` dataset. Acquisition and
+reading are deliberately split. The Soulseek client (`slskd/`) stays **disabled**
+— see the section below for why.
 
 ```
                     /var/tank/nas/library/books  (hostPath off the tank)
                                   │
-   ┌──────────────────┬───────────┴────────────┬───────────────────────┐
-   │                  │                        │                       │
- Chaptarr          Kavita                Audiobookshelf             slskd
- (manage/import    (read: epub,          (stream: audiobooks,      (Soulseek
-  eBook+audio, rw)  comics, pdf, ro)      podcasts; ro)             client, rw)
-   │                                                        │
- /downloads  ──── shared with SABnzbd ────────────────────────┘
+   ┌──────────────────┬───────────┴───────────┐
+   │                  │                       │
+ Chaptarr          Kavita             Audiobookshelf
+ (manage/import    (read: epub,        (stream: audiobooks,
+  eBook+audio, rw)  comics, pdf, ro)   podcasts; ro)
+   │
+ /downloads  ──── shared with SABnzbd
    │
  Prowlarr (indexers) → SABnzbd (usenet)
 ```
@@ -60,19 +61,20 @@ find /var/tank/nas/library/books -type f | sed 's/.*\.//' | sort | uniq -c | sor
 OCIRepository, HTTPRoute, and a kopiur policy where it is not the shared
 component). All are registered in `apps/default/kustomization.yaml`.
 
-| App            | Image (pinned)                              | Chart                | Port | Library mount                     |
-| -------------- | ------------------------------------------- | -------------------- | ---- | --------------------------------- |
-| Chaptarr       | `docker.io/chaptarr/chaptarr:0.9.1000`      | `app-template` 5.2.1 | 8789 | `/books` (rw) + `/downloads` (rw) |
-| Kavita         | `docker.io/jvmilazz0/kavita:0.9.1`          | `app-template` 5.2.1 | 5000 | `/books` (ro)                     |
-| Audiobookshelf | `docker.io/advplyr/audiobookshelf:2.37.2`   | `app-template` 5.2.1 | 80   | `/books` (ro)                     |
-| slskd          | `ghcr.io/slskd/slskd:0.26.2` (pre-existing) | `app-template` 5.2.1 | 5030 | `/media/music`, `/books`          |
+| App            | Image (pinned)                            | Chart                | Port | Library mount                     |
+| -------------- | ----------------------------------------- | -------------------- | ---- | --------------------------------- |
+| Chaptarr       | `docker.io/chaptarr/chaptarr:0.9.1000`    | `app-template` 5.2.1 | 8789 | `/books` (rw) + `/downloads` (rw) |
+| Kavita         | `docker.io/jvmilazz0/kavita:0.9.1`        | `app-template` 5.2.1 | 5000 | `/books` (ro)                     |
+| Audiobookshelf | `docker.io/advplyr/audiobookshelf:2.37.2` | `app-template` 5.2.1 | 80   | `/books` (ro)                     |
+
+`slskd/` is still in the tree but **not registered** in the parent
+kustomization — see below.
 
 | App            | State PVCs                                      | Backup                              |
 | -------------- | ----------------------------------------------- | ----------------------------------- |
 | Chaptarr       | `chaptarr` (5Gi)                                | shared kopiur component, `H 18`     |
 | Kavita         | `kavita-config` (5Gi)                           | shared kopiur component, `H 19`     |
 | Audiobookshelf | `audiobookshelf-config`, `-metadata` (5Gi each) | hand-written two-PVC policy, `H 20` |
-| slskd          | `slskd` (5Gi)                                   | shared kopiur component, `H 10`     |
 
 Audiobookshelf keeps state in **two** PVCs, and the shared component templates a
 single `${PVC}`, so its policy is hand-written in `app/kopia.yaml` — the same
@@ -107,11 +109,24 @@ own web UI on first visit, exactly like Navidrome:
 - Audiobookshelf — first visit creates the root user; add a library against
   `/books/<audiobook subdirectory>`.
 
-## slskd (Soulseek) — re-enabled
+## slskd (Soulseek) — left disabled (CGNAT)
 
-`infra/k8s/kyz/apps/default/slskd/` was already in the tree, commented out of the
-parent kustomization. Re-enabling is that one line, plus two corrections that
-only matter now that it runs:
+`infra/k8s/kyz/apps/default/slskd/` is in the tree but **not registered** in the
+parent kustomization, and it was decided on 2026-11-14 to leave it that way. It
+briefly merged registered in #1005 and was taken back out in #1007 — the pod sat
+in `CreateContainerConfigError` the whole time, because the 1Password item it
+needs did not exist.
+
+The blocker is connectivity, not the software. The site is CGNAT with no port
+forwards, so slskd's listening port (default 50300) has no inbound route.
+Outbound still works — searching and downloading are fine, because the client
+connects out to peers. What doesn't work is peers connecting _to us_, which is
+the upload half. Soulseek expects reciprocity: a client that shares nothing gets
+ignored or blocked, and this one would look like a low-connectivity peer
+permanently. Shipping that is worse than not shipping it.
+
+**What was fixed anyway**, so a later re-enable does not reintroduce two faults
+that were dormant only because the app never worked:
 
 - **The music hostPath was wrong.** It pointed at
   `/var/tank/nas/library/media/music`, which is not a path on the tank; kubelet
@@ -122,9 +137,15 @@ only matter now that it runs:
   a second PVC exists), so the snapshot policy named a claim that does not exist.
   Corrected to `slskd`.
 
-Soulseek credentials come from 1Password item **`slskd`** (`soulseek_username` /
-`soulseek_password`) via the app's existing ExternalSecret. If that item is
-missing the pod will not start; nothing else here needs provisioning.
+**To re-enable**, when there is an inbound route for the port (a tailnet path or
+a forward): uncomment the one line in the parent `kustomization.yaml`, and create
+the 1Password item **`slskd`** with fields `soulseek_username` and
+`soulseek_password` — the ExternalSecret reads exactly those names, and a
+mismatch syncs an empty value rather than erroring. (Its absence is precisely why
+the pod above could not start: missing item means no Secret, and the container
+never gets env.) The Soulseek account itself is created by the first successful
+login; there is no registration. The web UI's own credential is separate and
+defaults to `slskd` / `slskd`.
 
 **Soulseek has no supported bridge into Chaptarr or Lidarr** — Soularr is
 Lidarr→slskd for music only — so a Soulseek transfer is a manual workflow:
