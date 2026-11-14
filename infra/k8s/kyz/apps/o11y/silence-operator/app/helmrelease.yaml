@@ -33,7 +33,9 @@ spec:
       strategy: rollback
       retries: 3
   values:
-    fullnameOverride: silence-operator
+    # The address below is the only required value; the chart already names its
+    # objects silence-operator (no fullnameOverride needed — konflate flagged one
+    # as a no-op and the render confirmed the default names).
     # The headless peer service the kube-prometheus-stack Alertmanager creates;
     # same address the reference repo points at. The ClusterIP service
     # (kube-prometheus-stack-alertmanager) is the same single pod.
