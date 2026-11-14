@@ -90,6 +90,12 @@ an initContainer hashes `MIKROMCP_CLIENT_TOKEN` at pod start with the image's ow
 `routers.yaml`. The raw token exists only in the Secret; the hash is regenerated
 every start.
 
+The token is named explicitly on the initContainer, **not** inherited: `env` and
+`envFrom` are per-container, so an `envFrom` on the app container never reaches an
+init container. The failure looks like a bcrypt problem rather than a wiring
+problem — `Error: Illegal arguments: undefined, number` from inside `hash()` — and
+the pod sits in `Init:Error` forever.
+
 Identity role is `readonly`: read tools, and confirmation required for anything
 destructive.
 
