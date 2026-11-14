@@ -1,0 +1,122 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+#
+# Audiobookshelf — audiobook/podcast server and the mobile clients' backend.
+# This is the Navidrome-equivalent for spoken audio: per-book progress, speed
+# and sleep timer, which Jellyfin's book handling does not give you.
+#
+# Library is mounted READ-ONLY. Audiobookshelf keeps everything it owns —
+# settings, users, library item metadata, generated covers — on its /config and
+# /metadata PVCs; the library folder is added in its UI against /books, so the
+# mount does not depend on how the collection is laid out inside the dataset
+# (point it at the audiobook subdirectory, not the dataset root).
+#
+# Image runs as root by default (no USER directive). Its entrypoint is plain
+# `tini -- node dist-server/index.js` with no chown step, so non-root is safe
+# here as long as /config and /metadata are writable by the run user — the
+# fsGroup below is what makes that true. Root FS left writable because the
+# image's node entrypoint is not verified clean against a read-only root from
+# this pod (no docker daemon to test with).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: audiobookshelf
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: audiobookshelf
+  values:
+    fullnameOverride: audiobookshelf
+    controllers:
+      audiobookshelf:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/advplyr/audiobookshelf
+              tag: 2.37.2@sha256:b897c33f05972fb1bf484f7487bc878fa91ec8691335c1db6e2929c3a7658efa
+            env:
+              TZ: America/Chicago
+              # Explicit rather than relying on the image defaults (which already
+              # carry both), so a base-image change cannot silently move state
+              # off the backed-up PVCs.
+              CONFIG_PATH: /config
+              METADATA_PATH: /metadata
+            probes:
+              liveness:
+                enabled: true
+              readiness:
+                enabled: true
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                # Scanning a library and streaming transcodes are bursty; no CPU
+                # limit (it would throttle below 100% usage), memory bounded —
+                # no swap on this node.
+                memory: 1Gi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: audiobookshelf
+        ports:
+          http:
+            appProtocol: http
+            port: 80
+    persistence:
+      # users/settings database + the server's own state.
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC
+        # exists, and the kopiur policy refers to these exact names.
+        forceRename: audiobookshelf-config
+        globalMounts:
+          - path: /config
+      # Library item metadata + generated covers (grows with the library, and is
+      # expensive to regenerate, so it is backed up alongside the config).
+      metadata:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        forceRename: audiobookshelf-metadata
+        globalMounts:
+          - path: /metadata
+      # The books dataset, read-only — the audiobook subdirectory is chosen in
+      # the UI, not here.
+      books:
+        type: hostPath
+        hostPath: /var/tank/nas/library/books
+        globalMounts:
+          - path: /books
+            readOnly: true
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

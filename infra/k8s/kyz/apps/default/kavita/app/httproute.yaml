@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://gateway-api.sigs.k8s.io/geps/gep-1748
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kavita
+  annotations:
+    # Listed on the Homepage dashboard — see docs/homepage.md.
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Kavita
+    gethomepage.dev/description: eBook and comic reader
+    gethomepage.dev/group: Reading
+    gethomepage.dev/icon: kavita.png
+spec:
+  hostnames:
+    - kavita.waltr.tech
+  parentRefs:
+    - name: envoy-internal
+      namespace: network
+  rules:
+    - backendRefs:
+        - name: kavita
+          port: 5000

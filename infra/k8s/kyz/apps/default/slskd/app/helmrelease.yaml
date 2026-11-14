@@ -88,8 +88,20 @@ spec:
           - path: /downloads
       music:
         type: hostPath
-        hostPath: /var/tank/nas/library/media/music
+        # Corrected on re-enable: this pointed at
+        # /var/tank/nas/library/media/music, which is not a path on the tank —
+        # the music library dataset is /var/tank/nas/library/music (same one
+        # navidrome and jellyfin mount). The wrong path was silently created
+        # empty, so slskd shared nothing.
+        hostPath: /var/tank/nas/library/music
         globalMounts:
           - path: /media/music
+      # The books dataset, so a Soulseek transfer can be placed next to the
+      # rest of the collection. Read-write for parity with the music mount.
+      books:
+        type: hostPath
+        hostPath: /var/tank/nas/library/books
+        globalMounts:
+          - path: /books
       tmp:
         type: emptyDir
