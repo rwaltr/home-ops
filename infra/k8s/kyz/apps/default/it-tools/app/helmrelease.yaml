@@ -54,6 +54,18 @@ spec:
               capabilities:
                 drop:
                   - ALL
+                # nginx's master process runs as root and does two things that
+                # need capabilities back: chown() of its own cache dirs
+                # (/var/cache/nginx/client_temp -> uid 101) and setuid/setgid to
+                # drop its workers to the `nginx` user. With ALL dropped the
+                # container dies before it listens:
+                #   chown("/var/cache/nginx/client_temp", 101) failed (1: Operation not permitted)
+                # This is the minimum set for the official image as root — no
+                # DAC_OVERRIDE, no NET_BIND_SERVICE (root may bind :80 without it).
+                add:
+                  - CHOWN
+                  - SETGID
+                  - SETUID
             image:
               # Pinned by index digest: the project's last release was
               # 2024-10-22 (upstream `nightly` tracks main), so the tag alone
