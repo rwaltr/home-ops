@@ -44,7 +44,7 @@ do not grant those while the identity role is `readonly`.
 
 ## Credentials
 
-1Password item `mikrotik`, vault `home-ops`, Login type. Field labels are the
+1Password item `microtik`, vault `home-ops`, Login type — note the spelling. Field labels are the
 contract in `app/externalsecret.yaml`:
 
 - `username` → `ROUTER_MOUSE_USER` (must match `envPrefix` in `routers.yaml`)
@@ -60,10 +60,15 @@ Renaming a label in 1Password silently costs the pod that variable, and a missin
 _item_ fails the whole ExternalSecret rather than one key, so change both sides in
 the same breath.
 
-**New items are not instantly visible.** 1Password Connect caches vault and item
-metadata; right after creating an item, ESO reports
-`key not found in 1Password Vaults: mikrotik in: map[home-ops:1]` even though the
-item exists by that exact title. Restarting the Connect deployment clears it:
+**The item title is `microtik`** (spelled with an `r`), and 1Password matches
+titles literally — referencing `mikrotik` produced
+`key not found in 1Password Vaults: mikrotik in: map[home-ops:1]`, which reads
+like a caching problem and is not one. If the title is ever corrected in
+1Password, this line in `app/externalsecret.yaml` has to change in the same breath.
+
+1Password Connect _does_ also cache vault/item metadata, so a genuinely
+just-created item can lag; the tell-tale is that the error names the item you
+asked for. Clearing it:
 
 ```sh
 kubectl -n external-secrets rollout restart deploy/onepassword-connect
