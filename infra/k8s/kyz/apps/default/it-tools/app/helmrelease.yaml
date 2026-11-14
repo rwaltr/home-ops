@@ -1,0 +1,107 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# it-tools — static collection of developer utilities, served by nginx.
+# https://it-tools.waltr.tech (envoy-internal only: nothing here needs to leave
+# the LAN, so it is not attached to envoy-external).
+#
+# Runs as root with a writable root filesystem, like degoog and freshrss. Two
+# reasons, both structural rather than lazy:
+#   - the image's baked nginx config listens on :80, and binding a privileged
+#     port needs root (the image has no USER directive — `User: None` in its
+#     config — so root is its default anyway);
+#   - `/docker-entrypoint.d/10-listen-on-ipv6-by-default.sh` rewrites
+#     /etc/nginx/conf.d/default.conf at start, so readOnlyRootFilesystem: true
+#     fails before nginx ever serves a request.
+# Capabilities are dropped to the empty set — nginx needs none to bind :80 as
+# root, and no `runAsUser: 0` fallback is needed because root is the only uid
+# this image works as.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: it-tools
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: it-tools
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: it-tools
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: false
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+    controllers:
+      it-tools:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Left writable on purpose (see the header comment): the image's
+              # entrypoint rewrites /etc/nginx/conf.d/default.conf at start.
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+            image:
+              # Pinned by index digest: the project's last release was
+              # 2024-10-22 (upstream `nightly` tracks main), so the tag alone
+              # would let a rebuild move under us.
+              repository: docker.io/corentinth/it-tools
+              tag: 2024.10.22-7ca5933@sha256:8b8128748339583ca951af03dfe02a9a4d7363f61a216226fc28030731a5a61f
+            env:
+              TZ: America/Chicago
+            probes:
+              # Port 80 is the image's own ExposedPorts, not a guess; `/` is the
+              # static site root nginx serves (200, no redirect). `custom: true`
+              # is required — without it app-template ignores the spec: block and
+              # renders a tcpSocket probe, silently dropping the path.
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /
+                    port: &port 80
+                  periodSeconds: 30
+                  timeoutSeconds: 3
+                  failureThreshold: 3
+              readiness: *probes
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+              limits:
+                # Memory capped because this node has no swap; no CPU limit — it
+                # would throttle a static file server below 100% usage.
+                memory: 128Mi
+    service:
+      app:
+        ports:
+          http:
+            port: *port
+    route:
+      app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/name: IT-Tools
+          gethomepage.dev/description: Developer utilities
+          gethomepage.dev/group: Utilities
+        hostnames:
+          - it-tools.waltr.tech
+        parentRefs:
+          - name: envoy-internal
+            namespace: network

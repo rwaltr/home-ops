@@ -2161,6 +2161,32 @@ debugging falls back to Prometheus — and the app directory was already sitting
   `/api/v2/silences` when it triages — a silence is the channel that tells the
   agent-side triage this is in-flight work rather than a new incident.
 
+### 2026-11-14 (later still) — it-tools: static utilities, internal only
+
+Second item of the bjw-s parity series. `corentinth/it-tools` behind nginx at
+`https://it-tools.waltr.tech`, attached to `envoy-internal` only — nothing about a
+developer-utilities page needs to leave the LAN, and exposure stays rwaltr's call.
+
+- **Pinned to the project's last release, by digest.** Upstream's newest *release*
+  tag is `2024.10.22-7ca5933` (its `nightly` tracks main and was refreshed
+  2026-02), so a floating tag would drift silently. Index digest
+  `sha256:8b812874…a61f`.
+- **Runs as root with a writable root filesystem**, like degoog and freshrss, for
+  two structural reasons: the image's baked nginx config listens on `:80` (a
+  privileged port, and the image has no `USER` directive), and
+  `/docker-entrypoint.d/10-listen-on-ipv6-by-default.sh` rewrites
+  `/etc/nginx/conf.d/default.conf` at start, so `readOnlyRootFilesystem: true`
+  would fail before nginx serves anything. Capabilities are dropped to the empty
+  set — nginx needs none to bind `:80` as root.
+- **Probe port 80 and path `/` come from the image config** (`ExposedPorts
+  80/tcp`; `/` is the static root, a 200 with no redirect), not from intuition.
+  The render check caught the app-template probe shape: an `httpGet` written
+  directly under `probes.<name>` is rejected by the chart schema
+  (`additional properties 'httpGet' not allowed`) — the correct shape is
+  `custom: true` plus a `spec:` block. Worth knowing that this one *errors*
+  rather than silently rendering a `tcpSocket` probe.
+- No PVC and therefore no kopiur policy: the app is stateless.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
