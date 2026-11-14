@@ -2109,6 +2109,58 @@ cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
   Same class as the unchecked port guesses in the entry above — nothing here can
   run the image, so the first boot *is* the test.
 
+### 2026-11-14 (later still) — metrics-server: the metrics.k8s.io API, with kubelet TLS verified
+
+First item of the bjw-s parity series (metrics-server → chaski → it-tools →
+silence-operator → agentgateway → cliproxyapi → MCP servers; see Open questions
+for the kanidm/CloudNativePG call that pauses it). `kubectl top` has never worked
+on this cluster — the memory audit recorded "no metrics-server" as the reason
+debugging falls back to Prometheus — and the app directory was already sitting in
+`kube-system` commented out.
+
+- **Sourced upstream, not from the charts-mirror.** metrics-server publishes a
+  classic Helm repo (`https://kubernetes-sigs.github.io/metrics-server`), not OCI
+  artifacts, so the HelmRelease uses a `HelmRepository` — same shape as reloader
+  and rustfs. The home-operations mirror does carry the chart, but the mirror is
+  a stop-gap with a published expiry and a pruned chart fails as
+  `DENIED: requested access to the resource is denied`, taking its `dependsOn`
+  graph with it. Chart 3.14.0 (appVersion 0.9.0) is the current upstream release.
+- **Kubelet TLS is verified instead of skipped.** The usual homelab recipe is
+  `--kubelet-insecure-tls`, and the reference repo passes it. It is not needed
+  here: the kubelet serving certificate on mouse is issued by the cluster CA
+  (`issuer=CN=kubernetes-ca`, `subject=O=system:nodes, CN=system:node:mouse`,
+  SANs `DNS:mouse, IP:10.10.0.10, IP:FDAD:207A:F1AB:10:0:0:0:10`), and the
+  in-cluster service-account bundle at
+  `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` *is* that CA
+  (`subject=CN=kubernetes-ca`). So the manifest passes
+  `--kubelet-certificate-authority=` at that path and metrics-server verifies
+  kubelets for real — the flag exists in v0.9.0 (confirmed by running the pinned
+  release binary's `--help`, since nothing here can start the image).
+  `--kubelet-insecure-tls` would also hide a genuinely broken kubelet
+  certificate later, which is the failure this cluster would want to see.
+- **`metrics.enabled` + `serviceMonitor.enabled` are both required** — the
+  ServiceMonitor template is gated on both, and `metrics.enabled` is what adds
+  `--authorization-always-allow-paths=/metrics` so Prometheus can scrape without
+  a bearer token. `serviceMonitorSelectorNilUsesHelmValues: false` on the
+  kube-prometheus-stack means the new ServiceMonitor is picked up with no extra
+  labels.
+- **`dependsOn: kube-prometheus-stack` (namespace `o11y`) for the ServiceMonitor
+  CRD**, matching smartctl-exporter; `wait: true` so a rollout that never becomes
+  Ready surfaces as a failed Kustomization rather than a silently absent API.
+- **Resources are a first estimate, not a measurement** — the app is new, so
+  there is no history to size from. 50m/100Mi requests, 256Mi memory limit (no
+  CPU limit; it would throttle the 15s scrape loop). Revisit against observed
+  usage after a week, the way the memory audit did for every other component.
+- **Expected konflate caution**: the chart creates cluster-scoped RBAC
+  (`system:metrics-server`, the aggregated reader, the `auth-delegator`
+  binding). That is the chart's own minimal set for backing an aggregated API —
+  no `cluster-admin`, nothing hand-written.
+- **Alert coordination for the series**: while this deployment series is in
+  flight, expected alert churn is covered by an Alertmanager silence whose
+  comment names the work, because `alert-feed-triage` reads
+  `/api/v2/silences` when it triages — a silence is the channel that tells the
+  agent-side triage this is in-flight work rather than a new incident.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
@@ -2186,6 +2238,7 @@ session. Router-side specifics live in `infra/routeros/README.md`
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
+- [ ] bjw-s parity series is paused after metrics-server/chaski/it-tools/silence-operator/agentgateway/cliproxyapi/MCP servers: **kanidm via kaniop, or CloudNativePG, next?** (2026-11-14)
 
 - [ ] SOPS+age (keep) vs 1Password Connect + ESO (adopt)?
 - [ ] Dedicated service CIDR for BGP pool: `192.168.x.0/24` — pick one

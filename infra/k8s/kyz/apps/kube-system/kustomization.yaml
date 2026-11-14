@@ -17,7 +17,7 @@ resources:
   # - ./generic-device-plugin/ks.yaml
   - ./intel-gpu-resource-driver/ks.yaml
   - ./reloader/ks.yaml
-  # - ./metrics-server/ks.yaml
+  - ./metrics-server/ks.yaml
   # - ./multus/ks.yaml
   # - ./ocharted/ks.yaml
   # - ./snapshot-controller/ks.yaml

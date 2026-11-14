@@ -1,0 +1,62 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# metrics-server — the metrics.k8s.io API (`kubectl top`, resource-based HPA).
+#
+# k0s ships no metrics server, so `kubectl top` has never worked here (recorded
+# in REFACTOR_PLANS.md under the memory audit: "no metrics-server, debug via
+# metrics instead"). This is the upstream chart, not the home-operations mirror.
+#
+# Kubelet TLS is verified, not skipped. The kubelet serving certificate on this
+# node is issued by the cluster CA (`CN=kubernetes-ca`, SAN
+# `DNS:mouse, IP:10.10.0.10`), and the in-cluster service-account bundle *is*
+# that CA — so pointing metrics-server at it verifies kubelets for real.
+# `--kubelet-insecure-tls` is the usual homelab shortcut and is not needed here;
+# it is also the flag that hides a genuinely broken kubelet certificate later.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metrics-server
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: metrics-server
+      version: 3.14.0
+      sourceRef:
+        kind: HelmRepository
+        name: metrics-server
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: metrics-server
+    # Appended after the chart's own defaults (--cert-dir=/tmp,
+    # --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname,
+    # --kubelet-use-node-status-port, --metric-resolution=15s).
+    args:
+      - --kubelet-certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    # `metrics.enabled` also adds --authorization-always-allow-paths=/metrics, so
+    # Prometheus can scrape without a bearer token; the ServiceMonitor is only
+    # rendered when both of these are on.
+    metrics:
+      enabled: true
+    serviceMonitor:
+      enabled: true
+    resources:
+      # First estimate, not a measurement — this app is new, so there is no 30d
+      # history to size from. The chart's own default request (200Mi) is generous
+      # for a single node. Revisit against observed usage once it has run for a
+      # week (the pattern the memory audit used for every other component).
+      requests:
+        cpu: 50m
+        memory: 100Mi
+      limits:
+        # Memory is capped because this node has no swap: an unbounded container
+        # is an OOM cascade rather than a slow job. No CPU limit on purpose — it
+        # would throttle the 15s scrape loop below 100% usage.
+        memory: 256Mi
