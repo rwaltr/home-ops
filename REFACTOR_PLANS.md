@@ -1987,6 +1987,55 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
+### 2026-11-14 — Books and audiobooks: Chaptarr + Kavita + Audiobookshelf, and slskd re-enabled
+
+The tank already had the collection. Three new workloads over
+`/var/tank/nas/library/books` and the commented-out Soulseek client back on.
+Runbook: `docs/books.md`.
+
+- **The dataset inventory was readable before the contents were.** The
+  node-exporter zfs collector exposes per-dataset I/O
+  (`node_zfs_zpool_dataset_reads`), which enumerates the pool without a host
+  mount: `tank/nas/library/{archive,books,games,media,music}`, `tank/nas/pictures`,
+  `tank/backup/k8s`, `tank/home/rwaltr`. `tank/nas/library/books` is the existing
+  collection. There is **no** audiobooks dataset — audiobooks need a subdirectory
+  or a new `zfs create`, and that is a host operation.
+- **Contents are not readable from in-cluster and were not measured.** No
+  `/var/tank` mount in the agent pod, `pods/exec` not granted, pod creation not
+  permitted. File counts/formats/layout of `books` are unknown; the host one-liner
+  is in the doc.
+- **Readarr is retired, so the fork is the only *arr-shaped path.** Upstream repo
+  archived 2025-06 and its metadata servers gone. Chaptarr (eBook + audiobook in
+  one instance) is the maintained fork; bookshelf is a second revival. Kavita is
+  the *reader*; Audiobookshelf is the audiobook *streamer* with native apps.
+- **Mount the dataset root, pick the root folder in the UI.** Committing
+  `ebooks/` + `audiobooks/` subpaths would have baked in a guess about a layout
+  nobody could read; one mount plus in-app root folders is layout-agnostic.
+- **Re-enabling a commented-out app is not just uncommenting it.** slskd carried
+  two latent faults that never fired because it was off: its music hostPath
+  pointed at `/var/tank/nas/library/media/music`, which is not a path on the tank
+  (kubelet creates a missing hostPath empty, so it silently shared nothing), and
+  its kopiur `PVC:` substitution named `slskd-app-data` when app-template renders
+  the claim as plain `slskd`. Read the rendered claim name before trusting the
+  app's own naming, especially on an app that has never reconciled.
+- **Audiobookshelf keeps state in two PVCs, so it gets a hand-written kopiur
+  policy** (`config` + `metadata`) — the component templates one `${PVC}` and
+  Flux substitution is string-level. Same exception as FreshRSS and HA; its
+  verification block is duplicated with the component and has to be kept in step.
+- **Hour slots:** movers already occupied 1-17, so 18 (chaptarr), 19 (kavita) and
+  20 (audiobookshelf) were taken; slskd keeps its 10.
+- **Unverified at merge and stated as such in the doc:** container ports come from
+  the images' `ExposedPorts`/READMEs (8789/5000/80) with the chart's default
+  `tcpSocket` probes rather than an invented health path — no docker daemon here
+  to run the images. All three default to root and are pinned `runAsNonRoot`
+  `1000:1000` with fsGroup-owned PVCs; if an entrypoint insists on root the
+  remedy is `runAsUser: 0` in that app's `defaultPodOptions`.
+- **Out-of-band follow-ups for rwaltr:** confirm the 1Password item `slskd`
+  (`soulseek_username`/`soulseek_password`) exists — the pod will not start
+  without it; and note the `books` dataset is a hostPath, so kopiur does **not**
+  cover it — a Chaptarr bug is unrecoverable without a host-side snapshot of
+  `tank/nas/library`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

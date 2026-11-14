@@ -1,0 +1,126 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+#
+# Chaptarr — book manager (eBook + audiobook) for the existing tank books
+# dataset at /var/tank/nas/library/books. Readarr's successor fork; the Servarr
+# project retired Readarr in 2025 (repo archived, upstream metadata servers
+# gone), so this is the maintained path to an *arr-shaped book manager.
+#
+# Chaptarr is BETA software by its own README, and it WRITES to the library
+# (it organises, renames and imports into it) — so the books dataset is mounted
+# read-write here, unlike the read-only mounts the music readers use.
+#
+# Container port 8789 is the one its README and compose file both publish
+# (`-p 8789:8789`). Note the image config also carries ASPNETCORE_HTTP_PORTS=8080,
+# so the entrypoint wrapper is expected to front 8080 on 8789; the probes are
+# left as the chart's default tcpSocket rather than an invented HTTP path,
+# because a wrong path flaps readiness and the health route has not been
+# verified against a running container (this pod has no docker daemon).
+#
+# Image runs as root by default (no USER directive) and its entrypoint is
+# linuxserver-shaped (PUID/PGID/UMASK, chowns /config before exec). We pin
+# non-root and hand it the same uid/gid via PUID/PGID plus an fsGroup-owned PVC,
+# so the chown step has nothing to do. Root FS stays writable for that same
+# reason: the entrypoint self-modifies in place.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: chaptarr
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: chaptarr
+  values:
+    fullnameOverride: chaptarr
+    controllers:
+      chaptarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: docker.io/chaptarr/chaptarr
+              tag: 0.9.1000@sha256:7bc5774c79bd6e2deb633dd8555116a672b56be03e2b756b29fb86bedd44944c
+            env:
+              TZ: America/Chicago
+              PUID: "1000"
+              PGID: "1000"
+              # Shared media group: the library is written by more than one
+              # app, so group-write the files it creates.
+              UMASK: "002"
+            probes:
+              liveness:
+                enabled: true
+              readiness:
+                enabled: true
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              # The entrypoint chowns /config and sets up the run user before
+              # exec, so the root FS cannot be read-only for this image.
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                # .NET + an embedded SQLite index; the library scan is bursty.
+                # No CPU limit (it would throttle below 100% usage), memory
+                # bounded — this node has no swap.
+                memory: 2Gi
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: chaptarr
+        ports:
+          http:
+            appProtocol: http
+            port: 8789
+    persistence:
+      # chaptarr.db + logs. `-data=/config` is baked into the image's Cmd.
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        storageClass: openebs-hostpath
+        # Pinned: app-template only suffixes PVC names once a second PVC
+        # exists, and the kopiur policy refers to this exact name.
+        forceRename: chaptarr
+        globalMounts:
+          - path: /config
+      # The whole books dataset, one mount. Library roots (ebook vs audiobook
+      # subdirectories) are configured in the UI against /books, so the mount
+      # does not depend on how the existing collection is laid out inside it.
+      books:
+        type: hostPath
+        hostPath: /var/tank/nas/library/books
+        globalMounts:
+          - path: /books
+      # Shared with SABnzbd/Radarr/Sonarr so a completed download can be
+      # imported without a cross-filesystem copy.
+      downloads:
+        type: hostPath
+        hostPath: /var/tank/nas/downloads
+        globalMounts:
+          - path: /downloads
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp

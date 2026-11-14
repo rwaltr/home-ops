@@ -90,6 +90,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/calendar.md` — Radicale + CalDAV / Remind feed
 - `docs/freshrss.md` — FreshRSS
 - `docs/navidrome.md` — Navidrome (Subsonic/OpenSubsonic)
+- `docs/books.md` — Chaptarr + Kavita + Audiobookshelf over the tank `books` dataset, and the re-enabled slskd (Soulseek)
 - `docs/homebox.md` — HomeBox home inventory
 - `docs/homepage.md` — Homepage service dashboard
 - `docs/hermes-agent.md` — Hermes agent

@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotpolicy_v1alpha1.json
+# DELIBERATELY NOT using components/kopiur/backup: Audiobookshelf keeps state in
+# TWO PVCs (config + metadata) and the component templates a single ${PVC}. Flux
+# postBuild substitution is string-level, so a variable-length sources list
+# cannot be expressed as a component variable (same exception as FreshRSS's
+# kopia.yaml and HA's).
+#
+# copyMethod: Direct is mandatory on openebs-hostpath (no CSI snapshots) — the
+# mover reads the live PVCs, so snapshots are crash-consistent. Audiobookshelf
+# keeps its users/settings/library index in SQLite under /config; a snapshot
+# taken mid-write is the accepted tradeoff, same as HA's recorder DB. /metadata
+# is regenerable but expensive (every cover re-fetch), which is why it is
+# covered as well as /config.
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: audiobookshelf
+  namespace: default
+spec:
+  repository:
+    kind: ClusterRepository
+    name: cluster-kopia
+  sources:
+    - pvc:
+        name: audiobookshelf-config
+      sourcePathStrategy: PvcName
+    - pvc:
+        name: audiobookshelf-metadata
+      sourcePathStrategy: PvcName
+  copyMethod: Direct
+  # The pod runs as 1000:1000 with fsGroup 1000, so the default mover UID can
+  # read both PVCs. Stated explicitly because a mover that cannot read the data
+  # fails as a failed snapshot, not as a permission error.
+  mover:
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+    podSecurityContext:
+      fsGroup: 1000
+  retention:
+    keepLatest: 7
+    keepDaily: 14
+    keepWeekly: 4
+  # Verification duplicated from components/kopiur/backup — this policy is
+  # hand-written for the two-PVC reason above. Keep the two in step; without it
+  # kopiur verifies nothing here and `status.lastVerified` stays empty.
+  # `storageClassName` is required on the deep tier: this cluster has no default
+  # StorageClass, so a scratch PVC that omits it never binds and the deep-verify
+  # Job sits Pending.
+  verification:
+    quick:
+      schedule:
+        cron: "H 4 * * *"
+        jitter: 30m
+      maxErrors: 0
+    deep:
+      schedule:
+        cron: "H 5 * * 0"
+        jitter: 1h
+      capacity: 20Gi
+      storageClassName: openebs-hostpath
+    successExpr: "(tier == 'quick' ? stats.bytes > 0 : restored.files > 0) && stats.errors == 0"
+    verifyFilesPercent: 10
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kopiur.home-operations.com/snapshotschedule_v1alpha1.json
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: audiobookshelf-nightly
+  namespace: default
+spec:
+  policyRef:
+    name: audiobookshelf
+  schedule:
+    # H is a deterministic offset; 18-20 are clear of the other movers.
+    cron: "H 20 * * *"
+    jitter: 30m
+    runOnCreate: false
