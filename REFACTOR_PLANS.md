@@ -1987,11 +1987,12 @@ that is the field the UI gives you. An ExternalSecret pointing at a field the
 item does not have fails only as an empty Secret at runtime, but
 `mise run secrets:verify` catches it before the cluster does.
 
-### 2026-11-14 — Books and audiobooks: Chaptarr + Kavita + Audiobookshelf
+### 2026-11-14 — Books and audiobooks: Kavita + Audiobookshelf
 
-The tank already had the collection. Three new workloads over
-`/var/tank/nas/library/books`. Soulseek was scoped, merged, then taken back out
-the same day. Runbook: `docs/books.md`.
+The tank already had the collection. #1005 added three workloads over
+`/var/tank/nas/library/books` plus the slskd re-enable; by the end of the day two
+of the four were gone — Chaptarr and Soulseek — leaving the reader and the
+streamer. Acquisition is unsolved on purpose. Runbook: `docs/books.md`.
 
 - **The dataset inventory was readable before the contents were.** The
   node-exporter zfs collector exposes per-dataset I/O
@@ -2004,10 +2005,12 @@ the same day. Runbook: `docs/books.md`.
   `/var/tank` mount in the agent pod, `pods/exec` not granted, pod creation not
   permitted. File counts/formats/layout of `books` are unknown; the host one-liner
   is in the doc.
-- **Readarr is retired, so the fork is the only *arr-shaped path.** Upstream repo
-  archived 2025-06 and its metadata servers gone. Chaptarr (eBook + audiobook in
-  one instance) is the maintained fork; bookshelf is a second revival. Kavita is
-  the *reader*; Audiobookshelf is the audiobook *streamer* with native apps.
+- **Readarr is retired, so a fork was the only *arr-shaped option — and the fork
+  went too.** Upstream Readarr was archived 2025-06 with its metadata servers
+  gone, so Chaptarr (eBook + audiobook in one instance; its own README calls it
+  beta) was the maintained revival. It was removed the same day, for a supply
+  reason rather than a capability one. Kavita is the *reader*; Audiobookshelf is
+  the audiobook *streamer* with native apps; both stay.
 - **Mount the dataset root, pick the root folder in the UI.** Committing
   `ebooks/` + `audiobooks/` subpaths would have baked in a guess about a layout
   nobody could read; one mount plus in-app root folders is layout-agnostic.
@@ -2042,21 +2045,36 @@ the same day. Runbook: `docs/books.md`.
   EBookBay (public, ebooks), ABtorrents (private, audiobooks) and BookTracker
   (RU) are book-related, and **MyAnonaMouse has no definition at all** — it would
   need Jackett or a hand-written one.
+- **Chaptarr was never limited to usenet; it was still the wrong tool here.** Its
+  source tree ships `Newznab` *and* `Torznab` indexers, plus `MyAnonaMouse`,
+  `IPTorrents`, `FileList`, `Gazelle`, `Nyaa` and `Torrentleech` built in, and
+  torrent download clients including `QBittorrent`, `Transmission`, `Deluge` and
+  `Blackhole`. MAM in particular is something Prowlarr has no definition for. So
+  "it only does Newznab" was wrong — what looked like that was Prowlarr pushing
+  its single enabled indexer, NZBgeek. It was removed anyway: no torrent client is
+  deployed (SABnzbd is usenet-only), CGNAT degrades seeding while the trackers that
+  actually carry books are ratio-gated private ones, and a manager with nothing to
+  manage is one more pod, PVC and credential surface. **Read a fork's actual code
+  before concluding it lacks a protocol** — the README's one-line "standard *arr
+  integrations" was less informative than the tree was, and the tree took one API
+  call.
 - **Audiobookshelf keeps state in two PVCs, so it gets a hand-written kopiur
   policy** (`config` + `metadata`) — the component templates one `${PVC}` and
   Flux substitution is string-level. Same exception as FreshRSS and HA; its
   verification block is duplicated with the component and has to be kept in step.
-- **Hour slots:** movers already occupied 1-17, so 18 (chaptarr), 19 (kavita) and
-  20 (audiobookshelf) were taken.
+- **Hour slots:** movers already occupied 1-17, so 19 (kavita) and 20
+  (audiobookshelf) were taken; 18 was chaptarr's and was freed again when it was
+  removed.
 - **Unverified at merge and stated as such in the doc:** container ports come from
-  the images' `ExposedPorts`/READMEs (8789/5000/80) with the chart's default
-  `tcpSocket` probes rather than an invented health path — no docker daemon here
-  to run the images. All three default to root and are pinned `runAsNonRoot`
-  `1000:1000` with fsGroup-owned PVCs; if an entrypoint insists on root the
-  remedy is `runAsUser: 0` in that app's `defaultPodOptions`.
+  the images' `ExposedPorts`/READMEs (5000/80) with the chart's default `tcpSocket`
+  probes rather than an invented health path — no docker daemon here to run the
+  images. Both default to root and are pinned `runAsNonRoot` `1000:1000` with
+  fsGroup-owned PVCs; if an entrypoint insists on root the remedy is `runAsUser: 0`
+  in that app's `defaultPodOptions`.
 - **Out-of-band follow-up for rwaltr:** the `books` dataset is a hostPath, so
-  kopiur does **not** cover it — a Chaptarr bug is unrecoverable without a
-  host-side snapshot of `tank/nas/library`.
+  kopiur does **not** cover it, and now that both apps mount it read-only nothing
+  in-cluster writes to it at all — ingestion is a manual drop on the host. A
+  host-side snapshot of `tank/nas/library` is the only protection.
 
 ### 2026-11-14 (later) — Kavita: an emptyDir over /tmp hid the image's seed config
 
@@ -2083,7 +2101,7 @@ cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
   images hide initialisation payloads there. Before copying the `/tmp: emptyDir`
   block into a new app, check the image's Dockerfile for a `COPY ... /tmp/...`.
   Other apps in the tree keep that mount legitimately — their images don't bake
-  anything under `/tmp` (verified: chaptarr, audiobookshelf, navidrome, matrix,
+  anything under `/tmp` (verified: audiobookshelf, navidrome, matrix,
   beancount-stack, degoog, hermes, immich-paperless, paperless all render their
   own scratch there and none ship `/tmp/config`).
 - **`helm template` would never have caught this**: the rendered pod spec matched

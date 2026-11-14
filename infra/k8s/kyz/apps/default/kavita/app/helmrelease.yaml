@@ -2,8 +2,9 @@
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
 #
 # Kavita — eBook/comic/manga reader over the existing tank books dataset at
-# /var/tank/nas/library/books. This is the READER half: acquisition is Chaptarr
-# (or a manual drop into the dataset), Kavita serves and tracks reading.
+# /var/tank/nas/library/books. This is the READER half: acquisition is not solved
+# in this house yet (see docs/books.md), so the library is fed manually until a
+# working download path exists. Kavita serves and tracks reading.
 #
 # Library is mounted READ-ONLY: Kavita reads files and keeps its own database
 # and generated covers on the config PVC; it never rewrites the library. Library
