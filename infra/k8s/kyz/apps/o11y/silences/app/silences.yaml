@@ -1,0 +1,21 @@
+---
+# A dated silence covering expected rollout churn while the bjw-s parity series
+# lands (metrics-server, chaski, it-tools, silence-operator, agentgateway,
+# cliproxyapi, MCP servers). It is also this operator's end-to-end proof: the
+# comment is what the alert-triage agent reads in /api/v2/silences to learn that
+# a firing alert is in-flight work rather than a new incident.
+#
+# Self-expiring, and therefore disposable: delete this file once the series is
+# done rather than letting an expired Silence CR accumulate in git.
+apiVersion: observability.giantswarm.io/v1alpha2
+kind: Silence
+metadata:
+  name: bjw-s-parity-deploys
+spec:
+  matchers:
+    - name: pod
+      matchType: =~
+      value: >-
+        metrics-server-.*|chaski-.*|it-tools-.*|silence-operator-.*|agentgateway-.*|cliproxyapi-.*|flux-mcp-.*|kubectl-mcp-.*|kubesearch-mcp-.*|home-assistant-mcp-.*|mikrotik-mcp-.*
+  startsAt: "2026-11-14T18:00:00Z"
+  endsAt: "2026-11-16T06:00:00Z"

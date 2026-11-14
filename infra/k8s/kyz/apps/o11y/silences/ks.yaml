@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+# The Silence CRs live in their own Kustomization on purpose: the CRD they need
+# is installed by the silence-operator HelmRelease, not by kustomize, so the two
+# cannot share an apply — the first reconcile of a shared one would race the
+# CRD and fail with "no matches for kind Silence".
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: silences
+spec:
+  dependsOn:
+    - name: silence-operator
+      namespace: o11y
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/o11y/silences/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: o11y
+  wait: false
