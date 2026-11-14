@@ -1,0 +1,124 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# chaski — stateless webhook relay: POST /hooks/{route}, gate the payload with a
+# CEL expression, render title/message with Go templates, fan out to Apprise or
+# plain HTTP. Cluster-internal only (no route/hostname): every sender here is an
+# in-cluster app, and the relay holds a Pushover credential.
+#
+# Pushover is the only target for now, per rwaltr. The credential is the *same*
+# 1Password item Alertmanager already uses (`alertmanager` + `pushover`, see the
+# ExternalSecret), so notifications arrive from the app token that is already
+# trusted — they will show as the Alertmanager application in Pushover. Separate
+# per-source Pushover applications would need new tokens in 1Password; that is
+# rwaltr's to mint, and the target URL is the only line that changes.
+#
+# The routes below are the media-stack notifications the reference repo relays
+# (Sonarr/Radarr download + manual-interaction). They are inert until a sender
+# posts to them — pointing Sonarr/Radarr at
+# `http://chaski.default.svc.cluster.local:8080/hooks/{route}` is an app-side
+# step in their own config, documented in docs/chaski.md.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: chaski
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: chaski
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: chaski
+    deploymentAnnotations:
+      reloader.stakater.com/auto: "true"
+    env:
+      TZ: America/Chicago
+    envFrom:
+      - secretRef:
+          name: chaski-secret
+    config:
+      metricsEnabled: true
+      logLevel: info
+      logFormat: json
+      # Inbound token auth stays OFF: chaski is reachable only inside the
+      # cluster, and turning it on needs a secret rwaltr owns. Per-route `verify`
+      # is available for a sender that can sign (chaski has a `github` preset).
+      routes:
+        sonarr:
+          target: pushover
+          whenExpr: payload.eventType == "Download"
+          title: >-
+            Episode {{ if .payload.isUpgrade }}Upgraded{{ else }}Added{{ end }}
+          message: |-
+            <b>{{ .payload.series.title }} ({{ printf "S%02.0fE%02.0f" (index (index .payload.episodes 0) "seasonNumber") (index (index .payload.episodes 0) "episodeNumber") }})</b>
+            <small>{{ (index (index .payload.episodes 0) "title") | ellipsis 300 }}</small>
+            <small><b>Client:</b> {{ .payload.downloadClient | default "unknown" }}</small>
+          params:
+            format: html
+            priority: moderate
+            url: >-
+              {{ printf "%s/series/%s" .payload.applicationUrl .payload.series.titleSlug }}
+            url_title: View Series
+        sonarr-manual:
+          target: pushover
+          whenExpr: payload.eventType == "ManualInteractionRequired"
+          title: Episode Requires Manual Interaction
+          message: |-
+            <b>{{ .payload.series.title }}</b>
+            <small><b>Client:</b> {{ .payload.downloadClient | default "unknown" }}</small>
+          params:
+            format: html
+            priority: high
+            url: >-
+              {{ printf "%s/activity/queue" .payload.applicationUrl }}
+            url_title: View Queue
+        radarr:
+          target: pushover
+          whenExpr: payload.eventType == "Download"
+          title: >-
+            Movie {{ if .payload.isUpgrade }}Upgraded{{ else }}Added{{ end }}
+          message: |-
+            <b>{{ .payload.movie.title }} ({{ .payload.movie.year }})</b>
+            <small>{{ .payload.movie.overview | ellipsis 300 }}</small>
+            <small><b>Release:</b> {{ .payload.movieFile.sceneName }}
+            <b>Client:</b> {{ .payload.downloadClient | default "unknown" }}</small>
+          params:
+            format: html
+            priority: moderate
+            url: >-
+              {{ printf "%s/movie/%v" .payload.applicationUrl .payload.movie.tmdbId }}
+            url_title: View Movie
+        radarr-manual:
+          target: pushover
+          whenExpr: payload.eventType == "ManualInteractionRequired"
+          title: Movie Requires Manual Interaction
+          message: |-
+            <b>{{ .payload.movie.title }} ({{ .payload.movie.year }})</b>
+            <small><b>Client:</b> {{ .payload.downloadClient | default "unknown" }}</small>
+          params:
+            format: html
+            priority: high
+            url: >-
+              {{ printf "%s/activity/queue" .payload.applicationUrl }}
+            url_title: View Queue
+      targets:
+        pushover:
+          apprise:
+            url: 'pover://{{ env "PUSHOVER_USER_KEY" }}@{{ env "PUSHOVER_APP_TOKEN" }}'
+    monitoring:
+      serviceMonitor:
+        enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        # Memory capped because this node has no swap; no CPU limit.
+        memory: 128Mi

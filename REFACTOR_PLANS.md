@@ -2196,6 +2196,34 @@ developer-utilities page needs to leave the LAN, and exposure stays rwaltr's cal
   rather than silently rendering a `tcpSocket` probe.
 - No PVC and therefore no kopiur policy: the app is stateless.
 
+### 2026-11-14 (later still) — chaski: one relay for webhook notifications
+
+Third item of the bjw-s parity series (metrics-server, it-tools, then this).
+`home-operations/chaski` 0.5.4, cluster-internal only, Pushover the only target.
+
+- **No new secret needed.** The target is built from the two 1Password items
+  Alertmanager already reads (`alertmanager` → `ALERTMANAGER_PUSHOVER_TOKEN`,
+  `pushover` → Login `credential`), merged into one Apprise URL
+  `pover://<user>@<token>`. Consequence to remember: chaski's notifications appear
+  in Pushover as the Alertmanager application. Per-source applications need
+  tokens rwaltr mints, and only the target URL changes.
+- **Routes are declared, senders are not.** Four routes (`sonarr`, `radarr` and
+  their `-manual` variants) matching the reference repo's media notifications.
+  Nothing fires until Sonarr/Radarr are pointed at
+  `http://chaski.default.svc.cluster.local:8080/hooks/<route>` — an app-side
+  setting in their own config, the same class of step as adding a root folder, so
+  it is documented rather than declared.
+- **`?dryRun=1` is the verification lever.** It reports matched targets, the
+  rendered title/message and whether the CEL gate passed, without sending — that
+  is how a route gets checked after an edit, and how "nothing happened" is
+  distinguished from a gate that did not match.
+- **Inbound token auth is off on purpose** (internal-only relay, and turning it on
+  needs a secret). Per-route `verify` remains available for a sender that can
+  sign.
+- Not exposed: no HTTPRoute, no hostname. Metrics on with a ServiceMonitor.
+
+Operating doc: `docs/chaski.md`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
