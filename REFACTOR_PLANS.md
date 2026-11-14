@@ -2176,8 +2176,17 @@ developer-utilities page needs to leave the LAN, and exposure stays rwaltr's cal
   privileged port, and the image has no `USER` directive), and
   `/docker-entrypoint.d/10-listen-on-ipv6-by-default.sh` rewrites
   `/etc/nginx/conf.d/default.conf` at start, so `readOnlyRootFilesystem: true`
-  would fail before nginx serves anything. Capabilities are dropped to the empty
-  set — nginx needs none to bind `:80` as root.
+  would fail before nginx serves anything.
+- **Dropping ALL capabilities crashloops this image** — caught on the first
+  deploy, not in review:
+  `chown("/var/cache/nginx/client_temp", 101) failed (1: Operation not
+  permitted)`, then `[emerg]` and a restart loop. nginx's master runs as root and
+  needs two things back: `CHOWN` for its own cache dirs and `SETUID`/`SETGID` to
+  drop its workers to the `nginx` user. The manifest adds exactly those three —
+  no `DAC_OVERRIDE`, and no `NET_BIND_SERVICE` because root may bind `:80`
+  without it. The `drop: ALL` baseline is right for these images only when the
+  entrypoint is also non-root; for a root-running daemon, "drop ALL" and "runs
+  at all" are in direct conflict.
 - **Probe port 80 and path `/` come from the image config** (`ExposedPorts
   80/tcp`; `/` is the static root, a 200 with no redirect), not from intuition.
   The render check caught the app-template probe shape: an `httpGet` written
