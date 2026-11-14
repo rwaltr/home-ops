@@ -27,7 +27,7 @@ resources:
   - ./sonarr/ks.yaml
   - ./radarr/ks.yaml
   - ./prowlarr/ks.yaml
-  - ./slskd/ks.yaml
+  # - ./slskd/ks.yaml  # 2026-11-14: stays off — CGNAT gives no inbound route for its listening port, so it would be a half-connected client; see docs/books.md
   - ./bazarr/ks.yaml
   - ./seerr/ks.yaml
   - ./recyclarr/ks.yaml
@@ -38,7 +38,6 @@ resources:
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
   - ./navidrome/ks.yaml
-  - ./chaptarr/ks.yaml
   - ./kavita/ks.yaml
   - ./audiobookshelf/ks.yaml
   - ./homebox/ks.yaml
