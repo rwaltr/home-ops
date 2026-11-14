@@ -118,3 +118,29 @@ path, and the budget is still measured against the pushover send counter
   claim doing natural coalescing on a cascade.
 - **Do not** replace a blackhole with a silence or a deleted rule to quieten the
   agent feed. Only the notification is unwanted; the condition is real.
+
+## Silences
+
+Silences are declared in git as `Silence` resources
+(`observability.giantswarm.io/v1alpha2`, namespaced in `o11y`) under
+`infra/k8s/kyz/apps/o11y/silences/`, reconciled onto Alertmanager by
+`silence-operator` (`infra/k8s/kyz/apps/o11y/silence-operator/`). The CRs live in
+their own Flux Kustomization that `dependsOn` the operator, because the CRD comes
+from the operator's HelmRelease and cannot be in the same apply.
+
+- **A silence is a notification decision, not a fix.** It suppresses delivery;
+  the alert keeps firing and stays visible in the Alertmanager UI and Prometheus.
+  The distinction from `blackhole` routing matters: blackhole is permanent and
+  declares a condition by-design, a silence is time-bounded.
+- **Every silence is dated and disposable.** `spec.endsAt` is required in
+  practice; a Silence CR with no end date is a permanent mute that nobody will
+  remember to remove. Delete the CR once its window has passed rather than
+  leaving expired objects in the tree.
+- **The comment is the coordination channel.** The alert-triage agent reads
+  `/api/v2/silences` when it triages, so a silence whose comment names the work
+  ("bjw-s parity deployment series in progress") is how it learns that a firing
+  alert is expected churn rather than a new incident. Keep that comment accurate.
+- **Temporary silences can also be created over the Alertmanager API**
+  (`POST /api/v2/silences`) when a CR cannot land yet — but that state lives
+  outside git and must be expired by hand (`PUT /api/v2/silence/<id>` with an
+  `endsAt` in the past).

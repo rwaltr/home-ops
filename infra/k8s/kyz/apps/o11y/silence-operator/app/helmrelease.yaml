@@ -1,0 +1,53 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# silence-operator (Giant Swarm) — declares Alertmanager silences as Kubernetes
+# resources, so a maintenance window is reviewable in git instead of existing
+# only in Alertmanager's UI.
+#
+# The chart ships its CRDs as regular templates (templates/crds.yml, with
+# `helm.sh/resource-policy: keep`), not in `crds/` — so a chart bump does update
+# the schemas, unlike the install-only CRD problem in
+# cluster-app-deployment/references/crd-schema-drift.md. Current API is
+# `observability.giantswarm.io/v1alpha2`, namespaced, matchers required.
+#
+# `networkPolicy.enabled: false` (chart default is true, flavor kubernetes): this
+# cluster has no default-deny, and a chart-shaped NetworkPolicy would need
+# tuning for our Cilium + APIServer path to be sure the operator's egress is not
+# cut. Off is the reference repo's setting too. Turn it on deliberately, with the
+# policy's egress to Alertmanager and the API server checked.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: silence-operator
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: silence-operator
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    # The address below is the only required value; the chart already names its
+    # objects silence-operator (no fullnameOverride needed — konflate flagged one
+    # as a no-op and the render confirmed the default names).
+    # The headless peer service the kube-prometheus-stack Alertmanager creates;
+    # same address the reference repo points at. The ClusterIP service
+    # (kube-prometheus-stack-alertmanager) is the same single pod.
+    alertmanagerAddress: http://alertmanager-operated.o11y.svc.cluster.local:9093
+    networkPolicy:
+      enabled: false
+    podMonitor:
+      enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        # Memory capped because this node has no swap; no CPU limit.
+        memory: 128Mi

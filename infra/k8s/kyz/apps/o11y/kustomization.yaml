@@ -10,6 +10,8 @@ resources:
   - ./kube-prometheus-stack/ks.yaml
   - ./smartctl-exporter/ks.yaml
   - ./zfs-vdev-exporter/ks.yaml
+  - ./silence-operator/ks.yaml
+  - ./silences/ks.yaml
   #  - ./mqtt-probe/ks.yaml   # removed 2026-10-31 — see docs/mosquitto.md
   # Cluster logging (victoria-logs + fluent-bit) was decommissioned 2026-11-07
   # and its manifests deleted — see docs/logging.md.

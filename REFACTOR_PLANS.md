@@ -2224,6 +2224,38 @@ Third item of the bjw-s parity series (metrics-server, it-tools, then this).
 
 Operating doc: `docs/chaski.md`.
 
+### 2026-11-14 (later still) — silence-operator: silences as git objects
+
+Fourth item of the bjw-s parity series. Giant Swarm's `silence-operator` 0.22.0 in
+`o11y`, plus a `Silence` CR covering the series' own rollout churn.
+
+- **Two Kustomizations, not one.** The CRD ships inside the chart
+  (`templates/crds.yml`, with `helm.sh/resource-policy: keep`) rather than in an
+  install-only `crds/` directory — good, because a chart bump then updates the
+  schema. But it still comes from a HelmRelease, so a `Silence` CR in the same
+  apply would race it and fail with `no matches for kind`. `silences/` is its own
+  Flux Kustomization with `dependsOn: silence-operator`.
+- **API is `observability.giantswarm.io/v1alpha2`**, namespaced, `spec.matchers`
+  required with `{name, value, matchType}` where matchType is `=`, `!=`, `=~`,
+  `!~` — not the `isRegex`/`isEqual` booleans the older cluster-scoped
+  `monitoring.giantswarm.io` CRD used. The operator honours first-match and pushes
+  the set to Alertmanager over its v2 API.
+- **`networkPolicy.enabled: false`** (chart default is true, flavor kubernetes):
+  no default-deny on this cluster, and the chart's policy would need its egress to
+  Alertmanager and the API server verified before turning on. Reference repo runs
+  it off too.
+- **Pointed at `alertmanager-operated.o11y.svc.cluster.local:9093`**, the headless
+  peer service, matching the reference; the ClusterIP service is the same single
+  pod.
+- **The first Silence CR is dated and disposable** (`bjw-s-parity-deploys`,
+  ends 2026-11-16) — it covers expected churn for the rest of the series *and* is
+  the operator's end-to-end proof, since its comment is what the triage agent
+  reads in `/api/v2/silences`. Delete the CR once the window passes instead of
+  leaving an expired object in the tree. The equivalent API-created silence used
+  while the operator did not exist yet is expired by hand.
+
+Operating section: `docs/alerting.md` → "Silences".
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
