@@ -130,6 +130,23 @@ missing the pod will not start; nothing else here needs provisioning.
 Lidarr→slskd for music only — so a Soulseek transfer is a manual workflow:
 download it, then let the app import from `/downloads` or drop it in the library.
 
+## Kavita's config seed lives in the image's `/tmp`
+
+`jvmilazz0/kavita` ships its default config at **`/tmp/config/appsettings.json`**
+(`COPY Kavita.Server/config/appsettings.json /tmp/config/appsettings.json` in its
+Dockerfile) and Kavita copies it into `/kavita/config` on first boot. That means
+**do not add a `tmp: emptyDir` mounted at `/tmp`** to this app — it shadows the
+baked seed file and the container dies with:
+
+```text
+Kavita configuration file does not exist, copying from temp...
+cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
+```
+
+Other apps in the tree carry that mount legitimately; Kavita must not. With no
+`/tmp` mount the container layer is writable anyway
+(`readOnlyRootFilesystem: false`), so nothing is needed there.
+
 ## Unverified at merge time
 
 These are stated so a later reader does not mistake them for measurements:

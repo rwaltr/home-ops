@@ -98,7 +98,10 @@ spec:
         globalMounts:
           - path: /books
             readOnly: true
-      tmp:
-        type: emptyDir
-        globalMounts:
-          - path: /tmp
+      # No /tmp mount on purpose. The image bakes its seed config at
+      # /tmp/config/appsettings.json (Dockerfile: COPY Kavita.Server/config/
+      # appsettings.json /tmp/config/appsettings.json) and Kavita copies it into
+      # /kavita/config on first boot. An emptyDir over /tmp hides that seed file
+      # and the container dies on "cp: cannot stat '/tmp/config/appsettings.json'".
+      # The container FS is writable (readOnlyRootFilesystem: false), so /tmp
+      # works without a mount.

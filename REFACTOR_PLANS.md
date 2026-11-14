@@ -2036,6 +2036,39 @@ Runbook: `docs/books.md`.
   cover it — a Chaptarr bug is unrecoverable without a host-side snapshot of
   `tank/nas/library`.
 
+### 2026-11-14 (later) — Kavita: an emptyDir over /tmp hid the image's seed config
+
+Kavita crashlooped from the moment it was applied (`CrashLoopBackOff`, 7
+restarts) and `HelmReleaseReconciliationFailure` (critical) paged on it within
+minutes. The container log was the whole diagnosis:
+
+```text
+Kavita configuration file does not exist, copying from temp...
+cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
+```
+
+- **The image seeds its config from `/tmp`.** `jvmilazz0/kavita`'s Dockerfile
+  ends with `COPY Kavita.Server/config/appsettings.json /tmp/config/appsettings.json`,
+  and Kavita copies that file into `/kavita/config` on first boot. The HelmRelease
+  had added a `tmp: emptyDir` mounted at `/tmp` — copied from the pattern other
+  apps in this repo use — which **shadowed the baked file with an empty
+  directory**. The entrypoint's `cp` had nothing to read and the server exited.
+- **Fix**: delete the `tmp` persistence entry. Nothing about Kavita needs `/tmp`
+  to be its own volume, and `readOnlyRootFilesystem: false` already leaves the
+  container layer writable, so `/tmp` works with no mount at all.
+- **Generalise it**: an `emptyDir` over a path an image also *ships files in* is
+  a destructive mount, not a scratch volume. `/tmp` is the usual trap because
+  images hide initialisation payloads there. Before copying the `/tmp: emptyDir`
+  block into a new app, check the image's Dockerfile for a `COPY ... /tmp/...`.
+  Other apps in the tree keep that mount legitimately — their images don't bake
+  anything under `/tmp` (verified: chaptarr, audiobookshelf, navidrome, matrix,
+  beancount-stack, degoog, hermes, immich-paperless, paperless all render their
+  own scratch there and none ship `/tmp/config`).
+- **`helm template` would never have caught this**: the rendered pod spec matched
+  what the manifest asked for. The failure needed the image's own filesystem.
+  Same class as the unchecked port guesses in the entry above — nothing here can
+  run the image, so the first boot *is* the test.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
