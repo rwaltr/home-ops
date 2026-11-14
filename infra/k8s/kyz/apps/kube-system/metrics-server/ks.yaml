@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: metrics-server
+spec:
+  dependsOn:
+    - name: kube-prometheus-stack # the ServiceMonitor CRD
+      namespace: o11y
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/kube-system/metrics-server/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: kube-system
+  # wait: true on purpose — this backs the metrics.k8s.io API, so a rollout that
+  # never becomes Ready (an unverifiable kubelet certificate, a rejected
+  # APIService) should surface as a failed Kustomization instead of a silently
+  # absent API that only shows up later as a broken `kubectl top` or an HPA that
+  # cannot read metrics.
+  wait: true

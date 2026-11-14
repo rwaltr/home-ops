@@ -1,0 +1,15 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/source.toolkit.fluxcd.io/helmrepository_v1.json
+# metrics-server publishes a classic Helm repo (GitHub Pages), not OCI artifacts,
+# so this one uses a HelmRepository (same shape as reloader and rustfs). The
+# upstream repo is used deliberately instead of
+# `oci://ghcr.io/home-operations/charts-mirror/metrics-server`: the mirror is a
+# stop-gap with a published expiry, and a pruned mirror chart fails as
+# `DENIED: requested access to the resource is denied`.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: metrics-server
+spec:
+  interval: 1h
+  url: https://kubernetes-sigs.github.io/metrics-server
