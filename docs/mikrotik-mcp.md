@@ -44,19 +44,30 @@ do not grant those while the identity role is `readonly`.
 
 ## Credentials
 
-1Password item `mikrotik`, vault `home-ops`. Field names are the contract in
-`app/externalsecret.yaml`:
+1Password item `mikrotik`, vault `home-ops`, Login type. Field labels are the
+contract in `app/externalsecret.yaml`:
 
-- `api_user` → `ROUTER_MOUSE_USER` (must match `envPrefix` in `routers.yaml`)
-- `api_password` → `ROUTER_MOUSE_PASS`
-- `confirmation_secret` → `MIKROMCP_CONFIRMATION_SECRET` (HMAC key for destructive
-  action confirmations — required in HTTP mode even read-only)
-- `mcp_token` → `MIKROMCP_CLIENT_TOKEN` (what a client presents as a bearer token)
-- `host` → `ROUTER_HOST` (informational; the address actually used is in the
+- `username` → `ROUTER_MOUSE_USER` (must match `envPrefix` in `routers.yaml`)
+- `password` → `ROUTER_MOUSE_PASS`
+- `confirmsecret` → `MIKROMCP_CONFIRMATION_SECRET` (HMAC key for destructive action
+  confirmations — required in HTTP mode even read-only)
+- `website` → `ROUTER_HOST` (informational; the address actually dialled is in the
   ConfigMap)
+- `mcptoken` → `MIKROMCP_CLIENT_TOKEN` (the bearer token a client presents;
+  regenerate with `openssl rand -hex 32` if it leaks — the pod hashes it at start)
 
-Renaming a field in 1Password silently costs the pod that variable, so change the
-ExternalSecret in the same breath.
+Renaming a label in 1Password silently costs the pod that variable, and a missing
+_item_ fails the whole ExternalSecret rather than one key, so change both sides in
+the same breath.
+
+**New items are not instantly visible.** 1Password Connect caches vault and item
+metadata; right after creating an item, ESO reports
+`key not found in 1Password Vaults: mikrotik in: map[home-ops:1]` even though the
+item exists by that exact title. Restarting the Connect deployment clears it:
+
+```sh
+kubectl -n external-secrets rollout restart deploy/onepassword-connect
+```
 
 ## Why an initContainer
 
