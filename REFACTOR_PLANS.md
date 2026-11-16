@@ -2310,6 +2310,38 @@ pinned) in `default`, cluster-internal on 8317, agentgateway as the front door.
 
 Operating doc: `docs/cliproxyapi.md`.
 
+### 2026-11-16 — rustfs memory cap was measuring itself
+
+The weekly alert review (2026-11-09 → 11-16, issue #1024) found `OomKilled`
+firing for `kopiur-system/rustfs`: two episodes and three restarts in the
+window. A prepared branch from the 2026-11-11 night session had measured the
+same thing and never reached a PR; this refreshes its numbers and republishes it.
+
+- **The cap was being touched, not cleared.** 30d peak
+  `container_memory_working_set_bytes` 1535.5MiB against the 1536Mi limit — the
+  container was clipped by the ceiling, so that is a floor on demand, not a
+  peak. The 2026-09-24 audit sized the limit from a ~925Mi peak; the workload has
+  grown past it and been running at its own cap for weeks. The 04:53Z cold-start
+  resync on 2026-11-11 is what pushed it over.
+- **The request was fiction.** 256Mi against a 30d p95 of ~1.2–1.5Gi and ~890Mi
+  idle: it told the scheduler nothing true about the pod.
+- **New values: request 1536Mi (the p95), limit 3072Mi (≈2x the observed peak,
+  so a resync — scanner cycle plus kopia listing — clears instead of dying).**
+  Limits do not reserve, so this costs the node nothing on paper; rustfs is the
+  single writer to `tank/backup/k8s`, and a kill mid-upload is the one outcome
+  worth paying memory to avoid.
+- **This does not address host memory pressure.** The same host rebooted
+  *unplanned* at 04:53Z on 2026-11-11 after 62 days up, with major page faulting
+  in the minutes before it (`NodeMemoryMajorPagesFaults` fired 04:36Z–04:41Z;
+  `pgmajfault` ~4.3k/s and `MemAvailable` falling). No OS version change, so it
+  was not a Flatcar update. That cause is host-side and still open.
+- Re-read the working set after the rollout — a raised cap is only confirmed by
+  the replacement pod's own peak, not by the old pod's.
+
+Lesson: an `OomKilled` whose limit is also the observed p95 and max is not a
+workload spike, it is a stale audit. Re-measure before re-sizing, and read the
+p95 against the old *ceiling* before believing it.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
