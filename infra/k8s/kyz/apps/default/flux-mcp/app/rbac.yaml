@@ -59,6 +59,12 @@ rules:
   - apiGroups: ["image.toolkit.fluxcd.io"]
     resources: ["imagepolicies", "imagerepositories", "imageupdateautomations"]
     verbs: ["get", "list", "watch"]
+  # Added after the first live tool call: get_kubernetes_api_versions lists CRDs to
+  # report available APIs, so a Flux server without this cannot answer what it can
+  # see. Read-only and harmless — it exposes type names, not objects.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources:
       - pods
