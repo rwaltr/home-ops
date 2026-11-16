@@ -81,13 +81,15 @@ spec:
                 containerPort: 8317
                 protocol: TCP
             probes:
-              # No documented health endpoint; TCP on the port it actually
-              # serves says "the process is up and listening", nothing more.
+              # /healthz answers {"status":"ok"} unauthenticated, so the probes
+              # test the app rather than the socket: a TCP check would pass for a
+              # process that is listening but wedged.
               liveness:
                 enabled: true
                 custom: true
                 spec:
-                  tcpSocket:
+                  httpGet:
+                    path: /healthz
                     port: http
                   initialDelaySeconds: 10
                   periodSeconds: 30
@@ -95,7 +97,8 @@ spec:
                 enabled: true
                 custom: true
                 spec:
-                  tcpSocket:
+                  httpGet:
+                    path: /healthz
                     port: http
                   periodSeconds: 10
             resources:

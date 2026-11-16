@@ -68,6 +68,15 @@ expired refresh token — re-run the matching login.
 kubectl -n default logs deploy/cliproxyapi --tail=50
 ```
 
+`/healthz` answers `{"status":"ok"}` **without** a client key, which is what the
+liveness and readiness probes use — they test the app, not just the socket.
+
+A successful login shows up in the log as an auth-file event, one line, no error:
+
+```
+[info] [events.go:192] auth file changed (CREATE): claude-<id>-<account>.json, processing incrementally
+```
+
 Once a login exists, an OpenAI-compatible call with the front-door key works from
 inside the cluster:
 
@@ -75,6 +84,10 @@ inside the cluster:
 curl -s http://cliproxyapi.default.svc.cluster.local:8317/v1/models \
   -H "Authorization: Bearer $(op read 'op://home-ops/cliproxyapi/password')"
 ```
+
+Without the key every model and completion route answers `401` — the proxy refuses
+calls until a client key is presented, so a `401` on `/v1/models` is the front door
+working, not a fault.
 
 ## Images
 
