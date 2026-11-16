@@ -15,10 +15,18 @@
 #     empty state, not a failure.
 #
 # Logging in, once per provider (needs a browser; pods/exec is deliberately not in
-# Teletran's RBAC, so this is rwaltr's):
-#   kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --codex-login
-#   kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --claude-login
-#   kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --gemini-login
+# Teletran's RBAC, so this is rwaltr's). --config is not optional: the flag defaults
+# to an empty string upstream (DefaultConfigPath = ""), and the login subcommand
+# loads the config to resolve oauth.auth-dir, so omitting it fails with
+# "failed to load config file". --no-browser skips the launch attempt in a headless
+# pod and prints tunnel instructions instead.
+#   kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI \
+#     --config /etc/cliproxyapi/config.yaml --no-browser --codex-device-login
+#   kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI \
+#     --config /etc/cliproxyapi/config.yaml --no-browser --claude-login
+# Codex has a device-code flow (no callback into the pod); Claude prints a URL and
+# then accepts the callback URL pasted back at its prompt. Callback ports: Claude
+# 54545, Codex 1455, both overridable with --oauth-callback-port.
 # The container keeps HOME=/data and the auth dir under it, so the tokens land on
 # the PVC and survive pod rolls.
 apiVersion: helm.toolkit.fluxcd.io/v2

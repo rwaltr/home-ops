@@ -25,22 +25,42 @@ a second web surface on a homelab box buys nothing.
 Each provider is an OAuth account. The browser authorises it once; the proxy
 receives a token pair, stores it in `oauth.auth-dir` (`/data/.cli-proxy-api`, on
 the PVC) and refreshes it from then on. `pods/exec` is deliberately absent from
-Teletran's RBAC, so this is rwaltr's to run:
+Teletran's RBAC, so this is rwaltr's to run.
+
+**`--config` is required.** The flag defaults to an empty string upstream
+(`DefaultConfigPath = ""`), and the login subcommand loads the config to resolve
+`oauth.auth-dir` — so omitting it fails with `failed to load config file`. Add
+`--no-browser` too: in a headless pod it skips the launch attempt and prints tunnel
+instructions instead.
 
 ```sh
-kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --codex-login
-kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --claude-login
-kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI --gemini-login
+# Codex — device-code flow: no callback needs to reach the pod
+kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI \
+  --config /etc/cliproxyapi/config.yaml --no-browser --codex-device-login
+
+# Claude — prints a URL, then accepts the callback URL pasted back at its prompt
+kubectl -n default exec -it deploy/cliproxyapi -- /CLIProxyAPI/CLIProxyAPI \
+  --config /etc/cliproxyapi/config.yaml --no-browser --claude-login
+```
+
+Callback ports are 54545 (Claude) and 1455 (Codex), overridable with
+`--oauth-callback-port`. Claude's flow prompts `Paste the Claude callback URL (or
+press Enter to keep waiting)`, which is the path that works from a laptop browser.
+If a flow insists on the redirect actually reaching its port, forward it while the
+login runs:
+
+```sh
+kubectl -n default port-forward deploy/cliproxyapi 54545:54545
 ```
 
 `HOME=/data` is set so anything the process writes relative to home lands on the
-PVC and survives a pod roll. After a login, `ls` inside the pod shows a JSON file
-per account in the auth dir.
+PVC and survives a pod roll. After a login, a JSON file per account appears in the
+auth dir — visible with `kubectl -n default exec -it deploy/cliproxyapi -- ls -la /data/.cli-proxy-api`.
 
 **Until then the proxy runs and serves nothing.** That is the expected empty
 state: the pod is Ready because it is listening, and every request is rejected for
 want of an upstream. If a provider later stops working, the usual cause is an
-expired refresh token — re-run the matching `--*-login`.
+expired refresh token — re-run the matching login.
 
 ## Checking it
 
