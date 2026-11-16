@@ -89,6 +89,17 @@ Without the key every model and completion route answers `401` — the proxy ref
 calls until a client key is presented, so a `401` on `/v1/models` is the front door
 working, not a fault.
 
+### Verified end to end
+
+The authenticated call went through agentgateway, which holds the key in its own
+environment — so no human had to run anything. A completion for model `claude`
+returned a real Anthropic message (`id: msg_011Ch76…`, `"content":"ok"`), which means
+the OAuth session is live, not merely loaded.
+
+The advertised model id for the logged-in account is `claude-sonnet-5-5`, confirmed
+from the `model` field of that response rather than guessed. `agentgateway`'s
+`claude` alias maps to it.
+
 ## Images
 
 Pinned `docker.io/eceasy/cli-proxy-api:v8.0.72@sha256:7cac48fd…`. The project moves
