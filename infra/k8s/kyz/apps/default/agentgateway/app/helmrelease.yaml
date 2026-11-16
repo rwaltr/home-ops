@@ -39,6 +39,11 @@ spec:
           secretKeyRef:
             name: agentgateway-secret
             key: DANMANNERS_LLM_API_KEY
+      - name: OPENCODE_GO_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: OPENCODE_GO_API_KEY
     gateway:
       service:
         type: ClusterIP
@@ -122,3 +127,25 @@ spec:
               apiKey: ${CLIPROXYAPI_API_KEY}
               baseUrl: http://cliproxyapi.default.svc.cluster.local:8317/v1
               model: claude-sonnet-5-5
+          # --- OpenCode Go: the subscription tier, straight through ---
+          # Go refuses any request without an x-opencode-session header, checked
+          # before auth (a bogus key still returns MissingSessionID), so the header
+          # is injected here with a fixed value. requestHeaders takes no CEL and
+          # runs after requestTransformation.
+          #
+          # A fixed session id is the weak part of this route: Go routes per
+          # session and monitors for abuse, so every caller shares one affinity
+          # key. That is acceptable for one internal consumer and not for many; a
+          # per-client value belongs here if this entry ever gains more callers.
+          #
+          # deepseek-v4.1-flash also requires Regions -> Global in the Go workspace
+          # privacy settings; under the default EU+US allowlist it is blocked.
+          - name: go/deepseek-v4.1-flash
+            provider: openAI
+            requestHeaders:
+              set:
+                x-opencode-session: teletran-agentgateway
+            params:
+              apiKey: ${OPENCODE_GO_API_KEY}
+              baseUrl: https://opencode.ai/inference/go/openai/v1
+              model: deepseek-v4.1-flash
