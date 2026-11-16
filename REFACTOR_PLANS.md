@@ -2357,6 +2357,31 @@ Seventh item of the series: `kubectl-mcp` (`rohitg00/kubectl-mcp-server` 2.0.0) 
 
 Operating docs: `docs/kubectl-mcp.md`, `docs/flux-mcp.md`.
 
+### 2026-11-16 (later) — kubesearch and Home Assistant, and what each one holds
+
+Eighth item of the series: `kubesearch-mcp` (perfectra1n/kubesearch-mcp 1.3.0) and
+`home-assistant-mcp` (homeassistant-ai/ha-mcp 9.2.0).
+
+- **kubesearch.dev has no API.** The search index ships as daily SQLite release
+  assets (~44 MB), so this server is a database downloader plus a query engine, and
+  it needs a volume for the same reason: without one, every boot re-downloads.
+- **Readiness is the meaningful probe there, not liveness.** The pod is live
+  immediately and answerable only once the index lands; `/readyz` encodes that
+  distinction and `/healthz` does not.
+- **Its clone features are off.** A warm pool of 15 permanently cloned repos and an
+  on-request `repo_clone` are egress from a pod that otherwise reads a local file.
+  Search does not need either.
+- **The Home Assistant server adds no permissions of its own** — it acts with the
+  token it is given, which here is the Prometheus long-lived token already in
+  `home-assistant-secret`. So it runs read-only and its settings UI is disabled;
+  both are one-line reversals and both are deliberate.
+- **Its auth is the URL path.** Standard mode has no bearer token; the path is the
+  credential. That is tolerable only because nothing routes to it but the gateway.
+- Neither app needed a new 1Password *human* entry: one token is Terraform-minted
+  (kubesearch), one was reused (HA).
+
+Operating docs: `docs/kubesearch-mcp.md`, `docs/home-assistant-mcp.md`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
