@@ -2329,6 +2329,34 @@ pinned) in `default`, cluster-internal on 8317, agentgateway as the front door.
 
 Operating doc: `docs/cliproxyapi.md`.
 
+### 2026-11-16 — two read-only cluster API servers, one RBAC boundary each
+
+Seventh item of the series: `kubectl-mcp` (`rohitg00/kubectl-mcp-server` 2.0.0) and
+`flux-mcp` (`flux-operator-mcp` v0.62.1), both cluster-internal on 8000, `/mcp`.
+
+- **They are the first workloads that read the cluster API as themselves.** Each has
+  its own ServiceAccount and a hand-written ClusterRole; the upstream charts were not
+  used for RBAC because both default to more than we want — one binds `cluster-admin`,
+  the other ships a `secrets` flag.
+- **`secrets` is granted to neither.** The tempting argument is that both mask values
+  in output, but masking is formatting applied to a value the process already holds.
+  Withholding the verb is the boundary; masking is defence in depth. The cost is that
+  `flux-mcp` cannot diff manifests (that needs `secrets` and `patch`), which is an
+  accepted trade rather than an oversight.
+- **`kubectl-mcp` has no bearer-token auth at all** — only OAuth 2.1 JWT or an explicit
+  unauthenticated flag, which the server refuses to start without on a non-loopback
+  bind. ClusterIP plus the read-only role are the compensating controls; publishing
+  this endpoint needs an OAuth issuer first.
+- **`flux-mcp` has no health endpoint**, so its probes are `tcpSocket`. A passing probe
+  there means "listening", not "working" — the opposite of the guarantee the HTTP
+  probes on cliproxyapi give.
+- **`flux-mcp` is AGPL-3.0 and self-described as "in preview"**, the only such
+  dependency in the tree. Digest-pinned for that reason.
+- `flux-mcp`'s `get_flux_instance` will error here: we run plain Flux, not a
+  `FluxInstance` CR. Expected, not a fault.
+
+Operating docs: `docs/kubectl-mcp.md`, `docs/flux-mcp.md`.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into

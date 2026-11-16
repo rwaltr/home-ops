@@ -49,6 +49,8 @@ resources:
   - ./it-tools/ks.yaml
   - ./chaski/ks.yaml
   - ./mikrotik-mcp/ks.yaml
+  - ./flux-mcp/ks.yaml
+  - ./kubectl-mcp/ks.yaml
   - ./cliproxyapi/ks.yaml
   # Matrix comms-channel demo for the self-hosted agent — retired 2026-11-09, see
   # docs/comms-demos.md. Commented out rather than deleted, in the same style as

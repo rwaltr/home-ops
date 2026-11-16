@@ -1,0 +1,92 @@
+---
+# Read-only identity for flux-mcp.
+#
+# The upstream chart's rbac.create binds cluster-admin; that is why this manifest
+# exists instead. --read-only removes the write tools, and these verbs remove the
+# write permissions, so the two agree.
+#
+# `secrets` is absent on purpose: it would only be needed to resolve substituteFrom
+# / copyFrom during a manifest diff, and that tool also needs `patch` for a
+# server-side dry run — which a read-only identity must not have. Skipping both
+# means diff is unusable from this server, which is the intended trade.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-mcp
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-mcp-read
+rules:
+  # Discovery: the dynamic RESTMapper resolves kinds through these.
+  - nonResourceURLs:
+      - /api
+      - /api/*
+      - /apis
+      - /apis/*
+      - /openapi
+      - /openapi/*
+      - /version
+    verbs: ["get"]
+  # Flux kinds are listed one group at a time rather than with `resources: ["*"]`.
+  # A wildcard is correct in intent here — these are read-only verbs on Flux
+  # groups only — but it fails trivy KSV-0046 (CRITICAL), and a policy check that
+  # would pass only by exception is worse than an explicit list. The cost is that
+  # `get`/`trace`/`diff` on a kind not named below returns forbidden; add the kind
+  # when that happens rather than widening the rule.
+  - apiGroups: ["fluxcd.controlplane.io"]
+    resources: ["fluxinstances", "resourcessets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: ["kustomizations"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["source.toolkit.fluxcd.io"]
+    resources:
+      - gitrepositories
+      - ocirepositories
+      - helmrepositories
+      - helmcharts
+      - buckets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["notification.toolkit.fluxcd.io"]
+    resources: ["alerts", "providers", "receivers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["image.toolkit.fluxcd.io"]
+    resources: ["imagepolicies", "imagerepositories", "imageupdateautomations"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - events
+      - namespaces
+      - configmaps
+      - services
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-mcp-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-mcp-read
+subjects:
+  - kind: ServiceAccount
+    name: flux-mcp
+    namespace: default
