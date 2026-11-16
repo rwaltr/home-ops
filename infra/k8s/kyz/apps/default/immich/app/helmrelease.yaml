@@ -176,7 +176,7 @@ spec:
           postgres:
             image:
               repository: ghcr.io/immich-app/postgres
-              tag: 17-vectorchord1.1.1@sha256:7f0b786ed5a7a9d26522dacbf46114a76e043a515ce5e020690fc6702e987b72
+              tag: 17-vectorchord1.1.1@sha256:02ff0ed1d6fdf982d411d28d9a6c9d693be1fe5ac5aebae4f761dc5d767a2063
             env:
               POSTGRES_USER: postgres
               POSTGRES_DB: immich
