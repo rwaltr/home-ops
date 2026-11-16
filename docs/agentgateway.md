@@ -48,6 +48,17 @@ curl -s http://agentgateway.default.svc.cluster.local:8080/v1/chat/completions \
 
 `/healthz` on 15021 is for the probes; 15020 is Prometheus metrics.
 
+### Verified
+
+Every model was called through the service on 8080, from inside the cluster:
+
+- `deepseek-v4.1-flash` — real completion, with OpenRouter cost accounting in the response.
+- `claude` — a real Anthropic message back from the subscription session, via cliproxyapi.
+- `nvidia-llama`, `intel-vl` — local hardware on Manners' gateway, both answering.
+
+That covers all three upstream credentials: OpenRouter from `hermes-secret`,
+danmanners from the ExternalSecret, and cliproxyapi's Terraform-minted key.
+
 ## No inbound auth — deliberate, and temporary
 
 8080 answers anyone inside the cluster, so any pod can spend these keys. That is the
