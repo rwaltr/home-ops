@@ -52,6 +52,13 @@ spec:
             port: 8080
             targetPort: 8080
             protocol: TCP
+          # The MCP multiplex. Declared here because this chart publishes only the
+          # ports named in values — the listener on 8081 came up regardless and was
+          # unreachable until it was listed.
+          - name: mcp
+            port: 8081
+            targetPort: 8081
+            protocol: TCP
           - name: metrics
             port: 15020
             targetPort: 15020
