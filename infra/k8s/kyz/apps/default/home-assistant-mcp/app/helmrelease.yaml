@@ -1,0 +1,113 @@
+---
+# homeassistant-ai/ha-mcp (MIT) — the HTTP entrypoint, not the stdio default.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: home-assistant-mcp
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    controllers:
+      home-assistant-mcp:
+        containers:
+          app:
+            image:
+              repository: ghcr.io/homeassistant-ai/ha-mcp
+              tag: 9.2.0@sha256:9de5bf6c4216142fdffe862900abe72dac8dfe9621dd0b2b050d132372b676ba
+            # The image's default CMD is the stdio binary. `ha-mcp-web` is the
+            # console script that serves Streamable HTTP; without it the pod starts,
+            # holds stdin open, and answers nothing.
+            command:
+              - ha-mcp-web
+            env:
+              HOMEASSISTANT_URL: http://home-assistant.home-automation.svc.cluster.local:8123
+              HOMEASSISTANT_TOKEN:
+                secretKeyRef:
+                  name: home-assistant-mcp-secret
+                  key: HOMEASSISTANT_TOKEN
+              MCP_PORT: "8086"
+              MCP_HOST: 0.0.0.0
+              # Standard mode authenticates by URL-path secrecy — the path *is* the
+              # credential, and there is no bearer-token mode. Keeping the default
+              # /mcp is safe only because nothing routes here except the gateway;
+              # put a high-entropy path here before exposing this service directly.
+              MCP_SECRET_PATH: /mcp
+              # Read-only: this token carries the Prometheus token's permissions, so
+              # the safest shape is a server that can report state and not change it.
+              # Flipping this to "false" is a one-line change and a pod roll.
+              READ_ONLY_MODE: "true"
+              # The settings UI would let any holder of the path rewrite the entity
+              # filters; nothing needs it here.
+              HA_MCP_DISABLE_SETTINGS_UI: "1"
+              # Without this the server has no health endpoint at all.
+              MCP_HEALTHZ: "true"
+              TZ: America/Chicago
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8086
+                  initialDelaySeconds: 10
+                  periodSeconds: 30
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8086
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+            resources:
+              requests:
+                cpu: 20m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              readOnlyRootFilesystem: true
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+    service:
+      app:
+        controller: home-assistant-mcp
+        ports:
+          http:
+            port: 8086
+    persistence:
+      state:
+        # entity filters and tool settings; emptyDir means they reset on restart,
+        # which is intended — the filters belong in git, not in a PVC.
+        type: emptyDir
+        globalMounts:
+          - path: /home/mcpuser/.ha-mcp
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
