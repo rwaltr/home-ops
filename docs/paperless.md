@@ -46,12 +46,12 @@ Native AI (Paperless 3.0+) is enabled: **suggestions** (title, tags,
 correspondent, document type, storage path, dates), **document chat** and
 **similar documents** (RAG). The non-LLM classifier still runs alongside it.
 
-- **Generation** — `nvidia-llama`, the self-hosted **Qwen3-32B** (151k context)
-  on Dan Manners' cluster, reached through the local LiteLLM. The key is
-  `litellm-secret` / `LITELLM_MASTER_KEY`. His proxy does **not** store prompt or
-  response content (`store_prompts_in_spend_logs` unset → false), so document
-  text never reaches his spend logs — it is still processed in memory on his
-  vLLM node. See `docs/local-llm.md` and the retention notes there.
+- **Generation** — `intel-vl`, a **Qwen3-VL-8B** on an Intel Arc in Dan Manners'
+  cluster, reached through the local LiteLLM alias, so nothing is billed to a
+  model provider. The key is `litellm-secret` / `LITELLM_MASTER_KEY`. His proxy
+  does **not** store prompt or response content, so document text never reaches
+  his spend logs — it is still processed in memory on his hardware. See
+  `docs/local-llm.md`.
 - **Embeddings** — `huggingface` with `sentence-transformers/all-MiniLM-L6-v2`,
   running in-process. No embedding backend, no API key, nothing leaves the
   cluster. Cache lives on the tank (see storage); first use downloads ~90 MB.
@@ -115,7 +115,8 @@ name):
   `Policy`, `Medical`, `Correspondence`, `Other`
 - **Tags:** `status/inbox`, `status/ai-enriched`, `accounting/unlinked`,
   `accounting/beancounted`
-- **Custom fields:** `Reference`, `Total` (monetary), `Payment method`
+- **Custom fields:** `Reference`, `Total` (monetary), `Payment method`,
+  `Transaction date`
 - **Workflows:** `auto-classify: invoice`, `auto-classify: receipt`,
   `auto-classify: ai`, `mark accounting/unlinked`
 
@@ -166,28 +167,29 @@ Limits worth knowing:
 
 Paperless' AI suggestion action cannot write custom fields, so a CronJob fills
 the financial ones. `paperless-extract` (`paperless_extract.py`, every 5
-minutes) scans documents typed `Invoice` or `Receipt`, asks the same LLM
-(`nvidia-llama` via LiteLLM) for the values, and PATCHes the document:
+minutes) scans documents typed `Invoice` or `Receipt`, asks `intel-vl` through
+LiteLLM for the values, and PATCHes the document:
 
-| Field            | Example          |
-| ---------------- | ---------------- |
-| `Total`          | `CAD155.11`      |
-| `Payment method` | `VISA **** 5678` |
-| `Reference`      | `987654`         |
+| Field            | Example     |
+| ---------------- | ----------- |
+| `Total`          | `USD155.11` |
+| `Payment method` | `VISA 5678` |
+| `Reference`      | `987654`    |
 
-The merchant stays the correspondent and the transaction date is the document's
-`created` date (Paperless parses it), so neither is a custom field. A document
-that already has a `Total` is skipped, so the job only fills blanks and is safe
-to re-run.
+It reads **OCR text**, not the image, so a receipt photographed with no usable
+text yields nothing here. The Immich bridge does the same job from the image for
+the files it sends (next section) — better evidence — so this job is what covers
+everything else: an emailed PDF, a manual upload, or a document whose OCR only
+became available after the bridge ran.
 
-Two gotchas worth keeping:
+A document that already has a `Total` is skipped, so the job only fills blanks
+and is safe to re-run. `Payment method` is written as `<BRAND> <last4>`, no
+asterisks — the same shape both writers use.
 
-- Qwen3 is a reasoning model. Without
-  `chat_template_kwargs.enable_thinking=false` it spends the token budget
-  thinking and returns `content: null` — observed on a receipt whose OCR read
-  `TOTAL: $155. uu`. The extractor sets it.
+One gotcha worth keeping:
+
 - `Total` is a monetary field that carries its own currency as a 3-char prefix
-  (`CAD155.11`); Paperless parses the amount out of it. There is deliberately no
+  (`USD155.11`); Paperless parses the amount out of it. There is deliberately no
   separate `Currency` field.
 
 ## Storage layout
@@ -221,87 +223,119 @@ Recreate`); never run two pods against `data/`.
 - **The first AI call downloads the embedding model** (~90 MB) into the models
   hostPath. The RAG index is rebuilt nightly at 02:10 by default
   (`PAPERLESS_LLM_INDEX_TASK_CRON`) and on demand from the admin.
-- **Qwen3-32B is a reasoning model.** LiteLLM separates its thinking into
-  `reasoning_content`, so it does not pollute the answer, but suggestions spend
-  extra tokens/latency before emitting JSON.
+- **The generation model is shared.** `intel-vl` is one Qwen3-VL on someone
+  else's GPU, so it can flap or run slow while its owner redeploys it. The bridge
+  treats any failure as "no answer" and re-asks later rather than caching it, and
+  Paperless' own AI simply fails the workflow and leaves `status/inbox`.
 - **The PVC name is pinned** with `forceRename: paperless-data`: app-template
   only suffixes PVC names once a second PVC exists, and the kopiur policy
   references this exact name.
 
 ## Immich bridge (photo → archive)
 
-Receipts photographed on a phone land in Immich and used to stay there.
-`immich-paperless` (`infra/k8s/kyz/apps/default/immich-paperless/`) is a
-CronJob that every 15 minutes:
+Receipts photographed on a phone land in Immich. `immich-paperless`
+(`infra/k8s/kyz/apps/default/immich-paperless/`) runs one script (`bridge.py`,
+held in a ConfigMap) from two entry points: a CronJob that sweeps hourly
+(`0 * * * *`, `concurrencyPolicy: Forbid`) and a Deployment that holds Immich's
+websocket, so a fresh upload is examined within seconds instead of in an hour.
 
-**classify** — every image added in the last `WINDOW_HOURS` (24 by default) that
-carries none of the bridge's tags is offered to a three-stage cascade, cheapest
-first, so most assets never reach a model:
+There is a clickable diagram of this flow — every box, its verdicts and eight
+real failure scenarios — in `docs/immich-paperless-flow.html`. It is a plain file
+in the repo, not served anywhere: open it in a browser.
 
-1. **CLIP** — Immich's smart search (`DOC_QUERIES` in the script). This is a
-   recall net with no precision: it returns its best matches for a query, not
-   ones above a score, so a match only makes the asset a _candidate_.
-2. **Immich's local OCR** — an asset that already has OCR text is a document of
-   some kind, and is queued there and then. This stage is free, runs on the node,
-   and settles most candidates.
-3. **A vision model** — only for candidates OCR cannot judge. It is asked for a
-   JSON verdict: a yes queues the asset, a no writes `paperless-skip` instead.
-   **A failed call writes nothing**: an outage must not be recorded as a
-   permanent verdict, so the asset stays untagged and a later run re-asks.
+**The vision model decides everything.** One call to `intel-vl` answers with a
+JSON verdict — `description`, `tags`, `document`, `useful`, `confidence`,
+`kind` — and that answer drives the rest. There is no CLIP gate, no local-OCR
+gate and no review queue.
 
-The vision model is `intel-vl`, a Qwen3-VL-8B on a friend's Intel Arc reached
-through our own LiteLLM alias, so the photo stays off a model provider. Any other
-name in `VISION_MODEL` (e.g. `qwen3.8-omni-flash`) sends it to OpenRouter.
-`MAX_VISION_CALLS` caps the model calls per run either way.
+**classify** — every image in the window that carries none of the bridge's tags
+is offered to the model, newest first, walking `MAX_PAGES` pages of 200. Immich
+caps a metadata page at 200 and has no "everything since" call, so the pages have
+to be walked; without that a candidate older than the newest page could never be
+examined at all.
 
-The window is walked in pages of 200, newest first (`MAX_PAGES`), because Immich
-caps a metadata page at 200 and has no "everything since" call — without that, a
-candidate older than the newest page could never be examined at all.
+| Verdict                           | What happens                                           |
+| --------------------------------- | ------------------------------------------------------ |
+| `document: true`, useful          | added to the `Paperless` album, tagged `document`      |
+| `document: true`, `useful: false` | tagged `useless` — junk that must never queue          |
+| `document: false`                 | nothing beyond its content tags                        |
+| no answer at all                  | **nothing**: an outage must not be cached as a verdict |
 
-**send** — assets in the Immich album named `Paperless` are copied into the
-consume dropbox:
+The description is written onto the asset, and the model's `tags` are applied,
+restricted to `VOCAB` (`person`, `casual`, `formal`, `landscape`, `art`, `food`,
+`pet`, `children`, `vehicle`, `screenshot`, `indoor`, `outdoor`, `holiday`,
+`document`). A photo of a person or a dog is deliberately **not** labelled: it is
+not a document, and its content tags are the record of that decision. `useless`
+means the same thing here as it does in Paperless — a document worth reading and
+not worth keeping — so a coupon never reaches the archive at all.
+
+One tag namespace marks the decision, so a re-run asks nothing twice: `VOCAB`
+plus `document`, `useless` and `paperless-sent`. A tag an operator adds by hand
+counts as their answer too. There is no `paperless-skip` or `paperless-maybe`
+any more; both were retired with the CLIP/OCR cascade.
+
+**send** — assets tagged `document` are copied into the consume dropbox:
 
 1. skips any asset already carrying `paperless-sent`, and any video (a video
    would otherwise be archived as a single JPEG frame);
 2. downloads the original — or, for formats Paperless cannot read (HEIC straight
    off an iPhone), Immich's `fullsize` JPEG. The bridge never hands Paperless a
    HEIC, because its consumer would fail the file rather than convert it;
-3. writes it into the consume dropbox as `<date> immich <name>.<ext>`, mode 0644
+3. writes it into the consume dropbox as `<date> <description>.<ext>`, mode 0644
    so the consumer (uid 1000) can read it;
 4. tags the asset `paperless-sent`.
 
-Paperless then does everything it normally does: OCR, then its workflows assign
-the document type and the `accounting/inbox` tag. **The bridge holds no
-Paperless credential** — it only writes into the dropbox — so its only secret is
-an Immich API key.
+The **tag** is the queue, not the album. Immich's album API reports no assets for
+an album the key's user does not own, so an album-driven send reads back empty and
+silently sends nothing; the album is a display grouping only.
 
-### The review loop
+**enrich** — Paperless' own AI is text-only, so a receipt photographed with no
+usable OCR arrives titled after its camera filename. Once the document exists,
+the bridge asks the vision model about the _image_ and writes back, joining the
+two systems on the filename:
 
-The archive is permanent, so nothing enters it unreviewed — the automatic path
-only proposes.
+| Written            | Where                                                 |
+| ------------------ | ----------------------------------------------------- |
+| title              | the document title; the filename begins with it       |
+| merchant           | the correspondent, created if new                     |
+| transaction date   | `created` **and** the `Transaction date` custom field |
+| total              | `Total`, currency prefixed (`USD20.64`)               |
+| card               | `Payment method`, as `MASTERCARD 3642`                |
+| reference          | `Reference`                                           |
+| the reading itself | appended to `content` behind a marker                 |
 
-| Tag               | Set by         | Means                                                                  |
-| ----------------- | -------------- | ---------------------------------------------------------------------- |
-| `paperless-maybe` | the job        | CLIP thinks this is a document; review it                              |
-| `paperless-sent`  | the job        | already handed to Paperless                                            |
-| `paperless-skip`  | the job or you | declined: not a document (the vision model), or never suggest it again |
+Content is **appended**, never replaced, so the OCR text and an operator's own
+description survive. Custom fields and tags are merged rather than assigned (a
+PATCH replaces both lists wholesale). A document the model cannot make sense of —
+`useful: false`, or a reading too thin to act on — is tagged `useless` in
+Paperless rather than left untitled, so it can be found and deleted.
 
-To archive a suggestion: filter Immich by the `paperless-maybe` tag (the tag page
-is `/tags`), add the real documents to the `Paperless` album, and the next run
-copies them. To decline one, replace its tag with `paperless-skip` — create that
-tag once, because the job reads it but never creates it. The job never re-tags an
-asset that already carries any of its own tags.
+Documents already carrying `status/vision-enriched` are skipped, so the pass is
+idempotent, and the join accepts both the current filename and the camera stem,
+for files sent before the filename carried the description.
 
-State lives in Immich (the tags), not in a volume, so the job is idempotent,
-restartable, and "did this one get sent?" is answerable from the Immich UI. A
-missing album is **not** an error: the album is opt-in, so an empty review queue
-is the normal state.
+### State and review
+
+All state lives in Immich tags, so "did this get looked at?" and "what did the
+model decide?" are answerable from the Immich UI, and the job is restartable.
+
+| Tag                      | Set by     | Means                                |
+| ------------------------ | ---------- | ------------------------------------ |
+| `document`               | the bridge | queued for Paperless (the send gate) |
+| `useless`                | the bridge | read and judged not worth keeping    |
+| `paperless-sent`         | the bridge | already handed to Paperless          |
+| `status/vision-enriched` | the bridge | the Paperless side has the reading   |
+
+To undo a decision, remove the `document` tag (or replace it with `useless`)
+before the next run: the bridge never re-tags an asset carrying any of its own
+tags.
 
 ### Setting it up
 
-1. Create an Immich API key (Account Settings → API Keys). The bridge needs
-   `album.read`, `asset.read`, `asset.view`, `asset.download`, `tag.read`,
-   `tag.create` and `tag.asset`.
+1. Create an Immich API key (Account Settings → API Keys) with **all**
+   permissions. The bridge reads assets and tags, writes descriptions, adds
+   assets to an album and writes tags; a narrower key fails the writes with a zod
+   body naming the field that was refused.
 2. Add it to 1Password as an **API Credential** item named `paperless-bridge` in
    the `home-ops` vault, with the key in the **credential** field. The
    ExternalSecret reads `paperless-bridge/credential`, and the vault matters: the
@@ -309,11 +343,46 @@ is the normal state.
    invisible to the sync.
 3. `mise run secrets:verify` should then report it as resolving.
 
-Without step 2 the job fails with an explicit message instead of silently doing
-nothing.
+It also holds a Paperless token (`paperless/api_token`) for the enrich step, so a
+Paperless outage shows up in its logs instead of being silent.
 
-Backfilling is Immich UI work, not a mise task: Administration → Jobs → **OCR →
-All** gives existing photos OCR text (corroboration only), and **Smart Search →
-All** rebuilds embeddings if smart search ever returns nothing. The classify
-window is 24 hours; to classify the existing library in one go, run the script
-once with a wider `WINDOW_HOURS`.
+### Editing the script, and backfilling
+
+`bridge.py` lives in a ConfigMap, and **a ConfigMap change does not restart the
+Deployment** — the running process keeps whatever it loaded at start. After any
+script change:
+
+```sh
+kubectl rollout restart deploy/immich-paperless-realtime -n default
+```
+
+The CronJob is immune, because each run mounts the script fresh. Verify the
+deployed artifact, not the diff:
+
+```sh
+kubectl exec -n default deploy/immich-paperless-realtime -- \
+  grep -c '^def find_named' /scripts/bridge.py
+```
+
+To walk the whole library instead of the window, run the CronJob's own spec once
+with a wider window:
+
+```sh
+kubectl create job -n default vlbackfill --from=cronjob/immich-paperless-bridge \
+  --dry-run=client -o yaml > /tmp/bf.yaml
+# edit: WINDOW_HOURS=8760, MAX_PAGES=60, MAX_VISION_CALLS=8000 (quote the values,
+# Job env entries are strings), then add the annotation below
+kubectl apply -f /tmp/bf.yaml
+```
+
+It is resumable — everything already decided is skipped — so it can be stopped
+and restarted at will. Two things to know:
+
+- **Flux will delete it.** The Kustomization has `prune: true`, so a Job that is
+  not in Git is removed at the next reconcile, taking its logs with it. Add
+  `kustomize.toolkit.fluxcd.io/prune: disabled` under the Job's
+  `metadata.annotations`.
+- `MAX_VISION_CALLS` is a real request budget, not a limit to be set to infinity:
+  every call is a request against a shared GPU, and the model is the bottleneck.
+  The hourly sweep only does `MAX_VISION_CALLS` per run, so a large backfill is
+  better run as its own job.
