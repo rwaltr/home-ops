@@ -137,10 +137,12 @@ data:
                 body = resp.read()
                 return body if raw else json.loads(body or b"{}")
         except urllib.error.HTTPError as err:
-            # A bare traceback is useless in a CronJob log. 401/403 means the
-            # 1Password paperless-bridge credential is not an Immich API key, or
-            # lacks a scope this bridge needs.
-            sys.exit(f"Immich API returned {err.code} for {method} {path}: check the paperless-bridge 1Password item")
+            # A bare traceback is useless in a CronJob log, and so is our own guess at the
+            # cause: Immich answers a bad field with a zod body naming it, and dropping that
+            # turned a one-line diagnosis into an evening. 401/403 still means the
+            # paperless-bridge credential is not an Immich API key, or lacks a scope.
+            detail = err.read().decode("utf-8", "replace").strip()[:300]
+            sys.exit(f"Immich API returned {err.code} for {method} {path}: {detail}")
 
 
     def safe_name(asset):
@@ -417,7 +419,16 @@ data:
             method=method,
             headers={"Authorization": "Token " + PAPERLESS_KEY, "Content-Type": "application/json"},
         )
-        raw = urllib.request.urlopen(req, timeout=90).read().decode()
+        try:
+            raw = urllib.request.urlopen(req, timeout=90).read().decode()
+        except urllib.error.HTTPError as err:
+            # Paperless puts the reason in the body - "Object violates owner / name unique
+            # constraint" - and a bare "HTTP Error 400" is what hid it. Keep the exception
+            # type: ensure_named catches it to re-look-up a name it lost a race on.
+            detail = err.read().decode("utf-8", "replace").strip()[:300]
+            raise urllib.error.HTTPError(
+                err.url, err.code, f"{err.reason}: {detail}", err.headers, None
+            ) from None
         return json.loads(raw) if raw.strip() else {}
 
 

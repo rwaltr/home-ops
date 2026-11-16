@@ -4,8 +4,11 @@
 # Fills Total / Currency / Payment method / Reference on Invoice and Receipt
 # documents. Paperless' AI suggestion action cannot write custom fields —
 # AISuggestionField stops at the created date and documents/workflows/ai.py
-# never touches them — so this job asks the same LLM directly (nvidia-llama on
-# Dan's gateway via LiteLLM) and PATCHes the document through the API.
+# never touches them — so this job asks the same LLM directly (intel-vl via
+# LiteLLM) and PATCHes the document through the API.
+#
+# Covers documents that did not come through the Immich bridge — an emailed PDF or a
+# manual upload — because the bridge only enriches the files it sent, joined by name.
 #
 # Idempotent: a document that already has a Total is skipped, so a re-run only
 # fills blanks. The script lives in paperless_extract.py (configMapGenerator).
@@ -58,7 +61,7 @@ spec:
                       name: litellm-secret
                       key: LITELLM_MASTER_KEY
                 - name: LITELLM_MODEL
-                  value: nvidia-llama
+                  value: intel-vl
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

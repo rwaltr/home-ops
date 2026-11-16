@@ -5,8 +5,13 @@ Paperless' built-in "Apply AI suggestions" action can only write title, tags,
 correspondent, document type, storage path and created date — it has no
 custom-field path at all (`AISuggestionField` and `documents/workflows/ai.py`).
 This job closes that gap: for documents typed Invoice or Receipt, it asks the
-same LLM (nvidia-llama — Qwen3-32B on Dan's gateway via LiteLLM) for the total,
-currency, card and reference, then PATCHes the custom fields.
+same LLM (intel-vl via LiteLLM) for the total, currency, card and reference,
+then PATCHes the custom fields.
+
+It reads OCR text, not the image, so a receipt photographed with no usable text yields
+nothing here. The Immich bridge enriches the files it sends from the image itself,
+which is better evidence; this job covers everything else (an emailed PDF, a manual
+upload) and re-fills a document whose OCR only became available after the bridge ran.
 
 Runs as a CronJob (extract-cronjob.yaml). Idempotent: a document that already
 has a Total is skipped, so re-runs only fill blanks.
@@ -16,7 +21,7 @@ Env:
   PAPERLESS_API_TOKEN  from the paperless-secret
   LITELLM_BASE_URL     default http://litellm.default.svc.cluster.local:4000/v1
   LITELLM_API_KEY      litellm-secret/LITELLM_MASTER_KEY
-  LITELLM_MODEL        default nvidia-llama
+  LITELLM_MODEL        default intel-vl
   MAX_DOCS             default 25
 """
 
@@ -36,7 +41,7 @@ PAPERLESS = os.environ.get(
 TOKEN = os.environ.get("PAPERLESS_API_TOKEN", "").strip()
 LITELLM = os.environ.get("LITELLM_BASE_URL", "http://litellm.default.svc.cluster.local:4000/v1").rstrip("/")
 LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "").strip()
-MODEL = os.environ.get("LITELLM_MODEL", "nvidia-llama")
+MODEL = os.environ.get("LITELLM_MODEL", "intel-vl")
 MAX_DOCS = int(os.environ.get("MAX_DOCS", "25"))
 
 FINANCIAL_TYPES = ("Invoice", "Receipt")
