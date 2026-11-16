@@ -44,6 +44,11 @@ spec:
           secretKeyRef:
             name: agentgateway-secret
             key: OPENCODE_GO_API_KEY
+      - name: MIKROTIK_MCP_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: MIKROTIK_MCP_TOKEN
     gateway:
       service:
         type: ClusterIP
@@ -149,3 +154,36 @@ spec:
               apiKey: ${OPENCODE_GO_API_KEY}
               baseUrl: https://opencode.ai/inference/go/openai/v1
               model: deepseek-v4.1-flash
+      # MCP servers multiplexed behind one endpoint, so a client needs one URL and
+      # one credential instead of five of each. Served on 8081, same idiom as the
+      # llm block above.
+      #
+      # `conditional` prefixing namespaces a tool name only when two targets would
+      # collide, so the common case stays readable (flux_*, kubectl_*).
+      #
+      # kubesearch is deliberately absent: its bearer token does not exist yet
+      # (Terraform mint), and naming it here would leave the gateway unable to
+      # authenticate to itself. Add it when infra/terraform/bootstrap lands.
+      mcp:
+        port: 8081
+        prefixMode: conditional
+        targets:
+          - name: flux
+            mcp:
+              host: http://flux-mcp.default.svc.cluster.local:8000/mcp
+          - name: kubectl
+            mcp:
+              host: http://kubectl-mcp.default.svc.cluster.local:8000/mcp
+          - name: home-assistant
+            # Path-secrecy auth in its default form: no header is sent, and the
+            # target is reachable only from here.
+            mcp:
+              host: http://home-assistant-mcp.default.svc.cluster.local:8086/mcp
+          - name: mikrotik
+            mcp:
+              host: http://mikrotik-mcp.default.svc.cluster.local:3000/mcp
+            policies:
+              # The one target that demands a credential: the token Terraform
+              # minted, presented as a bearer.
+              backendAuth:
+                key: ${MIKROTIK_MCP_TOKEN}
