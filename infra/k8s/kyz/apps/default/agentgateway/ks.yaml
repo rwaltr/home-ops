@@ -3,22 +3,21 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app agentgateway
-  namespace: flux-system
+  name: agentgateway
 spec:
-  targetNamespace: default
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
+  interval: 1h
   path: ./infra/k8s/kyz/apps/default/agentgateway/app
   prune: true
   sourceRef:
-    kind: OCIRepository
+    kind: GitRepository
     name: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
+    namespace: flux-system
+  targetNamespace: default
   dependsOn:
-    - name: external-secrets-stores
+    # cliproxyapi must exist first: it is a model upstream.
     - name: cliproxyapi
+      namespace: default
+    # The ClusterSecretStore lives in the onepassword-connect Kustomization.
+    - name: onepassword-connect
+      namespace: external-secrets
+  wait: false
