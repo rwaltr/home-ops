@@ -1,0 +1,124 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# agentgateway — one LLM endpoint in front of the same upstreams litellm carries,
+# plus cliproxyapi's subscription-backed models. Deliberately NOT chained to our
+# own litellm: this is a parallel front door, not a second hop.
+#
+# Inbound auth is absent on purpose. 8080 is cluster-internal and unauthenticated,
+# so any pod can spend these keys; that is the same posture as the MCP servers in
+# this namespace, and it is the reason the pod carries no client-facing route. Add
+# the `policies.apiKey` block from the chart's examples before exposing it.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agentgateway
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: agentgateway
+  interval: 30m
+  values:
+    nameOverride: agentgateway
+    mode: readonly
+    replicaCount: 1
+    extraEnv:
+      # Same 1P item litellm uses for its OpenRouter calls; no copy in our secret.
+      - name: OPENROUTER_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: hermes-secret
+            key: OPENROUTER_API_KEY
+      # This chart supports extraEnv only, not envFrom — so each key is named.
+      - name: CLIPROXYAPI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: CLIPROXYAPI_API_KEY
+      - name: DANMANNERS_LLM_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: DANMANNERS_LLM_API_KEY
+    gateway:
+      service:
+        type: ClusterIP
+        ports:
+          - name: llm
+            port: 8080
+            targetPort: 8080
+            protocol: TCP
+          - name: metrics
+            port: 15020
+            targetPort: 15020
+            protocol: TCP
+          - name: readiness
+            port: 15021
+            targetPort: 15021
+            protocol: TCP
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+    config:
+      config:
+        adminAddr: "off"
+        statsAddr: 0.0.0.0:15020
+        readinessAddr: 0.0.0.0:15021
+      llm:
+        port: 8080
+        models:
+          # --- OpenRouter: the same three aliases litellm exposes ---
+          - name: deepseek-v4.1-flash
+            provider: openAI
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: deepseek/deepseek-v4.1-flash
+          - name: qwen3.8-omni-flash
+            provider: openAI
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: qwen/qwen3.8-omni-flash
+          - name: gpt-5.6-luna
+            provider: openAI
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: openai/gpt-5.6-luna
+          # --- Dan Manners' shared gateway: only the hardware-backed aliases ---
+          - name: nvidia-llama
+            provider: openAI
+            params:
+              apiKey: ${DANMANNERS_LLM_API_KEY}
+              baseUrl: https://llm.cloud.danmanners.com/v1
+              model: nvidia-llama
+          - name: intel-llama
+            provider: openAI
+            params:
+              apiKey: ${DANMANNERS_LLM_API_KEY}
+              baseUrl: https://llm.cloud.danmanners.com/v1
+              model: intel-llama
+          - name: intel-vl
+            provider: openAI
+            params:
+              apiKey: ${DANMANNERS_LLM_API_KEY}
+              baseUrl: https://llm.cloud.danmanners.com/v1
+              model: intel-vl
+          - name: gptoss-llama
+            provider: openAI
+            params:
+              apiKey: ${DANMANNERS_LLM_API_KEY}
+              baseUrl: https://llm.cloud.danmanners.com/v1
+              model: gptoss-llama
+          # --- cliproxyapi: subscription accounts as OpenAI-compatible models ---
+          # The service is cluster-internal; the key is the one Terraform minted,
+          # held only by this pod's env.
+          - name: claude
+            provider: openAI
+            params:
+              apiKey: ${CLIPROXYAPI_API_KEY}
+              baseUrl: http://cliproxyapi.default.svc.cluster.local:8317/v1
+              model: claude-sonnet-5-5

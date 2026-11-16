@@ -5,6 +5,7 @@ kind: Kustomization
 namespace: default
 
 resources:
+  - ./agentgateway/ks.yaml
   - ./namespace.yaml
   - ./esphome/ks.yaml
   - ./home-assistant/ks.yaml

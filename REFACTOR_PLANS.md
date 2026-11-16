@@ -2284,6 +2284,25 @@ vendor console exists in exactly one place with no record of what it is for.
   not. Documented non-interactive form: `MISE_YES=1
   TF_CLI_ARGS_apply=-auto-approve mise run tf:apply bootstrap`.
 
+### 2026-11-14 (later still) — agentgateway: a second front door
+
+Deployed to `default` ahead of the MCP set, because it was needed for a different
+reason: cliproxyapi's OAuth session can only be proven by an authenticated call, and
+the client key lives in a Secret Teletran does not read. agentgateway holds that key
+in its own environment, so the test moves to the gateway — the pod that has the
+credential makes the call.
+
+`cr.agentgateway.dev/charts/agentgateway-standalone` v1.7.0, `mode: readonly`, chart
+`config` rendered to a `config.yaml` ConfigMap, `${VAR}` interpolated from the
+container env at runtime so no key is in git. Models mirror litellm's list one for
+one, minus `whisper` and `piper` (they are litellm-pod sidecar endpoints on
+`127.0.0.1:8000`, not reachable from another pod). Not chained to litellm, per the
+explicit instruction.
+
+Two chart facts worth keeping: this chart supports `extraEnv` but **not** `envFrom`,
+so every secret key has to be named; and `session.secretName` is optional outside
+the admin UI, so readonly mode needs no session secret.
+
 ### 2026-11-14 (later still) — cliproxyapi: subscriptions behind one endpoint
 
 Sixth item of the bjw-s parity series. `eceasy/cli-proxy-api` v8.0.72 (digest

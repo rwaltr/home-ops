@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: agentgateway
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/default/agentgateway/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: default
+  dependsOn:
+    # cliproxyapi must exist first: it is a model upstream.
+    - name: cliproxyapi
+      namespace: default
+    # The ClusterSecretStore lives in the onepassword-connect Kustomization.
+    - name: onepassword-connect
+      namespace: external-secrets
+  wait: false
