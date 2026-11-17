@@ -1,0 +1,28 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/cert-manager.io/certificate_v1.json
+# The server's own TLS identity. Kanidm terminates TLS itself and refuses to
+# start without a usable secret, so this has to exist before the cluster is
+# reconciled — the Kustomization applies both, and the pod retries until the
+# DNS-01 challenge completes.
+#
+# A separate certificate rather than the network namespace's `tls-wildcard`: the
+# server reads this secret from its own namespace, and a secret cannot be mounted
+# across namespaces. Same issuer and profile, so renewal behaves identically.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kanidm
+spec:
+  dnsNames:
+    - idm.waltr.tech
+  duration: 160h
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  secretName: kanidm-tls
+  usages:
+    - digital signature

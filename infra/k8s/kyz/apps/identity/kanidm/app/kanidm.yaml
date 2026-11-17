@@ -1,0 +1,59 @@
+---
+# No yaml-language-server schema line: the schema host has no kaniop entry, so a
+# pointer there would 404 and the editor would fall back to guessing anyway.
+#
+# The identity server.
+#
+# `domain` is immutable after creation and is baked into WebAuthn and every
+# principal name (`rwaltr@idm.waltr.tech`), and `origin` must match or descend
+# from it or the server refuses to start. Chosen once, deliberately.
+#
+# Internal only: the HTTPRoute attaches to envoy-internal, which is the gateway
+# external-dns does not publish. Making this reachable from outside is a second
+# route on envoy-external, and that happens when the OAuth flow needs it.
+apiVersion: kaniop.rs/v1beta1
+kind: Kanidm
+metadata:
+  name: kanidm
+spec:
+  domain: idm.waltr.tech
+  origin: https://idm.waltr.tech
+  tlsSecretName: kanidm-tls
+  replicaGroups:
+    - name: default
+      replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          # Kanidm is a Rust server with a small resident set; this is headroom,
+          # not a measurement.
+          memory: 512Mi
+  # Not optional. With no storage specified the operator uses an EmptyDir, so
+  # the identity database would live in a scratch directory and vanish with the
+  # pod — silent data loss on the first restart or node drain.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: openebs-hostpath
+        resources:
+          requests:
+            storage: 5Gi
+  gateway:
+    parentRefs:
+      - name: envoy-internal
+        namespace: network
+        # The https listener. The http listener on this gateway only accepts
+        # routes from the network namespace, and Kanidm needs TLS regardless.
+        port: 443
+    hostnames:
+      - idm.waltr.tech
+    # The gateway must validate the server's certificate on the way in. It is a
+    # publicly trusted Let's Encrypt certificate, so the system trust store is
+    # the whole configuration.
+    backendTlsPolicy:
+      validation:
+        wellKnownCaCertificates: System
