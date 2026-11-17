@@ -4,8 +4,8 @@
 #
 # The identity server.
 #
-# `domain` is immutable after creation and is baked into WebAuthn and every
-# principal name (`rwaltr@idm.waltr.tech`), and `origin` must match or descend
+# `domain` is immutable after first initialisation and is baked into WebAuthn and
+# every principal name (`rwaltr@waltr.tech`), and `origin` must match or descend
 # from it or the server refuses to start. Chosen once, deliberately.
 #
 # Internal only: the HTTPRoute attaches to envoy-internal, which is the gateway
@@ -16,8 +16,18 @@ kind: Kanidm
 metadata:
   name: kanidm
 spec:
-  domain: idm.waltr.tech
-  origin: https://idm.waltr.tech
+  # The realm. Principal names are built from it (rwaltr@waltr.tech), and it is
+  # immutable after the first initialisation — changing it means a fresh volume.
+  #
+  # It is deliberately the apex rather than `idm.waltr.tech`: the realm is the
+  # identity namespace for everything in this house, and there is no reason for
+  # it to carry the name of one of the services that speaks it.
+  domain: waltr.tech
+  # The URL the server is reached at. `origin` may match the domain or descend
+  # from it, so a future move to a subdomain would not require a new realm — but
+  # the apex is what was asked for, and WebAuthn is happiest when the RP ID and
+  # the origin host are the same string.
+  origin: https://waltr.tech
   tlsSecretName: kanidm-tls
   # Pinned to the version the operator supports, not to "newest".
   #
@@ -67,7 +77,7 @@ spec:
         # routes from the network namespace, and Kanidm needs TLS regardless.
         port: 443
     hostnames:
-      - idm.waltr.tech
+      - waltr.tech
     # The gateway must validate the server's certificate on the way in. It is a
     # publicly trusted Let's Encrypt certificate, so the system trust store is
     # the whole configuration.

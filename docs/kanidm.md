@@ -46,13 +46,21 @@ manual identity management. Kaniop is the option that keeps identity declarative
 
 ## Domain
 
-`idm.waltr.tech`. Kanidm's `domain` is immutable after creation and is baked into
-WebAuthn and every principal name (`rwaltr@idm.waltr.tech`), and `origin` must
-match or descend from it or the server refuses to start. Choose it once.
+The realm is **`waltr.tech`** — the apex, not `idm.waltr.tech`. Principal names are
+built from it (`rwaltr@waltr.tech`), and the identity namespace for everything in
+this house should not be named after one of the services that speaks it.
+
+`domain` is immutable after first initialisation and is baked into WebAuthn and
+every principal name, so changing it means a fresh volume. `origin` is the URL the
+server is reached at, and it may match the domain **or descend from it** — which
+means the UI could move to a subdomain later without touching the realm. It is
+currently the apex itself, where the RP ID and the origin host are the same string.
+
+`domain` and `origin` must be consistent or the server refuses to start.
 
 ## Running it
 
-Internal only: `https://idm.waltr.tech/ui/login` on `envoy-internal`, with a
+Internal only: `https://waltr.tech/ui/login` on `envoy-internal`, with a
 Let's Encrypt certificate and a 5Gi PVC on `openebs-hostpath`. external-dns
 publishes only routes attached to `envoy-external`, so nothing about this is
 reachable from the internet until a second route is added on purpose.
@@ -123,6 +131,11 @@ day to day.
 The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
 That is also when `llm.waltr.tech` gets republished, since the flow needs both
 the authorization server and the MCP endpoint reachable from outside.
+
+Publishing the IdP needs **two** changes, not one: the route moves to
+`envoy-external`, and the Cloudflare tunnel needs an ingress rule for the apex,
+because the tunnel's only rule is `*.waltr.tech` — a wildcard does not match the
+apex, so `waltr.tech` currently falls through to the tunnel's 404.
 
 ## Layout
 

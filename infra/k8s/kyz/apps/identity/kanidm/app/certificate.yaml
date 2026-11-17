@@ -14,7 +14,7 @@ metadata:
   name: kanidm
 spec:
   dnsNames:
-    - idm.waltr.tech
+    - waltr.tech
   duration: 160h
   issuerRef:
     kind: ClusterIssuer

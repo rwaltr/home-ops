@@ -3,7 +3,7 @@
 # recovery account.
 #
 # `kanidmName` is omitted: it defaults to the resource name, giving
-# rwaltr@idm.waltr.tech.
+# rwaltr@waltr.tech.
 #
 # Delivery is `event`, which is also the default. Email would need
 # spec.mailSender on the Kanidm cluster, which is not configured — and it is
