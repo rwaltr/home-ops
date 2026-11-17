@@ -237,6 +237,36 @@ membership has to ask for it.
 URLs are matched exactly, so it has to be the URL the application actually calls
 back on.
 
+**Kaniop enforces PKCE by default**, and Kanidm refuses an authorization request
+without a code challenge:
+
+```
+ERROR  No PKCE code challenge was provided with client in enforced PKCE mode
+       o2rs.name: "<client>"
+ERROR  Unable to authorise - error: invalid_request
+```
+
+The client-side symptom is generic (`invalid_request`, or an `invalidstate`-flavoured
+error page served by the identity provider itself) and everything at the app looks
+correct, so this is worth checking in Kanidm's log first. Turn PKCE on in the
+application (`use_pkce` for Grafana) rather than relaxing the client — the
+enforcement is the safer default, and every client we have supports PKCE.
+
+**A public client cannot disable the consent prompt.** Kanidm requires both PKCE and
+the consent prompt on public clients, so `disableConsentPrompt: true` alongside
+`public: true` is a contradiction the operator cannot resolve: it retries
+`PATCH /v1/oauth2/<client>` and gets
+
+```
+ERROR  requested_pres is not a subset of allowed
+       requested_pres: {OAuth2ConsentPromptEnable}
+```
+
+forever, with the client otherwise fully reconciled and working. Public clients are
+only for applications that cannot keep a secret — such as one whose configuration is
+a single JSON blob that cannot be assembled from two Secret keys (Paperless). The
+consent screen is the cost.
+
 ## Not done yet
 
 The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.

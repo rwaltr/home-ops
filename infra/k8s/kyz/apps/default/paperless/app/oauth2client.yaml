@@ -33,5 +33,10 @@ spec:
         - profile
         - email
         - groups
-  disableConsentPrompt: true
+  # Deliberately NOT set: Kanidm requires the consent prompt on public clients
+  # ("Public clients must have pkce and consent prompt"), and asking the operator to
+  # disable it makes it retry a write Kanidm refuses — PATCH /v1/oauth2/paperless
+  # 403 `requested_pres: {OAuth2ConsentPromptEnable} !⊆ allowed`, forever, with the
+  # client otherwise fully reconciled. So a consent screen is inherent to this
+  # client type.
   preferShortUsername: true
