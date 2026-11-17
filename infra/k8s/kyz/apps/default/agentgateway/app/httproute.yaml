@@ -1,0 +1,41 @@
+---
+# The public door: one hostname, both surfaces.
+#
+#   /v1  -> the LLM surface   (8080, apiKey in strict mode)
+#   /mcp -> the MCP multiplex (8081, apiKey in strict mode + per-client tool rules)
+#
+# Publishing this route does not expose an unauthenticated surface, because both
+# listeners reject requests without a key. The internal listener (8082) is
+# deliberately absent here: it is for in-cluster callers and never leaves the
+# ClusterIP Service.
+#
+# Nothing else is needed to make the hostname resolve. The cloudflare tunnel
+# carries *.waltr.tech to envoy-external, and external-dns publishes records only
+# for routes attached to that gateway, so this HTTPRoute is the entire publish
+# step — no Terraform record and no tunnel edit. Unpublishing is deleting this
+# file, the same as navidrome.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: agentgateway
+spec:
+  hostnames:
+    - llm.waltr.tech
+  parentRefs:
+    - name: envoy-external # public via cloudflare tunnel (CGNAT — no port forwards)
+      namespace: network
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1
+      backendRefs:
+        - name: agentgateway
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      backendRefs:
+        - name: agentgateway
+          port: 8081
