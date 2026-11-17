@@ -8,9 +8,19 @@
 # every principal name (`rwaltr@waltr.tech`), and `origin` must match or descend
 # from it or the server refuses to start. Chosen once, deliberately.
 #
-# Internal only: the HTTPRoute attaches to envoy-internal, which is the gateway
-# external-dns does not publish. Making this reachable from outside is a second
-# route on envoy-external, and that happens when the OAuth flow needs it.
+# Public, and unavoidably so. An OAuth2 authorization server has to be reachable
+# by the client's *browser* (the authorization endpoint and its login page) and by
+# the client's *servers* (the token endpoint, discovery and the signing keys), so
+# there is no subset of this that can stay internal once a non-cluster client is
+# wired up. Grok's consumer connector is the forcing case.
+#
+# The internal route stays. Both parentRefs are on the same HTTPRoute, so
+# idm.waltr.tech resolves to the internal VIP inside the house and to the
+# Cloudflare tunnel outside it — the split-horizon behaviour the cluster's DNS
+# already gives every dual-homed hostname.
+#
+# external-dns publishes only routes attached to envoy-external, so the second
+# parentRef is also what creates the public DNS record. Removing it unpublishes.
 apiVersion: kaniop.rs/v1beta1
 kind: Kanidm
 metadata:
@@ -101,6 +111,15 @@ spec:
         namespace: network
         # The https listener. The http listener on this gateway only accepts
         # routes from the network namespace, and Kanidm needs TLS regardless.
+        port: 443
+      # The public listener. Its https allowedRoutes is `from: All`, so this
+      # attaches from the identity namespace without a gateway-side change.
+      #
+      # This is also what publishes the DNS record: external-dns runs with
+      # `--gateway-name=envoy-external` and ignores every other gateway, so the
+      # internal route alone keeps the hostname out of the public zone.
+      - name: envoy-external
+        namespace: network
         port: 443
     hostnames:
       - idm.waltr.tech
