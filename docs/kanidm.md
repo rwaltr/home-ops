@@ -108,6 +108,22 @@ Identity resources live in `infra/k8s/kyz/apps/identity/resources` as kaniop
 custom resources — persons, groups, and later OAuth2 clients. Each is reviewed and
 merged like anything else; there is no separate identity database to edit by hand.
 
+**Do not declare `members` on a built-in group.** A `KanidmGroup` is authoritative
+over the member list it declares, and the built-in groups are load-bearing: the
+operator's own account (`idm_admin`) is a member of `idm_admins`, and every
+permission it needs — creating persons, creating groups, issuing OAuth2 clients —
+hangs off `idm_admins` through `idm_people_admins`, `idm_group_admins` and friends.
+Declaring `members: [rwaltr]` on `idm_admins` therefore does not _add_ a member, it
+**replaces** the list, deletes `idm_admin`, and strips the operator of every right it
+has. The operator then fails its own reconciles with `403 AccessDenied` and
+`allowed: {}` — having locked itself out with its own write.
+
+If a built-in group must be managed, list the built-in members explicitly
+(`members: [idm_admin, rwaltr]`) and treat that list as load-bearing. The safer
+answer is not to manage built-ins at all: administration belongs to the `idm_admin`
+account, and Kanidm's own guidance is to keep a separate administration account
+rather than granting administration to a daily-use person.
+
 A new person account gets its one-time credential link through a Kubernetes Event,
 which is the operator's default delivery. Email would require `spec.mailSender` on
 the Kanidm cluster, which is not configured, and is not worth standing up a mail
@@ -121,10 +137,10 @@ The link is valid for `credentialsTokenTtl` (a day here). If it lapses before it
 used, bump the resend annotation on the person resource rather than deleting and
 recreating it — the account keeps its identifier.
 
-`idm-admins` is a `KanidmGroup` naming Kanidm's built-in `idm_admins` group with
-`rwaltr` as a member, which is what grants identity administration in the UI. The
-`admin` account is recovery only, and should not be the account anyone logs in as
-day to day.
+Administration is the `idm_admin` account, whose password the operator generates
+into the `kanidm-admin-passwords` Secret. The `admin` account is recovery only and
+should not be anyone's daily login. Neither belongs to a person resource — see the
+warning above about built-in groups.
 
 ## Not done yet
 
