@@ -80,6 +80,30 @@ Two settings are load-bearing rather than stylistic: `storage.volumeClaimTemplat
 database in a scratch directory) and `tlsSecretName` (the server terminates TLS
 itself and will not start without a usable secret).
 
+## Accounts
+
+Identity resources live in `infra/k8s/kyz/apps/identity/resources` as kaniop
+custom resources — persons, groups, and later OAuth2 clients. Each is reviewed and
+merged like anything else; there is no separate identity database to edit by hand.
+
+A new person account gets its one-time credential link through a Kubernetes Event,
+which is the operator's default delivery. Email would require `spec.mailSender` on
+the Kanidm cluster, which is not configured, and is not worth standing up a mail
+path just to read one link:
+
+```sh
+kubectl -n identity get events --field-selector involvedObject.name=rwaltr
+```
+
+The link is valid for `credentialsTokenTtl` (a day here). If it lapses before it is
+used, bump the resend annotation on the person resource rather than deleting and
+recreating it — the account keeps its identifier.
+
+`idm-admins` is a `KanidmGroup` naming Kanidm's built-in `idm_admins` group with
+`rwaltr` as a member, which is what grants identity administration in the UI. The
+`admin` account is recovery only, and should not be the account anyone logs in as
+day to day.
+
 ## Not done yet
 
 The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
