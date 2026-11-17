@@ -1,0 +1,43 @@
+---
+# Grafana's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# The client lives in the *application's* namespace rather than in `identity`, so
+# the credentials the operator mints land next to the app that consumes them:
+# `kanidmRef.namespace` is what makes that legal, and it saves copying a Secret
+# across namespaces.
+#
+# Redirect URLs are matched exactly (`strictRedirectUrl` defaults to enabled), so
+# this must be the URL Grafana actually calls back on.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: grafana
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Grafana
+  origin: https://grafana.waltr.tech
+  # A list, despite the singular name — the CRD types it as an array.
+  redirectUrl:
+    - https://grafana.waltr.tech/login/generic_oauth
+  # Scopes have to be granted to a group, and a client cannot request a scope no
+  # group holds. `idm_all_persons` is Kanidm's built-in dynamic group of every
+  # person account, so every account we create can use this client without
+  # maintaining a membership list by hand.
+  #
+  # `groups` is requested for role mapping: Grafana decides the org role from a
+  # claim, and Kanidm only releases group claims when the scope is granted.
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  # A first-party app on a single-user homelab does not need a consent screen
+  # between the user and their own Grafana.
+  disableConsentPrompt: true
+  # `preferred_username` becomes `rwaltr` instead of `rwaltr@waltr.tech`, which is
+  # what Grafana shows as the account name.
+  preferShortUsername: true
