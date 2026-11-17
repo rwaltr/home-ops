@@ -35,6 +35,15 @@ spec:
       # `preferShortUsername` is set on the client, so this is `rwaltr`, not
       # `rwaltr@waltr.tech`.
       login_attribute_path: preferred_username
+      # Kaniop enforces PKCE on its clients by default, and Kanidm refuses an
+      # authorization request without a code challenge:
+      #
+      #   No PKCE code challenge was provided with client in enforced PKCE mode
+      #   Unable to authorise - error: invalid_request
+      #
+      # Grafana supports PKCE, so it is enabled here rather than switching the
+      # client out of enforced PKCE mode.
+      use_pkce: "true"
       # Kanidm's `groups` claim is a flat array holding both each group's UUID and
       # its SPN, so the SPN form is matched. Both spellings are checked because the
       # built-in groups are the ones that matter here and their SPN form has varied
