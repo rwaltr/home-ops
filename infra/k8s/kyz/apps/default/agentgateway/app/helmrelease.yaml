@@ -49,6 +49,21 @@ spec:
           secretKeyRef:
             name: agentgateway-secret
             key: MIKROTIK_MCP_TOKEN
+      - name: GROK_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: GROK_API_KEY
+      - name: PEBBLE_INDEX_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: PEBBLE_INDEX_API_KEY
+    # Encrypts MCP session IDs. The chart injects SESSION_KEY from this Secret's `key`
+    # entry; without it session IDs are base64 only, which discloses the multiplexed
+    # target names to any client that can read its own session id.
+    session:
+      secretName: agentgateway-session
     gateway:
       service:
         type: ClusterIP
@@ -63,6 +78,12 @@ spec:
           - name: mcp
             port: 8081
             targetPort: 8081
+            protocol: TCP
+          # The unauthenticated listener, for in-cluster callers only. It is published
+          # on the ClusterIP Service and never on the public route.
+          - name: internal
+            port: 8082
+            targetPort: 8082
             protocol: TCP
           - name: metrics
             port: 15020
@@ -83,8 +104,60 @@ spec:
         adminAddr: "off"
         statsAddr: 0.0.0.0:15020
         readinessAddr: 0.0.0.0:15021
+      # Three listeners, two of them authenticated.
+      #
+      # apiKey sits at the GATEWAY level rather than on the llm/mcp blocks because
+      # llm.policies and mcp.policies apply to every gateway they are attached to —
+      # port-level placement is the only way to keep an unauthenticated listener for
+      # in-cluster callers. A hostname split would not be a boundary, since the Host
+      # header is client-controlled.
+      #
+      # mode must be `strict`: the default is `optional`, which accepts requests with
+      # no key at all.
+      gateways:
+        llm-public:
+          port: 8080
+          apiKey:
+            mode: strict
+            keys:
+              # A client key doubles as the client's identity: the metadata becomes
+              # the CEL variable `apiKey.client`, which the model allow-lists here and
+              # the MCP authorization rules below are written against.
+              - key: ${GROK_API_KEY}
+                metadata:
+                  name: grok
+                  client: grok
+                # Filters /v1/models as well, and a disallowed model is refused before
+                # any provider is contacted. Claude (the paid subscription via
+                # cliproxyapi) is deliberately absent.
+                allowedModels:
+                  - deepseek-v4.1-flash
+                  - qwen3.8-omni-flash
+              - key: ${PEBBLE_INDEX_API_KEY}
+                metadata:
+                  name: pebble-index
+                  client: pebble-index
+                allowedModels:
+                  - deepseek-v4.1-flash
+        mcp-public:
+          port: 8081
+          apiKey:
+            mode: strict
+            keys:
+              - key: ${GROK_API_KEY}
+                metadata:
+                  name: grok
+                  client: grok
+              - key: ${PEBBLE_INDEX_API_KEY}
+                metadata:
+                  name: pebble-index
+                  client: pebble-index
+        internal:
+          # No apiKey. Reachable only through the ClusterIP Service, and the mcp
+          # authorization rules below allow a caller with no key.
+          port: 8082
       llm:
-        port: 8080
+        gateways: [llm-public, internal]
         models:
           # --- OpenRouter: the same three aliases litellm exposes ---
           - name: deepseek-v4.1-flash
@@ -172,8 +245,27 @@ spec:
       # (Terraform mint), and naming it here would leave the gateway unable to
       # authenticate to itself. Add it when infra/terraform/bootstrap lands.
       mcp:
-        port: 8081
+        gateways: [mcp-public, internal]
         prefixMode: conditional
+        # Per-client tool authorization. A denied tool is hidden from tools/list, not
+        # merely refused when called — so each client sees only its own subset, which
+        # is also what keeps a wrist-button client's list small enough to fit one page.
+        #
+        # Tool arguments are not visible here; argument-level rules belong to
+        # mcpGuardrails, which filters content rather than identity.
+        policies:
+          mcpAuthorization:
+            rules:
+              # The internal listener presents no key at all.
+              - "!has(apiKey.client)"
+              # Grok answers one question about the house; it gets the read-only
+              # Home Assistant target and nothing else.
+              - 'apiKey.client == "grok" && mcp.tool.target == "home-assistant"'
+              # The ring controls the house, so it may reach the write-capable target
+              # as well as the read-only one. That target arrives in a following
+              # change; a rule naming a target that does not exist yet is inert.
+              - 'apiKey.client == "pebble-index" && mcp.tool.target == "home-assistant"'
+              - 'apiKey.client == "pebble-index" && mcp.tool.target == "home-assistant-control"'
         targets:
           - name: flux
             mcp:
