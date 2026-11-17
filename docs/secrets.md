@@ -11,6 +11,10 @@ one Secret per app → the app. The store maps exactly one vault
 `infra/k8s/kyz/apps/external-secrets/onepassword-connect/app/clustersecretstore.yaml`),
 and every ExternalSecret in the repo reads from it.
 
+**Values that nothing outside the cluster needs are generated in the cluster instead**
+and never touch 1Password or this flow — see
+[Generated values](#generated-values-do-not-go-through-here) below.
+
 Local and CI tooling reaches the same vault a different way: fnox, with
 references in `fnox.toml` and values in 1Password — never in git.
 
@@ -20,6 +24,7 @@ references in `fnox.toml` and values in 1Password — never in git.
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **You**, by hand in 1Password               | the Cloudflare account token, the OpenRouter key, the Pushover user key, the GitHub App keys, the Reolink and Soulseek logins                    |
 | **Terraform**, `infra/terraform/bootstrap/` | the Tailscale operator's OAuth client, the cluster's Cloudflare DNS tokens, the MikroTik MCP server's bearer token, CLIProxyAPI's front-door key |
+| **External Secrets**, in the cluster        | Homepage's session cookie secret, FreshRSS's OIDC crypto key — see below                                                                         |
 
 `bootstrap` is the only project that holds `OP_SERVICE_ACCOUNT_TOKEN`, and the
 only thing in the repo that writes to 1Password. It cannot create the credential
@@ -39,6 +44,53 @@ Grant it read/write in 1Password (Developer → Service Accounts → the account
 `home-ops` vault). Terraform cannot repair that from the outside. A failed apply
 leaves whatever it managed to create — credentials sitting in state rather than in
 1Password — so grant access and re-run; it creates only what is missing.
+
+### Generated values do not go through here
+
+Two kinds of secret end up in the cluster, and only one belongs in this flow:
+
+- **Values a human has to read** — an API key pasted into a phone, a client key typed
+  into someone else's app. These belong in 1Password, and Terraform mints the ones
+  nothing upstream issues.
+- **Values nothing outside the cluster reads** — a session cookie signing key, an app's
+  internal encryption key. No human sees them and no other system holds them, so
+  1Password and an apply add a step and buy nothing.
+
+Terraform is a poor fit for the second kind for a structural reason: the `bootstrap`
+workspace runs in **local execution mode** on purpose, so the credentials it needs come
+from fnox on a workstation and never reach Terraform Cloud. Every Terraform-minted value
+is therefore a manual step that can only be taken at a workstation — see
+[Running an apply without a human](#running-an-apply-without-a-human), which still needs
+those credentials locally.
+
+External Secrets can generate the value in the cluster instead, so it arrives with the
+app and there is nothing to apply:
+
+```yaml
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: <app>-secret
+spec:
+  length: 48
+  digits: 12
+  symbols: 0 # spent into an env var; quoting characters are a hazard
+  allowRepeat: true # required by the CRD
+```
+
+paired with an ExternalSecret that sources from it by
+`dataFrom.sourceRef.generatorRef` and renames the emitted `password` key to whatever the
+app actually reads.
+
+**`refreshInterval: "0"` on that ExternalSecret is load-bearing.** A generator produces a
+fresh value on every reconcile, so the default interval would rotate a cookie signing key
+or a crypto key on a schedule and break whatever holds it. Zero means sync once, then
+leave it alone.
+
+The trade-off: the value then exists **only** in that Secret. Delete it and a new one is
+minted — fine for a session cookie, not fine for anything a third party authenticates
+against. A value that has to be both generated and readable belongs in 1Password, and
+therefore in Terraform, with the manual apply that implies.
 
 ### Running an apply without a human
 
