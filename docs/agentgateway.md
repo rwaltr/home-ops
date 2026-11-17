@@ -98,7 +98,8 @@ Claude is deliberately absent from the phone clients' allow-lists: it is the pai
 subscription, and a leaked client key should not be able to spend it. `pi` is the
 exception — it is the operator's own agent client, and the subscription is the one
 credential it cannot hold itself. It reaches every other model directly, so its
-allow-list is `claude` alone. `allowedModels` also
+allow-list is `claude` alone, and a request for any other model through this door is
+refused rather than silently served. `allowedModels` also
 filters `/v1/models`, and a disallowed model is refused before any provider is
 contacted.
 

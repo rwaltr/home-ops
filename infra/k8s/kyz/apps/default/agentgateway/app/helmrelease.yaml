@@ -289,7 +289,9 @@ spec:
       mcp:
         gateways: [mcp-public, internal, mcp-oauth]
         prefixMode: conditional
-        # Per-client tool authorization. A denied tool is hidden from tools/list, not
+        # Per-client tool authorization. Rules are ORed: a tool is allowed when ANY
+        # rule evaluates to true, so order carries no meaning and a bare client check
+        # grants that client every target. A denied tool is hidden from tools/list, not
         # merely refused when called — so each client sees only its own subset, which
         # is also what keeps a wrist-button client's list small enough to fit one page.
         #
@@ -334,6 +336,7 @@ spec:
               - 'apiKey.client == "pebble-index" && mcp.tool.target == "home-assistant-control"'
               # The operator's own agent client gets every target; the per-client
               # split exists to keep phone-sized surfaces small, not to limit pi.
+              # No tool or target term on purpose: any rule matching allows all.
               - 'apiKey.client == "pi"'
         targets:
           - name: flux
