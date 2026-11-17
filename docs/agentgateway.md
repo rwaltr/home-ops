@@ -117,7 +117,7 @@ Four rules, split by credential rather than by hostname:
 - `/v1` → 8080, `apiKey` strict.
 - `/mcp` → 8081, `apiKey` strict plus the per-client tool rules.
 - `/oauth/mcp` → 8083, rewritten onto `/mcp`. JWT bearer tokens.
-- `/.well-known/oauth-protected-resource` → 8083, served by the gateway itself.
+- `/.well-known/oauth-protected-resource` → 8082, the unauthenticated listener. The\n  document has to be readable by a client that holds no credential yet, so it is the\n  one path deliberately published from the internal listener.
 
 The OAuth surface is a second path to the same servers rather than a second
 hostname, because a client's identity travels in its credential: Grok presents a
