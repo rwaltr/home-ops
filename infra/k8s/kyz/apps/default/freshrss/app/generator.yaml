@@ -1,0 +1,23 @@
+---
+# OIDC_CLIENT_CRYPTO_KEY, generated in the cluster rather than minted by Terraform.
+#
+# The value is FreshRSS's OIDC module's own internal encryption key: nothing outside
+# the pod reads it and no human ever needs to see it. Routing it through 1Password and
+# a Terraform apply bought nothing and cost a manual step — and that step can only ever
+# be taken from a workstation with fnox, by design, because the Terraform Cloud
+# workspaces run in local execution mode so credentials never reach Terraform Cloud.
+#
+# It is not a client credential. Those come from the KanidmOAuth2Client beside this
+# file, which kaniop mints.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: freshrss-oidc
+spec:
+  length: 48
+  # Letters and digits only: the value is spent into an environment variable, where
+  # shell-quoting characters are a hazard and buy nothing.
+  digits: 12
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
