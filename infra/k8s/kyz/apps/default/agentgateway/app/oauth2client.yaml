@@ -1,0 +1,59 @@
+---
+# The OAuth2 client Grok's consumer MCP connector authenticates with.
+#
+# The client lives in the *application's* namespace rather than in `identity`, so the
+# credentials the operator mints land next to the gateway that verifies its tokens.
+# `kanidmRef.namespace` is what makes that legal.
+#
+# ---------------------------------------------------------------------------
+# TWO VALUES ARE PLACEHOLDERS AND MUST BE REPLACED.
+#
+# `origin` and `redirectUrl` are xAI's, not ours. They are not published in xAI's
+# docs, and the gateway's own configuration cannot tell us either — the connector
+# sends them at request time. Both are set to a reserved `.invalid` host so that a
+# placeholder cannot be mistaken for a working value, and so that the two stay
+# consistent with each other: Kanidm expects the origin to be the origin of the
+# redirect URL.
+#
+# The real values come from one of two places:
+#   - the connector UI at grok.com/connectors, which shows the callback it will use
+#   - Kanidm's log, which names the rejected `redirect_uri` when the first attempt
+#     fails
+#
+# `strictRedirectUrl` is left at its default (exact matching) deliberately. Relaxing
+# it to origin-only matching would paper over the wrong value instead of surfacing it.
+#
+# Until they are replaced the client exists, its signing key is resolvable, and any
+# authorization attempt is refused — which is the correct state for a client whose
+# callback is not yet known.
+# ---------------------------------------------------------------------------
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: grok-mcp
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Grok MCP connector
+  origin: https://grok-connector.invalid
+  # A list, despite the singular name — the CRD types it as an array.
+  redirectUrl:
+    - https://grok-connector.invalid/oauth/callback
+  # Confidential, not public: xAI's connector takes a client secret, and a
+  # confidential client keeps the token exchange on their server rather than in a
+  # browser. PKCE is required either way.
+  public: false
+  # Scopes have to be granted to a group and a client cannot request a scope no group
+  # holds. `idm_all_persons` is Kanidm's built-in dynamic group of every person
+  # account, so the account we have does not need a hand-maintained membership list.
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+  # No consent screen between the owner and their own gateway. Unlike a public client
+  # this is not contradicted by Kanidm — the constraint that a public client must show
+  # a prompt does not apply to a confidential one.
+  disableConsentPrompt: true

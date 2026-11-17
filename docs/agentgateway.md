@@ -146,13 +146,30 @@ Three details are load-bearing:
   on, and the apiKey and internal listeners have to keep working without a token.
   Enforcement is the gateway-level JWT — the same placement argument as `apiKey`.
 
-**Not done yet: the Kanidm client.** The connector wants a client id and secret, and
-a `KanidmOAuth2Client` requires a redirect URL. That URL is xAI's, not ours, and it
-is neither in their docs nor inferable from ours — it shows up in the connector UI
-during setup, or in Kanidm's log as the rejected `redirect_uri` on a first attempt.
-Once it is known the client is one file: `oauth2client.yaml` in this app's directory,
-the same shape as the one Grafana uses. Until then the OAuth listener answers 401 to
-everything, which is the correct answer to a request with no token.
+### The Kanidm client, and the two values still placeholder
+
+`oauth2client.yaml` in this app's directory is the client the connector signs in with,
+the same shape Grafana's takes. It is confidential rather than public, because xAI's
+connector accepts a client secret and that keeps the token exchange on their server.
+PKCE is required regardless. The operator mints the secret into a Secret in this
+namespace; read it with `kubectl -n default get secret grok-mcp -o jsonpath='{.data}'`.
+
+Two fields are **placeholders**: `origin` and `redirectUrl`. Both are xAI's, not ours.
+They are not in xAI's documentation, and nothing on our side can infer them — the
+connector sends them when it starts a flow. They are set to a reserved `.invalid` host
+so a placeholder cannot be mistaken for a working value, and they are kept consistent
+with each other because Kanidm expects the origin to be the origin of the redirect.
+
+The real values come from the connector UI at `grok.com/connectors`, which shows the
+callback it will use, or from Kanidm's log, which names the rejected `redirect_uri`
+when a first attempt fails. `strictRedirectUrl` is left at its default — exact
+matching — so a wrong value is surfaced rather than papered over by origin-only
+matching.
+
+Until they are replaced the client exists, its signing key resolves, and any
+authorization attempt is refused. That is the correct state for a client whose callback
+is not yet known: it also means the JWT listener's JWKS URL is live rather than
+pointing at a 404.
 
 ## MCP
 
