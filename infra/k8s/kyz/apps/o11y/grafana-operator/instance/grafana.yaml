@@ -15,6 +15,32 @@ spec:
       reporting_enabled: "false"
     auth:
       disable_login_form: "false"
+    # Kanidm as an OIDC provider. Grafana's generic OAuth client has no discovery
+    # field, so every endpoint is named explicitly — taken from the client's own
+    # discovery document, which is the authoritative source for them:
+    # https://idm.waltr.tech/oauth2/openid/grafana/.well-known/openid-configuration
+    #
+    # Note the authorization endpoint is `/ui/oauth2`, not `/oauth2/authorise`.
+    #
+    # The client id and secret come from the Secret the kaniop operator minted for
+    # the KanidmOAuth2Client in this namespace; they are the only two values that
+    # cannot live in this file.
+    auth.generic_oauth:
+      enabled: "true"
+      name: Kanidm
+      scopes: openid profile email groups
+      auth_url: https://idm.waltr.tech/ui/oauth2
+      token_url: https://idm.waltr.tech/oauth2/token
+      api_url: https://idm.waltr.tech/oauth2/openid/grafana/userinfo
+      # `preferShortUsername` is set on the client, so this is `rwaltr`, not
+      # `rwaltr@waltr.tech`.
+      login_attribute_path: preferred_username
+      # Kanidm's `groups` claim is a flat array holding both each group's UUID and
+      # its SPN, so the SPN form is matched. Both spellings are checked because the
+      # built-in groups are the ones that matter here and their SPN form has varied
+      # across versions. Everything unmatched is a Viewer rather than an error.
+      role_attribute_path: contains(groups[*], 'idm_admins@waltr.tech') && 'Admin' || contains(groups[*], 'idm_admins') && 'Admin' || 'Viewer'
+      allow_sign_up: "true"
     auth.anonymous:
       enabled: "true"
     log:
@@ -43,6 +69,17 @@ spec:
                     secretKeyRef:
                       name: grafana-admin-password-secret
                       key: GF_SECURITY_ADMIN_PASSWORD
+                # Minted by kaniop for the KanidmOAuth2Client in this namespace.
+                - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: grafana-kanidm-oauth2-credentials
+                      key: CLIENT_ID
+                - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: grafana-kanidm-oauth2-credentials
+                      key: CLIENT_SECRET
                 # GF_INSTALL_PLUGINS pinned victoriametrics-logs-datasource for
                 # the VictoriaLogs datasource. Removed with the logging
                 # decommission (2026-11-07) — see docs/logging.md.
