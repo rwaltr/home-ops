@@ -30,8 +30,10 @@ litellm wires them:
 
 Seven aliases, mirroring litellm's list exactly: `deepseek-v4.1-flash`,
 `qwen3.8-omni-flash`, `gpt-5.6-luna` (OpenRouter), `nvidia-llama`, `intel-llama`,
-`intel-vl`, `gptoss-llama` (Manners' gateway), plus `claude`, which resolves through
-cliproxyapi to the subscription account logged in there.
+`intel-vl`, `gptoss-llama` (Manners' gateway), plus three subscription aliases that
+resolve through cliproxyapi to the account logged in there — `claude-sonnet-5-5`,
+`claude-opus-5-5`, `claude-haiku-5-5`. Each alias is the upstream id verbatim, so a
+response always names the model that answered.
 
 Two litellm aliases are **not** here: `whisper` and `piper`. They point at
 `127.0.0.1:8000`, a sidecar inside the litellm pod, and they are transcription and
@@ -92,14 +94,15 @@ to any client that can read its own session id.
 | -------------- | -------------- | ------------------------------------------- | ------------------------------------------ |
 | `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash` | `home-assistant` (read-only)               |
 | `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                       | `home-assistant`, `home-assistant-control` |
-| `pi`           | `pi`           | `claude`                                    | all four targets                           |
+| `pi`           | `pi`           | the three `claude-*-5-5` aliases            | all four targets                           |
 
 Claude is deliberately absent from the phone clients' allow-lists: it is the paid
 subscription, and a leaked client key should not be able to spend it. `pi` is the
 exception — it is the operator's own agent client, and the subscription is the one
 credential it cannot hold itself. It reaches every other model directly, so its
-allow-list is `claude` alone, and a request for any other model through this door is
-refused rather than silently served. `allowedModels` also
+allow-list is the three subscription aliases and nothing else, and a request for any
+other model through this door is refused rather than silently served. `allowedModels`
+also
 filters `/v1/models`, and a disallowed model is refused before any provider is
 contacted.
 
