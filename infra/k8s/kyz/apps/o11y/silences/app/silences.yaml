@@ -12,6 +12,16 @@
 # there was a 13-hour gap in which a firing alert would have reached triage with
 # no record that the work was deliberate. The MCP servers named in the matcher
 # were always the last block of the series; only the end date was wrong.
+# The two companion CRs below carry the same window as this one — they were
+# written against the earlier end date and re-aligned on rebase so all three
+# retire together.
+#
+# Scope caveat: this CR matches on `pod` only, so it silences exactly the alerts
+# that carry that app's pod name (KubePodNotReady, KubePodCrashLooping, ...). The
+# kube-state-metrics-derived alerts about the same app do NOT carry a `pod` label
+# naming the app — they carry `pod=kube-state-metrics-<hash>` plus `deployment`
+# or `name` — so they escape this silence and page. The two CRs below exist to
+# cover those shapes; keep the three lists in step.
 apiVersion: observability.giantswarm.io/v1alpha2
 kind: Silence
 metadata:
@@ -22,5 +32,46 @@ spec:
       matchType: =~
       value: >-
         metrics-server-.*|chaski-.*|it-tools-.*|silence-operator-.*|agentgateway-.*|cliproxyapi-.*|flux-mcp-.*|kubectl-mcp-.*|kubesearch-mcp-.*|home-assistant-mcp-.*|mikrotik-mcp-.*
+  startsAt: "2026-11-14T18:00:00Z"
+  endsAt: "2026-11-23T06:00:00Z"
+---
+# Deployment-scoped view of the same in-flight series: KubeDeploymentReplicasMismatch
+# and KubeDeploymentRolloutStuck label the app as `deployment` (a bare name, not a
+# pod prefix), with `namespace` pointing at the app's namespace and `pod` at the
+# kube-state-metrics pod itself. Matchers combine with AND, so `deployment` alone is
+# enough to keep this narrow — an AND with `pod=kube-state-metrics-.*` would only
+# re-state what the deployment name already pins.
+apiVersion: observability.giantswarm.io/v1alpha2
+kind: Silence
+metadata:
+  name: bjw-s-parity-deployment-scoped
+spec:
+  matchers:
+    - name: deployment
+      matchType: =~
+      value: >-
+        metrics-server|chaski|it-tools|silence-operator|agentgateway|cliproxyapi|flux-mcp|kubectl-mcp|kubesearch-mcp|home-assistant-mcp|mikrotik-mcp
+  startsAt: "2026-11-14T18:00:00Z"
+  endsAt: "2026-11-23T06:00:00Z"
+---
+# HelmRelease-scoped view. `HelmReleaseReconciliationFailure` labels the object as
+# `name` (the HelmRelease name) plus `customresource_kind: HelmRelease`, and
+# reports the *object's* namespace in `exported_namespace` while the `namespace`
+# label stays `o11y` because kube-state-metrics is the exporter — which is why a
+# namespace matcher would miss it. Pinning `customresource_kind` keeps this CR to
+# HelmRelease alerts only rather than any alert that happens to use `name`.
+apiVersion: observability.giantswarm.io/v1alpha2
+kind: Silence
+metadata:
+  name: bjw-s-parity-helmreleases
+spec:
+  matchers:
+    - name: name
+      matchType: =~
+      value: >-
+        metrics-server|chaski|it-tools|silence-operator|agentgateway|cliproxyapi|flux-mcp|kubectl-mcp|kubesearch-mcp|home-assistant-mcp|mikrotik-mcp
+    - name: customresource_kind
+      matchType: =
+      value: HelmRelease
   startsAt: "2026-11-14T18:00:00Z"
   endsAt: "2026-11-23T06:00:00Z"

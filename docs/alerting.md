@@ -140,7 +140,19 @@ from the operator's HelmRelease and cannot be in the same apply.
   `/api/v2/silences` when it triages, so a silence whose comment names the work
   ("bjw-s parity deployment series in progress") is how it learns that a firing
   alert is expected churn rather than a new incident. Keep that comment accurate.
+- **Match the label the alert actually carries, not the app it is about.** A
+  silence on `pod=<app>-.*` covers only the alerts that name the app in `pod`
+  (`KubePodNotReady`, `KubePodCrashLooping`, `TargetDown`). The
+  kube-state-metrics-derived alerts about the same app do not: `pod` is
+  `kube-state-metrics-<hash>` and the app appears as `deployment` (or `name` on a
+  `HelmRelease`), with `namespace` being the exporter's (`o11y`) and the real one
+  in `exported_namespace`. Those escape the silence and page. When a series
+  silence is written, write the companion CRs for those shapes in the same
+  commit — the parity series carries `bjw-s-parity-deploys` for `pod`,
+  `bjw-s-parity-deployment-scoped` for `deployment` and
+  `bjw-s-parity-helmreleases` for `name` + `customresource_kind`.
 - **Temporary silences can also be created over the Alertmanager API**
   (`POST /api/v2/silences`) when a CR cannot land yet — but that state lives
-  outside git and must be expired by hand (`PUT /api/v2/silence/<id>` with an
-  `endsAt` in the past).
+  outside git and is retired with `DELETE /api/v2/silence/<id>`. The v2 API has
+  no `PUT` for a silence: it answers `405` and leaves the silence active, so the
+  documented "expire it by PUTting a past `endsAt`" is not a thing that works.
