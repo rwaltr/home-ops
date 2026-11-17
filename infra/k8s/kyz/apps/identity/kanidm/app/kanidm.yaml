@@ -86,6 +86,13 @@ spec:
     # The gateway must validate the server's certificate on the way in. It is a
     # publicly trusted Let's Encrypt certificate, so the system trust store is
     # the whole configuration.
+    #
+    # `hostname` has to be named explicitly. Left unset, the operator defaults it
+    # to `spec.domain` — the realm, `waltr.tech` — while the server presents the
+    # certificate for the origin host, `idm.waltr.tech`. The two do not match, so
+    # the handshake fails with `certificate_unknown` and the route answers 503
+    # while looking perfectly healthy: accepted, resolved, backend pod ready.
     backendTlsPolicy:
       validation:
+        hostname: idm.waltr.tech
         wellKnownCaCertificates: System
