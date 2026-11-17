@@ -1,0 +1,37 @@
+---
+# FreshRSS's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# Confidential: FreshRSS takes its client id and secret from environment variables, so
+# the secret has somewhere to live. secretKeyAliases name the variables the app reads,
+# so the HelmRelease points at the minted Secret without restating any value.
+#
+# FreshRSS is the one app here reachable from outside the cluster as well as inside
+# (envoy-external via the Cloudflare tunnel), which makes the login gate load-bearing
+# rather than convenient.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: freshrss
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: FreshRSS
+  origin: https://feeds.waltr.tech
+  # mod_auth_openidc's callback path, which FreshRSS documents as /i/oidc/.
+  redirectUrl:
+    - https://feeds.waltr.tech/i/oidc/
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true
+  secretKeyAliases:
+    clientId:
+      - OIDC_CLIENT_ID
+    clientSecret:
+      - OIDC_CLIENT_SECRET

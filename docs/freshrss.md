@@ -57,6 +57,50 @@ Then point the client at `https://feeds.waltr.tech/api/greader.php`.
 Nothing consumes this yet. If an automation ever wants the article list, prefer
 the Google Reader API with a dedicated user over scraping the UI.
 
+## Authentication
+
+FreshRSS logs in through Kanidm using the OIDC module built into the official Docker
+image. That module exists **only in the Debian image**, not Alpine — which is why the
+tag here is `ghcr.io/freshrss/freshrss` and not an Alpine variant. Switching the image
+would silently disable the login path.
+
+Configuration is entirely environment variables, plus one value that has to be minted:
+
+- `OIDC_CLIENT_CRYPTO_KEY` is the module's own internal encryption key. It is not a
+  client credential — the client id and secret come from the `KanidmOAuth2Client` in
+  this directory, minted by kaniop. It is **generated in the cluster** rather than
+  minted by Terraform: `generator.yaml` declares an External Secrets `Password`
+  generator and `externalsecret.yaml` copies its value into `freshrss-oidc`. Nothing
+  outside the pod reads it and no human needs to see it, so there is no reason for it
+  to pass through 1Password or a Terraform apply.
+
+  `refreshInterval: "0"` on that ExternalSecret is load-bearing — a generator produces
+  a fresh value on every reconcile, and a rotating crypto key would invalidate
+  in-flight sessions on a schedule. Zero means sync once and leave it alone.
+
+- `OIDC_SCOPES` defaults to `openid` alone, which does **not** carry
+  `preferred_username` — the claim used as the FreshRSS username. `profile` is
+  required for it.
+- `OIDC_X_FORWARDED_HEADERS` is **required** here because FreshRSS sits behind Envoy.
+  Without it the module cannot determine the external scheme, host and port, and
+  builds a return URL that will not match the registered callback.
+
+The callback registered with Kanidm is the one upstream documents: `/i/oidc/`.
+
+### The step that is not in git
+
+FreshRSS authenticates a user by _claim_, so the FreshRSS account itself has to be
+told to trust it. Once, per account:
+
+1. Log in as the account, open **Administration → user → Authentication**.
+2. Set the authentication method to **HTTP Authentication**.
+3. Confirm the page shows your identity, e.g. `HTTP (for advanced users with HTTPS)
+(REMOTE_USER='rwaltr@waltr.tech')`.
+
+The username must match the OIDC identity, or you will lose administrator access to
+the instance — upstream warns about this explicitly, and it is the reason to verify
+step 3 before closing the tab.
+
 ## Operational notes
 
 - **Runs as root.** The upstream entrypoint rewrites `/etc/localtime`,

@@ -54,6 +54,36 @@ spec:
               # opening the UI (mobile clients rely on the server having pulled).
               # Empty/omitted = refresh only on page load.
               CRON_MIN: "11,41"
+              # OIDC against Kanidm. A non-empty OIDC_ENABLED is what activates the
+              # module, and it only exists in the Debian image — which is why this
+              # app is pinned to ghcr.io/freshrss/freshrss rather than an Alpine tag.
+              OIDC_ENABLED: "1"
+              OIDC_PROVIDER_METADATA_URL: https://idm.waltr.tech/oauth2/openid/freshrss/.well-known/openid-configuration
+              # Defaults to `openid` alone, which does not carry preferred_username —
+              # the claim used as the FreshRSS username — so `profile` is required.
+              OIDC_SCOPES: openid profile email groups
+              OIDC_REMOTE_USER_CLAIM: preferred_username
+              # Required behind a reverse proxy. Without it the module cannot work out
+              # the external scheme, host and port, and builds a return URL that does
+              # not match the registered callback.
+              OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Port X-Forwarded-Proto
+              OIDC_CLIENT_ID:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-kanidm-oauth2-credentials
+                    key: OIDC_CLIENT_ID
+              OIDC_CLIENT_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-kanidm-oauth2-credentials
+                    key: OIDC_CLIENT_SECRET
+              # Minted, not a client credential: the module's own internal
+              # encryption key.
+              OIDC_CLIENT_CRYPTO_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-oidc
+                    key: OIDC_CLIENT_CRYPTO_KEY
             # /i/ is the FreshRSS front controller: the web installer before
             # install, the login form after. Both render inline (Minz forward,
             # not a redirect), so an anonymous GET is a 200 in either state.
