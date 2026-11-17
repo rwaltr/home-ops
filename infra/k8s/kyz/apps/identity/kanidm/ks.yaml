@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kanidm
+spec:
+  dependsOn:
+    # The CRDs, and the operator that reconciles them. The Certificate below is
+    # also consumed by the server as its TLS identity, and the server refuses to
+    # start without it.
+    - name: kaniop
+      namespace: identity
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/identity/kanidm/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: identity
+  # wait: true on purpose: the StatefulSet must reach Ready, and a cluster that
+  # never comes up (a rejected TLS secret, a domain/origin mismatch, a PVC that
+  # cannot bind) should fail the Kustomization rather than sit there looking
+  # applied while the login page 502s.
+  wait: true

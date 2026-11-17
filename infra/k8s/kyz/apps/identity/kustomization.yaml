@@ -6,4 +6,5 @@ namespace: identity
 
 resources:
   - ./namespace.yaml
+  - ./kanidm/ks.yaml
   - ./kaniop/ks.yaml
