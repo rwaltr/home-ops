@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - ./configmap.yaml
   - ./externalsecret.yaml
+  - ./generator.yaml
   - ./helmrelease.yaml
   - ./oauth2client.yaml
   - ./ocirepository.yaml

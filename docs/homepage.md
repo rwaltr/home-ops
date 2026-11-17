@@ -196,10 +196,18 @@ so `HOMEPAGE_AUTH_PASSWORD` is not set at all.
 
 Two variables are required regardless of how you log in, and both are easy to miss:
 
-- `HOMEPAGE_AUTH_SECRET` signs the session cookie. It is minted by
-  `infra/terraform/bootstrap/homepage-oidc.tf` into the 1Password item
-  `homepage-auth` and arrives as `homepage-secret`. Rotating it signs every session
-  out — that is the entire blast radius.
+- `HOMEPAGE_AUTH_SECRET` signs the session cookie. It is **generated in the cluster**,
+  not minted by Terraform: `generator.yaml` declares an External Secrets `Password`
+  generator and `externalsecret.yaml` copies its value into `homepage-secret`. Nothing
+  outside the pod reads it and no human needs to see it, so there is no reason for it
+  to pass through 1Password or a Terraform apply.
+
+  `refreshInterval: "0"` on that ExternalSecret is load-bearing — a generator produces
+  a fresh value on every reconcile, and re-signing the cookie on a schedule would sign
+  every session out. Zero means sync once and leave it alone. The trade-off is that
+  the value lives only in that Secret: deleting it mints a new one and signs sessions
+  out, which is the entire blast radius.
+
 - `HOMEPAGE_EXTERNAL_URL` must be the `https://` URL. It is what marks the session
   cookie `Secure` and what the callback is built from, so an `http://` value here
   weakens the cookie and can produce a callback the client will not match.
