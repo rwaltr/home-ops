@@ -2,8 +2,6 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# The Kanidm cluster resource is absent from this revision on purpose: the database
-# has to be re-created (see the commit message), and a single apply cannot delete
-# and re-create the same object. It returns in the next commit.
 resources:
   - ./certificate.yaml
+  - ./kanidm.yaml
