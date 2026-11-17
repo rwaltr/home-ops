@@ -72,9 +72,11 @@ subjects:
     namespace: default
 ---
 # Read-only CRD surfaces Teletran asked for: Cilium (kube-proxy replacement),
-# Gateway API (the ingress surface), storage (openebs/ZFS), Leases, and kopiur
-# (PVC backups). Still no secrets, no pods/exec, no nodes/proxy, no write verbs
-# anywhere.
+# Gateway API (the ingress surface), storage (openebs/ZFS), Leases, kopiur
+# (PVC backups), and kaniop (the Kanidm CRs: clusters, persons, groups, OAuth2
+# clients, service accounts, and its backup/restore objects). Still no secrets, no
+# pods/exec, no nodes/proxy, no write verbs anywhere — in particular the generated
+# OAuth2 client credentials are Secrets and stay unreadable.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -128,6 +130,19 @@ rules:
       - snapshotreplications
       - snapshots
       - snapshotschedules
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["kaniop.rs"]
+    resources:
+      - kanidms
+      - kanidmgroups
+      - kanidmoauth2clients
+      - kanidmpersonaccounts
+      - kanidmradiusservers
+      - kanidmserviceaccounts
+      - kanidmbackups
+      - kanidmbackuprepositories
+      - kanidmbackupschedules
+      - kanidmrestores
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
