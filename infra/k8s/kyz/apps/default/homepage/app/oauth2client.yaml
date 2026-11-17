@@ -1,0 +1,36 @@
+---
+# Homepage's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# Confidential, not public: Homepage keeps its credentials in environment variables
+# that can each be filled from a Secret key, so the client secret has somewhere to
+# live and there is no reason to give up client authentication.
+#
+# The alias names are the variables Homepage reads, which lets the HelmRelease point
+# each one at the minted Secret without restating the value anywhere.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: homepage
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Homepage
+  origin: https://homepage.waltr.tech
+  # NextAuth's callback path, which carries the provider name.
+  redirectUrl:
+    - https://homepage.waltr.tech/api/auth/callback/homepage-oidc
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true
+  secretKeyAliases:
+    clientId:
+      - HOMEPAGE_OIDC_CLIENT_ID
+    clientSecret:
+      - HOMEPAGE_OIDC_CLIENT_SECRET
