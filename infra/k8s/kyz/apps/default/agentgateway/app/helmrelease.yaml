@@ -159,7 +159,9 @@ spec:
                   name: pi
                   client: pi
                 allowedModels:
-                  - claude
+                  - claude-sonnet-5-5
+                  - claude-opus-5-5
+                  - claude-haiku-5-5
         mcp-public:
           port: 8081
           apiKey:
@@ -248,12 +250,30 @@ spec:
           # --- cliproxyapi: subscription accounts as OpenAI-compatible models ---
           # The service is cluster-internal; the key is the one Terraform minted,
           # held only by this pod's env.
-          - name: claude
+          #
+          # One alias per subscription model worth choosing by name, and each alias
+          # is the upstream id verbatim — a bare `claude` would leave the caller and
+          # the response log unable to say which model ran. cliproxyapi offers more
+          # than these three (the 4.x line, fable, legacy 3.x); they are added here
+          # when something needs to name one, not because they are missing.
+          - name: claude-sonnet-5-5
             provider: openAI
             params:
               apiKey: ${CLIPROXYAPI_API_KEY}
               baseUrl: http://cliproxyapi.default.svc.cluster.local:8317/v1
               model: claude-sonnet-5-5
+          - name: claude-opus-5-5
+            provider: openAI
+            params:
+              apiKey: ${CLIPROXYAPI_API_KEY}
+              baseUrl: http://cliproxyapi.default.svc.cluster.local:8317/v1
+              model: claude-opus-5-5
+          - name: claude-haiku-5-5
+            provider: openAI
+            params:
+              apiKey: ${CLIPROXYAPI_API_KEY}
+              baseUrl: http://cliproxyapi.default.svc.cluster.local:8317/v1
+              model: claude-haiku-5-5
           # --- OpenCode Go: the subscription tier, straight through ---
           # Go refuses any request without an x-opencode-session header, checked
           # before auth (a bogus key still returns MissingSessionID), so the header
