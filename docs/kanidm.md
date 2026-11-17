@@ -74,7 +74,7 @@ The server image is **pinned** (`kanidm/server:1.11.2`) because the operator's
 default is `:latest`, and `latest` is one minor version ahead of what kaniop
 0.23.0 can drive. Kaniop's client SDK is 1.11.2; Kanidm 1.12 support is an open
 upstream issue. The mismatch is quiet and ugly rather than loud: the operator
-could *create* an entry but not *read it back*, so it decided every object was
+could _create_ an entry but not _read it back_, so it decided every object was
 missing and retried the create, which the server then refused with 403.
 
 Do not trust the operator's own compatibility field after a bump — it reported
