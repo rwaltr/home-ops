@@ -187,6 +187,40 @@ into the `kanidm-admin-passwords` Secret. The `admin` account is recovery only a
 should not be anyone's daily login. Neither belongs to a person resource — see the
 warning above about built-in groups.
 
+## OAuth2 clients
+
+Each application that logs users in through Kanidm gets a `KanidmOAuth2Client`
+resource, and it lives in the _application's_ namespace so that the credentials the
+operator mints land next to the app consuming them (`CLIENT_ID` and
+`CLIENT_SECRET`).
+
+That only works because the `Kanidm` resource names the namespaces to watch:
+
+- unset — only the Kanidm resource's own namespace;
+- `{}` — every namespace in the cluster;
+- a label selector — matching namespaces.
+
+We list namespaces explicitly. An empty selector would let any namespace in the
+cluster mint an identity provider client, and the list costs one line per namespace
+when a new one is needed.
+
+A client in an unwatched namespace does not fail loudly. It sits with no status, no
+log line, and no error — the only clue is an event on the object itself:
+
+```
+Warning  ResourceNotWatched  configure `oauth2ClientNamespaceSelector` on Kanidm resource to watch this namespace
+```
+
+Scopes are granted per group: a client cannot request a scope that no group holds,
+so each `scopeMap` names a group — usually `idm_all_persons`, which is dynamic and
+therefore needs no membership list — and the scopes it may ask for. `groups` is
+only released when that scope is granted, so anything that maps roles from group
+membership has to ask for it.
+
+`redirectUrl` is an **array** in the CRD despite the singular name, and redirect
+URLs are matched exactly, so it has to be the URL the application actually calls
+back on.
+
 ## Not done yet
 
 The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
