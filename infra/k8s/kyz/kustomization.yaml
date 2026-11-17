@@ -8,6 +8,7 @@ resources:
   - ./apps/default
   - ./apps/external-secrets
   - ./apps/flux-system
+  - ./apps/identity
   - ./apps/kopiur-system
   - ./apps/kube-system
   - ./apps/network

@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kaniop
+spec:
+  dependsOn:
+    # The chart renders a ServiceMonitor and a PrometheusRule, and neither CRD
+    # exists until kube-prometheus-stack installs them.
+    - name: kube-prometheus-stack
+      namespace: o11y
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/identity/kaniop/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: identity
+  # wait: true on purpose — this operator owns the CRDs the Kanidm cluster and the
+  # OAuth2 client are declared with, so a half-applied install would surface later
+  # as resources that silently never reconcile.
+  wait: true

@@ -93,6 +93,8 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/books.md` — Kavita + Audiobookshelf over the tank `books` dataset, why acquisition is still unsolved, and the disabled slskd (Soulseek)
 - `docs/homebox.md` — HomeBox home inventory
 - `docs/homepage.md` — Homepage service dashboard
+- `docs/kanidm.md` — Kanidm identity provider (kaniop, SQLite) and the OAuth
+  requirement that put it on the list
 - `docs/hermes-agent.md` — Hermes agent
 - `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)
 - `docs/beancount-stack.md` — Beancount v3 + Fava (ledger UI, internal-only; example ledger, real data TBD)
