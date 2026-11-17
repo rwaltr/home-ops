@@ -19,6 +19,12 @@ spec:
   domain: idm.waltr.tech
   origin: https://idm.waltr.tech
   tlsSecretName: kanidm-tls
+  # Pinned deliberately. The operator's default is `kanidm/server:latest`, which
+  # is a floating tag: any pod restart could land a new major version under us.
+  # Kanidm upgrades are sequential — you cannot skip versions — so an
+  # uncontrolled jump is not a cosmetic problem, it is the one upgrade path the
+  # server refuses. 1.12.1 is what `latest` resolved to when this was deployed.
+  image: kanidm/server:1.12.1
   replicaGroups:
     - name: default
       replicas: 1

@@ -50,8 +50,44 @@ manual identity management. Kaniop is the option that keeps identity declarative
 WebAuthn and every principal name (`rwaltr@idm.waltr.tech`), and `origin` must
 match or descend from it or the server refuses to start. Choose it once.
 
+## Running it
+
+Internal only: `https://idm.waltr.tech/ui/login` on `envoy-internal`, with a
+Let's Encrypt certificate and a 5Gi PVC on `openebs-hostpath`. external-dns
+publishes only routes attached to `envoy-external`, so nothing about this is
+reachable from the internet until a second route is added on purpose.
+
+The operator recovers the built-in `admin` and `idm_admin` accounts on first
+initialisation and writes the generated passwords to the `kanidm-admin-passwords`
+Secret in the `identity` namespace. They are Secrets, so the agent cannot read
+them — which is the point:
+
+```sh
+kubectl -n identity get secret kanidm-admin-passwords \
+  -o go-template='{{range $k,$v := .data}}{{$k}} = {{$v | base64decode}}{{"\n"}}{{end}}'
+```
+
+`idm_admin` administers the directory; `admin` is the recovery account. Log in at
+the UI, then change the passwords there.
+
+The server image is **pinned** (`kanidm/server:1.12.1`). The operator defaults to
+`:latest`, and Kanidm upgrades are sequential — skipping a version is the one
+upgrade path the server refuses — so a floating tag means an uncontrolled
+version jump on any pod restart. Renovate can bump it deliberately.
+
+Two settings are load-bearing rather than stylistic: `storage.volumeClaimTemplate`
+(the operator's default is an **EmptyDir**, so omitting it puts the identity
+database in a scratch directory) and `tlsSecretName` (the server terminates TLS
+itself and will not start without a usable secret).
+
+## Not done yet
+
+The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
+That is also when `llm.waltr.tech` gets republished, since the flow needs both
+the authorization server and the MCP endpoint reachable from outside.
+
 ## Layout
 
 - `infra/k8s/kyz/apps/identity/kaniop` — the operator
-- `infra/k8s/kyz/apps/identity/kanidm` — the cluster, its certificate, and its
-  HTTPRoute
+- `infra/k8s/kyz/apps/identity/kanidm` — the cluster, its certificate, and the
+  HTTPRoute the CR generates
