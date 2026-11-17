@@ -1,0 +1,23 @@
+---
+# The owner's own account, so the recovery account can go back to being a
+# recovery account.
+#
+# `kanidmName` is omitted: it defaults to the resource name, giving
+# rwaltr@idm.waltr.tech.
+#
+# Delivery is `event`, which is also the default. Email would need
+# spec.mailSender on the Kanidm cluster, which is not configured — and it is
+# not worth standing up a mail path just to read one reset link.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmPersonAccount
+metadata:
+  name: rwaltr
+spec:
+  kanidmRef:
+    name: kanidm
+  personAttributes:
+    displayname: rwaltr
+  # A day, rather than Kanidm's short default: this is a link a human has to
+  # notice in an event stream, not a machine that acts within the hour.
+  credentialsTokenTtl: 86400
+  credentialBootstrapDelivery: event

@@ -1,0 +1,22 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: identity-resources
+spec:
+  dependsOn:
+    - name: kanidm
+      namespace: identity
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/identity/resources/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: identity
+  # No wait: true here, unlike the cluster itself. A person account is not
+  # "ready" until someone accepts its credential invitation, which is a human
+  # action — so waiting would turn an ordinary pending invitation into a failed
+  # Kustomization.
