@@ -96,6 +96,14 @@ either link it in the UI or use the OIDC-created one.
 The registered redirect URL is allauth's callback path for the provider id
 `kanidm`, and it is matched exactly by Kanidm.
 
+**A consent screen is expected.** Kanidm requires the consent prompt on public
+clients, so the first screen after logging in at `idm.waltr.tech` is Kanidm asking
+you to allow Paperless. Asking the operator to disable it (`disableConsentPrompt`)
+does not work — it retries a write Kanidm refuses (`PATCH /v1/oauth2/paperless` →
+403 `requested_pres: {OAuth2ConsentPromptEnable} !⊆ allowed`) indefinitely while the
+rest of the client stays reconciled. The prompt is inherent to the client type, not
+a misconfiguration.
+
 ## First run
 
 1. Create the 1Password item above (or `mise run secrets:verify` will flag it).
