@@ -1,0 +1,42 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.envoyproxy.io/backendtrafficpolicy_v1alpha1.json
+# A blunt edge limit on the one endpoint where an unauthenticated caller can guess
+# at a password.
+#
+# Why here and not in Kanidm: Kanidm's server.toml documents no rate-limit or
+# lockout setting — its option list is bindaddress, db_path, domain, origin, path,
+# schedule, sidebar, tls_chain, tls_key, version — so the limit has to sit in front
+# of it.
+#
+# Why `/v1/auth` and not `/ui/login`: the login *page* is served from `/ui/login`,
+# but the password is POSTed to `/v1/auth`. Limiting the page would have throttled
+# a wasm bundle and left the credential endpoint untouched. The match is Exact, not
+# a prefix, so `/v1/auth/valid` — the session check the UI and the operator both
+# poll — is not caught by it.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: kanidm
+spec:
+  # kaniop generates the HTTPRoute from the Kanidm resource and names it after it.
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kanidm
+  rateLimit:
+    local:
+      rules:
+        - clientSelectors:
+            - path:
+                type: Exact
+                value: /v1/auth
+          limit:
+            requests: 20
+            unit: Minute
+        # Everything else — the UI's assets, discovery, JWKS, the token and
+        # userinfo endpoints — is a flood guard rather than a login shaper. The
+        # counters are per Route, and Envoy applies the strictest matching rule, so
+        # this one never loosens the rule above.
+        - limit:
+            requests: 600
+            unit: Minute

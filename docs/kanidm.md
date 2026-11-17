@@ -147,6 +147,58 @@ Two settings are load-bearing rather than stylistic: `storage.volumeClaimTemplat
 database in a scratch directory) and `tlsSecretName` (the server terminates TLS
 itself and will not start without a usable secret).
 
+## Exposure: internal and public
+
+`idm.waltr.tech` is served on **both** gateways, and the two parentRefs sit on the
+one HTTPRoute kaniop generates:
+
+- `envoy-internal` — the house. This is the split-horizon answer the cluster's DNS
+  gives every dual-homed hostname: `idm.waltr.tech` resolves to the internal VIP
+  inside, and to the Cloudflare tunnel outside.
+- `envoy-external` — the internet, via the Cloudflare tunnel. **This parentRef is
+  also what publishes the DNS record**, because external-dns runs with
+  `--gateway-name=envoy-external` and ignores every other gateway. Removing it
+  unpublishes the hostname.
+
+**Public is not a choice, and there is no partial version of it.** An OAuth2
+authorization server has to be reachable by the client's _browser_ — the
+authorization endpoint and the login page that follows it — and by the client's
+_servers_ — the token endpoint, the discovery document, the signing keys. A
+non-cluster client therefore needs the whole surface, and the only thing a
+path-based split would protect is the admin UI, at the cost of a rule that breaks
+the next time the UI moves a route.
+
+The certificate was already the public answer: `certificate.yaml` gets
+`idm.waltr.tech` from `letsencrypt-production` over DNS-01, so nothing about TLS
+changed when the route became public. `backendTlsPolicy` names the origin host
+explicitly for both listeners — see the trap above.
+
+### The limit in front of the credential endpoint
+
+`ratelimit.yaml` is a `BackendTrafficPolicy` on the generated route:
+
+- `/v1/auth` — **Exact**, 20 requests/minute. This is where the password is
+  actually POSTed. It is not `/ui/login`: that path serves the page, and the login
+  UI is a wasm app that would have been throttled while the credential endpoint sat
+  untouched. The match is Exact rather than a prefix so `/v1/auth/valid` — the
+  session check the UI and the operator both poll — is unaffected.
+- everything else — 600 requests/minute, a flood guard rather than a login shaper.
+  Envoy applies the strictest matching rule, so it cannot loosen the one above.
+
+The limit is here rather than in Kanidm because Kanidm documents no rate-limit or
+lockout setting at all: its `server.toml` option list is `bindaddress`, `db_path`,
+`domain`, `origin`, `path`, `schedule`, `sidebar`, `tls_chain`, `tls_key`,
+`version`. The counters are per Route, and they are **not** per client — a burst
+from one source consumes the budget for everyone, which is the intent for credential
+stuffing and the reason the number is generous for a human. Raise it here if it ever
+gets in the way; nothing else depends on the value.
+
+What the limit does not do: it does not stop an attacker from reaching the login
+page, the discovery document or the admin UI. What protects the accounts is the
+credential itself — a generated password for `idm_admin`, and a passkey or password
+for `rwaltr` — plus this limit on attempts. Anyone administering Kanidm should
+understand that the admin surface is internet-reachable by design.
+
 ## Accounts
 
 Identity resources live in `infra/k8s/kyz/apps/identity/resources` as kaniop
