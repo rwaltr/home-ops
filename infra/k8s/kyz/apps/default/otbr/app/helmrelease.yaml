@@ -57,7 +57,7 @@ spec:
             # network-attached RCP. RCP_* / OTBR_* env names are its contract.
             image:
               repository: docker.io/bnutzer/otbr-tcp
-              tag: latest@sha256:c02bf3be6720d418ecbe54a629ffdc6c081dce33a09a7c49575f871db963b928
+              tag: latest@sha256:98bef4fccf8ad7f2a72b61110bd80f96b4e9802913fa56be920c83728b9482db
             env:
               TZ: America/Chicago
               # Radio (SLZB "Thread to remote OTBR", tcp/6638 on mgmt VLAN)
