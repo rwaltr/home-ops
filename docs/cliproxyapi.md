@@ -92,13 +92,15 @@ working, not a fault.
 ### Verified end to end
 
 The authenticated call went through agentgateway, which holds the key in its own
-environment — so no human had to run anything. A completion for model `claude`
-returned a real Anthropic message (`id: msg_011Ch76…`, `"content":"ok"`), which means
-the OAuth session is live, not merely loaded.
+environment — so no human had to run anything. A completion for model
+`claude-sonnet-5-5` returned a real Anthropic message (`id: msg_011Ch76…`,
+`"content":"ok"`), which means the OAuth session is live, not merely loaded.
 
 The advertised model id for the logged-in account is `claude-sonnet-5-5`, confirmed
-from the `model` field of that response rather than guessed. `agentgateway`'s
-`claude` alias maps to it.
+from the `model` field of that response rather than guessed. agentgateway publishes
+one alias per subscription model it exposes, each the upstream id verbatim —
+`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5` — so a caller names the
+model it wants and the response names the model that answered.
 
 ## Images
 

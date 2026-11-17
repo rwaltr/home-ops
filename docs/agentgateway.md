@@ -55,7 +55,7 @@ curl -s http://agentgateway.default.svc.cluster.local:8080/v1/chat/completions \
 Every model was called through the service on 8080, from inside the cluster:
 
 - `deepseek-v4.1-flash` — real completion, with OpenRouter cost accounting in the response.
-- `claude` — a real Anthropic message back from the subscription session, via cliproxyapi.
+- `claude-sonnet-5-5` — a real Anthropic message back from the subscription session, via cliproxyapi.
 - `nvidia-llama`, `intel-vl` — local hardware on Manners' gateway, both answering.
 
 That covers all three upstream credentials: OpenRouter from `hermes-secret`,

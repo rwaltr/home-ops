@@ -52,7 +52,8 @@ resource "onepassword_item" "pebble_index" {
 
 # pi, the operator's own agent client. Its own key for the same reason as the
 # others: revoking it must not disturb the phone clients. It is the only client
-# allowed to reach `claude`, the paid subscription behind cliproxyapi.
+# allowed to reach the subscription models (claude-sonnet-5-5, claude-opus-5-5,
+# claude-haiku-5-5), the paid account behind cliproxyapi.
 resource "random_password" "pi_key" {
   length  = 48
   special = false
