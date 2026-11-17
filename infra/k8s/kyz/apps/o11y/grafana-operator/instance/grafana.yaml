@@ -55,6 +55,11 @@ spec:
       angular_support_enabled: "true"
     server:
       enable_gzip: "true"
+      # Without this Grafana builds absolute URLs — including the OAuth redirect
+      # URI — from its own listen address, so the callback went out as
+      # `http://localhost:3000/login/generic_oauth` and could never match the
+      # client's registered redirect URL.
+      root_url: https://grafana.waltr.tech
   deployment:
     spec:
       strategy:
