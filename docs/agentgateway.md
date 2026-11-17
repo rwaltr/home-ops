@@ -105,16 +105,25 @@ authentication failed` with no key, and 8080 also rejects the literal string
 `${GROK_API_KEY}`. That second one is the useful one — a literal placeholder would
 have been a known-plaintext key, so a 401 proves the substitution happened.
 
-## Public door
+## Public door — unpublished
 
-`llm.waltr.tech` serves both surfaces: `/v1` → 8080, `/mcp` → 8081. The HTTPRoute
-attaches to `envoy-external`, and external-dns publishes only routes attached to
-that gateway, so the route is the entire publish step — no Terraform record and no
-tunnel edit. The tunnel carries `*.waltr.tech` to that gateway with SNI
-`external.waltr.tech`. Unpublishing is deleting `app/httproute.yaml`.
+`llm.waltr.tech` was published and then removed, pending an authorization server.
+The route was `/v1` → 8080 and `/mcp` → 8081, attached to `envoy-external`, with
+external-dns creating the record from the HTTPRoute. Republishing is restoring
+`app/httproute.yaml`; nothing else changed, so there is no Terraform record and no
+tunnel edit to undo either.
 
-8082 is deliberately not routed: it stays on the ClusterIP Service for in-cluster
-callers, which is what the Hermes agent's own model config points at.
+Why it came down: Grok's consumer MCP connector will not accept a static header
+for a server that answers `401`. It probes the URL, sees the challenge, and
+demands an OAuth client — authorization endpoint, token endpoint, PKCE. Our
+gateway authenticates with `apiKey`, which no amount of header configuration
+satisfies. The intended authorization server is Kanidm, whose OAuth2 client
+endpoints (`/oauth2/authorise`, `/oauth2/token`, ES256 JWTs, PKCE-only public
+clients) match that form field for field.
+
+Until then the surfaces stay cluster-internal. 8082 is not routed at all: it
+stays on the ClusterIP Service for in-cluster callers, which is what the Hermes
+agent's own model config points at.
 
 ## MCP
 
