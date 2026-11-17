@@ -188,6 +188,35 @@ widget:
       label: Account
 ```
 
+## Authentication
+
+The dashboard is behind Kanidm. `HOMEPAGE_AUTH_ENABLED` turns the gate on and the
+`HOMEPAGE_OIDC_*` variables do the login; **OIDC takes precedence over the password**,
+so `HOMEPAGE_AUTH_PASSWORD` is not set at all.
+
+Two variables are required regardless of how you log in, and both are easy to miss:
+
+- `HOMEPAGE_AUTH_SECRET` signs the session cookie. It is minted by
+  `infra/terraform/bootstrap/homepage-oidc.tf` into the 1Password item
+  `homepage-auth` and arrives as `homepage-secret`. Rotating it signs every session
+  out — that is the entire blast radius.
+- `HOMEPAGE_EXTERNAL_URL` must be the `https://` URL. It is what marks the session
+  cookie `Secure` and what the callback is built from, so an `http://` value here
+  weakens the cookie and can produce a callback the client will not match.
+
+Note the variable names: upstream uses **`HOMEPAGE_OIDC_*`**, not
+`HOMEPAGE_AUTH_OIDC_*`. The `HOMEPAGE_AUTH_*` prefix is only for the gate itself.
+
+The callback registered with Kanidm is NextAuth's, which carries the provider name:
+`https://homepage.waltr.tech/api/auth/callback/homepage-oidc`.
+
+`HOMEPAGE_OIDC_AUTO_LOGIN` is deliberately left off, so the login page still renders
+and a broken provider leaves a way in rather than a redirect loop.
+
+The client credentials come from the `KanidmOAuth2Client` in this directory, whose
+`secretKeyAliases` name the variables Homepage reads — so the HelmRelease points each
+variable at the minted Secret without restating any value.
+
 ## Secrets
 
 Never put a widget API key in the ConfigMap. Env vars prefixed `HOMEPAGE_VAR_`
@@ -210,7 +239,9 @@ and — with writes allowed — edit these config files.
 Think before enabling it: the token grants read access to **every configured
 service credential** and, with writes enabled, control of `custom.js`, which runs
 in every browser that loads the dashboard. It requires `HOMEPAGE_MCP_TOKEN` of at
-least 32 characters whenever Homepage auth is off, which it currently is.
+least 32 characters whenever Homepage auth is off. Auth is now **on** (see
+Authentication above), which raises the floor rather than removing the concern: the
+token still reads every widget credential, it just no longer sits behind nothing.
 
 ## The top strip comes from Prometheus, not from Kubernetes
 

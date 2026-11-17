@@ -72,6 +72,35 @@ spec:
               # is why there is an emptyDir at /app/config/logs — kubectl logs
               # is where a homelab reads them.
               LOG_TARGETS: stdout
+              # Auth gate. OIDC takes precedence over password login, so
+              # HOMEPAGE_AUTH_PASSWORD is not needed — but the cookie secret and the
+              # external URL are required either way. Upstream's variable names are
+              # HOMEPAGE_OIDC_*, not HOMEPAGE_AUTH_OIDC_*.
+              #
+              # HOMEPAGE_EXTERNAL_URL has to be the https URL: it is what marks the
+              # session cookie Secure, and it is what the callback is built from.
+              HOMEPAGE_AUTH_ENABLED: "true"
+              HOMEPAGE_EXTERNAL_URL: https://homepage.waltr.tech
+              HOMEPAGE_AUTH_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: homepage-secret
+                    key: HOMEPAGE_AUTH_SECRET
+              HOMEPAGE_OIDC_ISSUER: https://idm.waltr.tech/oauth2/openid/homepage
+              HOMEPAGE_OIDC_NAME: Kanidm
+              # Upstream defaults to `openid email profile`; `groups` is added so the
+              # token carries group membership for any later claim-based rule.
+              HOMEPAGE_OIDC_SCOPE: openid email profile groups
+              HOMEPAGE_OIDC_CLIENT_ID:
+                valueFrom:
+                  secretKeyRef:
+                    name: homepage-kanidm-oauth2-credentials
+                    key: HOMEPAGE_OIDC_CLIENT_ID
+              HOMEPAGE_OIDC_CLIENT_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: homepage-kanidm-oauth2-credentials
+                    key: HOMEPAGE_OIDC_CLIENT_SECRET
             probes:
               # /api/healthcheck is the image's own HEALTHCHECK target.
               liveness: &probes
