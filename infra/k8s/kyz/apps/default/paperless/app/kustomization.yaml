@@ -10,6 +10,7 @@ configMapGenerator:
       disableNameSuffixHash: true
 resources:
   - ./externalsecret.yaml
+  - ./oauth2client.yaml
   - ./extract-cronjob.yaml
   - ./helmrelease.yaml
   - ./ocirepository.yaml

@@ -1,0 +1,37 @@
+---
+# Paperless-ngx's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# `public: true` is deliberate, and it is the reason this app could be configured
+# at all without a second secret pipeline. Paperless takes its provider settings as
+# one JSON blob in a single environment variable, and a JSON blob cannot be
+# assembled from two Secret keys — so the client id has to be known statically.
+# A public client has no secret, and its id is the Kanidm entity name, so the whole
+# blob is a literal.
+#
+# Trade-off: Kanidm's public clients "can not access all APIs of OAuth2" — RFC 7662
+# token introspection needs client authentication. Paperless does not use it.
+#
+# `public` is immutable after creation.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: paperless
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Paperless
+  origin: https://paperless.waltr.tech
+  # allauth's callback path carries the provider id configured below.
+  redirectUrl:
+    - https://paperless.waltr.tech/accounts/oidc/kanidm/login/callback/
+  public: true
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true

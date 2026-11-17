@@ -105,6 +105,19 @@ spec:
               PAPERLESS_TIKA_ENDPOINT: http://paperless-tika:9998
               PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://paperless-gotenberg:3000
               PAPERLESS_EMAIL_PARSE_DEFAULT_LAYOUT: "2" # HTML then text
+              # OIDC against Kanidm. PAPERLESS_APPS is additive, so this only adds
+              # the allauth provider rather than replacing the app list.
+              #
+              # The whole provider config is one JSON blob, which is why the client
+              # is public: a blob cannot be assembled from separate Secret keys, so
+              # the client id has to be a literal, and a public client's id is its
+              # Kanidm name with no secret beside it. PKCE is on, as Kanidm requires
+              # for public clients.
+              PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+              PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect":{"OAUTH_PKCE_ENABLED":true,"APPS":[{"provider_id":"kanidm","name":"Kanidm","client_id":"paperless","settings":{"server_url":"https://idm.waltr.tech/oauth2/openid/paperless","fetch_userinfo":true}}]}}'
+              # First login creates the account. The existing local `rwaltr` account
+              # is separate until it is linked in the UI.
+              PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
               # Native AI (Paperless 3.0+), off by default. Generation —
               # suggestions and document chat — runs on Qwen3-32B through the
               # local LiteLLM, which proxies Dan Manners' self-hosted vLLM (his

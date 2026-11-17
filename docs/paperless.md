@@ -75,6 +75,27 @@ image's `init-superuser` step does not reset an existing password. Change the
 password in the UI afterwards; the 1P value only records what was used at
 creation.
 
+## Logging in through Kanidm
+
+Paperless authenticates through Kanidm via django-allauth's `openid_connect`
+provider, configured entirely by environment variables: `PAPERLESS_APPS` adds the
+provider (it is additive, not a replacement), and
+`PAPERLESS_SOCIALACCOUNT_PROVIDERS` carries the whole provider config as one JSON
+blob.
+
+That blob is why the Kanidm client is **public**. It cannot be assembled from
+separate Secret keys, so the client id has to be a literal — and a public client's
+id is its Kanidm name (`paperless`) with no secret beside it. PKCE is enabled, as
+Kanidm requires for public clients. The trade-off is that public clients cannot use
+client-authenticated APIs such as RFC 7662 token introspection; Paperless does not.
+
+`PAPERLESS_SOCIAL_AUTO_SIGNUP` is on, so the first login creates the account. The
+pre-existing local `rwaltr` account is a _separate_ account until it is linked —
+either link it in the UI or use the OIDC-created one.
+
+The registered redirect URL is allauth's callback path for the provider id
+`kanidm`, and it is matched exactly by Kanidm.
+
 ## First run
 
 1. Create the 1Password item above (or `mise run secrets:verify` will flag it).
