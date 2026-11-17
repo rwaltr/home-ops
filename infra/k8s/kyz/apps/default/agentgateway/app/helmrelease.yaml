@@ -85,6 +85,13 @@ spec:
             port: 8082
             targetPort: 8082
             protocol: TCP
+          # The JWT listener. Same rule as above: a listener that is not named here is
+          # unreachable, and the public route's backendRef to it would resolve to
+          # nothing.
+          - name: oauth
+            port: 8083
+            targetPort: 8083
+            protocol: TCP
           - name: metrics
             port: 15020
             targetPort: 15020
@@ -156,6 +163,23 @@ spec:
           # No apiKey. Reachable only through the ClusterIP Service, and the mcp
           # authorization rules below allow a caller with no key.
           port: 8082
+        mcp-oauth:
+          # JWT bearer tokens, for a client that cannot hold a static key: Grok's
+          # consumer connector authenticates over OAuth against Kanidm and is given a
+          # client id, not an apiKey. A key is not a token, so this cannot be another
+          # rule on mcp-public — it is a fourth listener.
+          #
+          # mode strict is load-bearing: it is what returns the 401 that makes an MCP
+          # client start its OAuth flow. optional and permissive both suppress the 401
+          # and no flow ever begins.
+          port: 8083
+          jwtAuth:
+            mode: strict
+            issuer: https://idm.waltr.tech/oauth2/openid/grok-mcp/
+            audiences:
+              - grok-mcp
+            jwks:
+              url: https://idm.waltr.tech/oauth2/openid/grok-mcp/public_key.jwk
       llm:
         gateways: [llm-public, internal]
         models:
@@ -245,7 +269,7 @@ spec:
       # (Terraform mint), and naming it here would leave the gateway unable to
       # authenticate to itself. Add it when infra/terraform/bootstrap lands.
       mcp:
-        gateways: [mcp-public, internal]
+        gateways: [mcp-public, internal, mcp-oauth]
         prefixMode: conditional
         # Per-client tool authorization. A denied tool is hidden from tools/list, not
         # merely refused when called — so each client sees only its own subset, which
@@ -254,6 +278,30 @@ spec:
         # Tool arguments are not visible here; argument-level rules belong to
         # mcpGuardrails, which filters content rather than identity.
         policies:
+          # The MCP-native authentication object, and the only thing that serves the
+          # protected-resource metadata an MCP client discovers before it starts an
+          # OAuth flow (RFC 9728). `resourceMetadata` is required on it, which is the
+          # point: the document is what tells a client where the authorization server
+          # is, and Kanidm has no dynamic client registration to fall back on.
+          #
+          # Permissive here, enforced on the mcp-oauth gateway above. This block is
+          # attached to every gateway the mcp servers are served on, and the apiKey
+          # and internal listeners must keep working without a token.
+          mcpAuthentication:
+            issuer: https://idm.waltr.tech/oauth2/openid/grok-mcp/
+            mode: optional
+            jwks:
+              url: https://idm.waltr.tech/oauth2/openid/grok-mcp/public_key.jwk
+            resourceMetadata:
+              resource: https://llm.waltr.tech/oauth/mcp
+              authorizationServers:
+                - https://idm.waltr.tech/oauth2/openid/grok-mcp/
+              scopesSupported:
+                - openid
+                - profile
+                - email
+              bearerMethodsSupported:
+                - header
           mcpAuthorization:
             rules:
               # The internal listener presents no key at all.
