@@ -1,0 +1,38 @@
+---
+# HomeBox's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# The client lives in the application's namespace so the credentials the operator
+# mints land next to the app that consumes them. That requires the namespace to be
+# listed in the Kanidm resource's `oauth2ClientNamespaceSelector` — see
+# docs/kanidm.md.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: homebox
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: HomeBox
+  origin: https://homebox.waltr.tech
+  # Matched exactly (`strictRedirectUrl` defaults on).
+  redirectUrl:
+    - https://homebox.waltr.tech/api/v1/users/login/oidc/callback
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true
+  # HomeBox reads its credentials from environment variables with its own names, so
+  # the minted Secret carries aliases matching them. That lets the app take the
+  # whole Secret with `envFrom` instead of mapping each key by hand, and keeps the
+  # two values in one place rather than two.
+  secretKeyAliases:
+    clientId:
+      - HBOX_OIDC_CLIENT_ID
+    clientSecret:
+      - HBOX_OIDC_CLIENT_SECRET

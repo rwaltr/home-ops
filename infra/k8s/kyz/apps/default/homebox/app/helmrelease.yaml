@@ -65,9 +65,25 @@ spec:
               # so the Collection → Invites flow keeps working with signup shut.
               # See docs/homebox.md → Accounts.
               HBOX_OPTIONS_ALLOW_REGISTRATION: "false"
+              # OIDC against Kanidm. The issuer is per client and must match
+              # Kanidm's exactly — discovery is appended to it.
+              HBOX_OIDC_ENABLED: "true"
+              HBOX_OIDC_ISSUER_URL: https://idm.waltr.tech/oauth2/openid/homebox
+              HBOX_OIDC_SCOPE: openid profile email groups
+              # Left off on purpose: with it set, the local login page redirects
+              # straight to Kanidm, which leaves no way in if the provider is the
+              # thing that is broken. Both buttons are shown instead.
+              HBOX_OIDC_AUTO_REDIRECT: "false"
             envFrom:
               - secretRef:
                   name: homebox-secret
+              # Client id and secret, minted by kaniop from the
+              # KanidmOAuth2Client in this directory. The keys in it are named
+              # HBOX_OIDC_CLIENT_ID / HBOX_OIDC_CLIENT_SECRET by that resource's
+              # `secretKeyAliases`, which is why the whole Secret can be taken
+              # wholesale here.
+              - secretRef:
+                  name: homebox-kanidm-oauth2-credentials
             probes:
               # The image's own HEALTHCHECK path (`/api/v1/status`): no auth,
               # answers before any user exists, so it is safe for the startup
