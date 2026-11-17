@@ -33,6 +33,27 @@ spec:
   # server WILL refuse to start" — so this is the same relationship the RP ID
   # above depends on, expressed the other way round.
   origin: https://idm.waltr.tech
+  # OAuth2 clients live with the applications that use them, so the operator has to
+  # be told which namespaces to look in. Unset means "only this namespace", which
+  # is why a client resource anywhere else silently does nothing but warn:
+  #
+  #   Warning ResourceNotWatched: configure `oauth2ClientNamespaceSelector`
+  #   on Kanidm resource to watch this namespace
+  #
+  # Listed by name rather than `{}` (every namespace) on purpose: an empty selector
+  # would let any namespace in the cluster mint an identity provider client. The
+  # list is short and a new namespace is one line, reviewed like anything else.
+  #
+  # Persons and groups deliberately keep the default — those are identity-domain
+  # objects and stay in this namespace.
+  oauth2ClientNamespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values:
+          - default
+          - o11y
+          - kopiur-system
   tlsSecretName: kanidm-tls
   # Pinned to the version the operator supports, not to "newest".
   #
