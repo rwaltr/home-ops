@@ -62,13 +62,20 @@ spec:
         - name: agentgateway
           port: 8083
     # Protected-resource metadata (RFC 9728), which an MCP client fetches before it
-    # has a token. It is served by the gateway itself on the OAuth listener, so it
-    # has to be routed there explicitly — the client asks the resource for its
-    # authorization server, and gets nothing if this rule is missing.
+    # has a token. Routed to the *unauthenticated* listener on purpose: the gateway
+    # serves the document there, and a client that cannot read it cannot find the
+    # authorization server at all. Both strict listeners answer 401 to this path,
+    # which is the wrong answer for a document whose whole purpose is to be readable
+    # by a client that holds no credential yet.
+    #
+    # This is the one path deliberately published from the internal listener: a static
+    # document, unauthenticated by design, naming only the issuer. The path-based form
+    # (/.well-known/oauth-protected-resource/oauth/mcp) matches the same prefix, which
+    # is what RFC 9728 specifies for a resource with a path.
     - matches:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-protected-resource
       backendRefs:
         - name: agentgateway
-          port: 8083
+          port: 8082
