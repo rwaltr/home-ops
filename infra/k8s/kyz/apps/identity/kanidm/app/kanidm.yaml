@@ -19,12 +19,23 @@ spec:
   domain: idm.waltr.tech
   origin: https://idm.waltr.tech
   tlsSecretName: kanidm-tls
-  # Pinned deliberately. The operator's default is `kanidm/server:latest`, which
-  # is a floating tag: any pod restart could land a new major version under us.
-  # Kanidm upgrades are sequential — you cannot skip versions — so an
-  # uncontrolled jump is not a cosmetic problem, it is the one upgrade path the
-  # server refuses. 1.12.1 is what `latest` resolved to when this was deployed.
-  image: kanidm/server:1.12.1
+  # Pinned to the version the operator supports, not to "newest".
+  #
+  # The operator's default is `kanidm/server:latest`, which resolved to 1.12.1 —
+  # one minor version ahead of what kaniop 0.23.0 can drive. Its client SDK is
+  # 1.11.2, and Kanidm 1.12 support is still an open issue upstream (#1141). The
+  # mismatch is not cosmetic: the server's access-control behaviour changed
+  # enough that the operator could create an entry but not read it back, so it
+  # concluded every object was missing and looped on 403s.
+  #
+  # Worth knowing: the operator's own compatibility check reported this image as
+  # "compatible / upgrade-check passed" while `kanidmd domain upgrade-check`
+  # was failing to exec inside the pod. The check that should have caught the
+  # mismatch degrades to a pass. Verify versions by hand after any bump.
+  #
+  # Kanidm cannot be downgraded once its database has migrated, so moving to a
+  # newer server line requires a fresh volume — see docs/kanidm.md.
+  image: kanidm/server:1.11.2
   replicaGroups:
     - name: default
       replicas: 1

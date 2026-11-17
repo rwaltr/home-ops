@@ -70,10 +70,24 @@ kubectl -n identity get secret kanidm-admin-passwords \
 `idm_admin` administers the directory; `admin` is the recovery account. Log in at
 the UI, then change the passwords there.
 
-The server image is **pinned** (`kanidm/server:1.12.1`). The operator defaults to
-`:latest`, and Kanidm upgrades are sequential — skipping a version is the one
-upgrade path the server refuses — so a floating tag means an uncontrolled
-version jump on any pod restart. Renovate can bump it deliberately.
+The server image is **pinned** (`kanidm/server:1.11.2`) because the operator's
+default is `:latest`, and `latest` is one minor version ahead of what kaniop
+0.23.0 can drive. Kaniop's client SDK is 1.11.2; Kanidm 1.12 support is an open
+upstream issue. The mismatch is quiet and ugly rather than loud: the operator
+could _create_ an entry but not _read it back_, so it decided every object was
+missing and retried the create, which the server then refused with 403.
+
+Do not trust the operator's own compatibility field after a bump — it reported
+the 1.12.1 image as `compatible / upgrade-check passed` while `kanidmd domain
+upgrade-check` was failing to exec inside the pod. The check that exists to catch
+exactly this mismatch degrades to a pass. Compare the image tag against kaniop's
+`kanidm_client` version by hand.
+
+**Kanidm cannot be downgraded once its database has migrated.** Moving to a newer
+server line therefore means starting from a fresh volume: delete the PVC and the
+`-admin-passwords` Secret, then let the operator re-initialise. Both are
+disposable — the Secret is regenerated and identity resources are re-created from
+git.
 
 Two settings are load-bearing rather than stylistic: `storage.volumeClaimTemplate`
 (the operator's default is an **EmptyDir**, so omitting it puts the identity
