@@ -50,20 +50,31 @@ The realm is **`waltr.tech`** — the apex, not `idm.waltr.tech`. Principal name
 built from it (`rwaltr@waltr.tech`), and the identity namespace for everything in
 this house should not be named after one of the services that speaks it.
 
+The realm is also the **WebAuthn RP ID**, and that is the load-bearing reason for
+the apex rather than a tidiness preference: an RP ID of `waltr.tech` covers
+`idm.waltr.tech`, so passkeys work from the subdomain and survive the UI moving.
+
 `domain` is immutable after first initialisation and is baked into WebAuthn and
 every principal name, so changing it means a fresh volume. `origin` is the URL the
-server is reached at, and it may match the domain **or descend from it** — which
-means the UI could move to a subdomain later without touching the realm. It is
-currently the apex itself, where the RP ID and the origin host are the same string.
+server is reached at — the login page and the links the server mints — and it must
+match the domain **or descend from it**:
 
-`domain` and `origin` must be consistent or the server refuses to start.
+> This must match or be a descendent of the domain name you configure above. If
+> these two items are not consistent, the server WILL refuse to start.
+
+So the realm is the apex and the server is at `idm.waltr.tech`. Those two are the
+same constraint read in both directions, not two independent settings: `idm.waltr.tech`
+descends from `waltr.tech`, which is why the split is allowed at all.
 
 ## Running it
 
-Internal only: `https://waltr.tech/ui/login` on `envoy-internal`, with a
+Internal only: `https://idm.waltr.tech/ui/login` on `envoy-internal`, with a
 Let's Encrypt certificate and a 5Gi PVC on `openebs-hostpath`. external-dns
 publishes only routes attached to `envoy-external`, so nothing about this is
 reachable from the internet until a second route is added on purpose.
+
+The apex itself stays free — the login page is on the subdomain, so nothing about
+this layout claims `waltr.tech` for the IdP.
 
 The operator recovers the built-in `admin` and `idm_admin` accounts on first
 initialisation and writes the generated passwords to the `kanidm-admin-passwords`
@@ -164,10 +175,10 @@ The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
 That is also when `llm.waltr.tech` gets republished, since the flow needs both
 the authorization server and the MCP endpoint reachable from outside.
 
-Publishing the IdP needs **two** changes, not one: the route moves to
-`envoy-external`, and the Cloudflare tunnel needs an ingress rule for the apex,
-because the tunnel's only rule is `*.waltr.tech` — a wildcard does not match the
-apex, so `waltr.tech` currently falls through to the tunnel's 404.
+Publishing the IdP is a route move and nothing else: `idm.waltr.tech` is already
+covered by the tunnel's `*.waltr.tech` rule, so no tunnel change is needed. (This
+was two changes while the login page sat on the apex, because a wildcard does not
+match the apex — moving it to the subdomain removed that whole class of problem.)
 
 ## Layout
 

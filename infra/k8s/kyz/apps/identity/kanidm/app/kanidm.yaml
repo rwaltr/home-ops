@@ -22,12 +22,17 @@ spec:
   # It is deliberately the apex rather than `idm.waltr.tech`: the realm is the
   # identity namespace for everything in this house, and there is no reason for
   # it to carry the name of one of the services that speaks it.
+  #
+  # The realm is also the WebAuthn RP ID, which is why the apex is the right
+  # choice and not merely the tidy one: an RP ID of `waltr.tech` covers
+  # `idm.waltr.tech`, so passkeys keep working from the subdomain, and they
+  # survive the UI moving again later.
   domain: waltr.tech
-  # The URL the server is reached at. `origin` may match the domain or descend
-  # from it, so a future move to a subdomain would not require a new realm — but
-  # the apex is what was asked for, and WebAuthn is happiest when the RP ID and
-  # the origin host are the same string.
-  origin: https://waltr.tech
+  # The URL the server is reached at. Kanidm requires the origin to match the
+  # domain or descend from it — "if these two items are not consistent, the
+  # server WILL refuse to start" — so this is the same relationship the RP ID
+  # above depends on, expressed the other way round.
+  origin: https://idm.waltr.tech
   tlsSecretName: kanidm-tls
   # Pinned to the version the operator supports, not to "newest".
   #
@@ -77,7 +82,7 @@ spec:
         # routes from the network namespace, and Kanidm needs TLS regardless.
         port: 443
     hostnames:
-      - waltr.tech
+      - idm.waltr.tech
     # The gateway must validate the server's certificate on the way in. It is a
     # publicly trusted Let's Encrypt certificate, so the system trust store is
     # the whole configuration.
