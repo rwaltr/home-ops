@@ -59,6 +59,11 @@ spec:
           secretKeyRef:
             name: agentgateway-secret
             key: PEBBLE_INDEX_API_KEY
+      - name: PI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: PI_API_KEY
     # Encrypts MCP session IDs. The chart injects SESSION_KEY from this Secret's `key`
     # entry; without it session IDs are base64 only, which discloses the multiplexed
     # target names to any client that can read its own session id.
@@ -146,6 +151,15 @@ spec:
                   client: pebble-index
                 allowedModels:
                   - deepseek-v4.1-flash
+              # The operator's own agent client. Claude only: everything else it
+              # reaches directly, and the subscription is the one credential it
+              # cannot hold itself.
+              - key: ${PI_API_KEY}
+                metadata:
+                  name: pi
+                  client: pi
+                allowedModels:
+                  - claude
         mcp-public:
           port: 8081
           apiKey:
@@ -159,6 +173,10 @@ spec:
                 metadata:
                   name: pebble-index
                   client: pebble-index
+              - key: ${PI_API_KEY}
+                metadata:
+                  name: pi
+                  client: pi
         internal:
           # No apiKey. Reachable only through the ClusterIP Service, and the mcp
           # authorization rules below allow a caller with no key.
@@ -314,6 +332,9 @@ spec:
               # change; a rule naming a target that does not exist yet is inert.
               - 'apiKey.client == "pebble-index" && mcp.tool.target == "home-assistant"'
               - 'apiKey.client == "pebble-index" && mcp.tool.target == "home-assistant-control"'
+              # The operator's own agent client gets every target; the per-client
+              # split exists to keep phone-sized surfaces small, not to limit pi.
+              - 'apiKey.client == "pi"'
         targets:
           - name: flux
             mcp:

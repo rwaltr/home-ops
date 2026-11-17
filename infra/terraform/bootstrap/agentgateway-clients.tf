@@ -50,6 +50,24 @@ resource "onepassword_item" "pebble_index" {
   password = random_password.pebble_index_key.result
 }
 
+# pi, the operator's own agent client. Its own key for the same reason as the
+# others: revoking it must not disturb the phone clients. It is the only client
+# allowed to reach `claude`, the paid subscription behind cliproxyapi.
+resource "random_password" "pi_key" {
+  length  = 48
+  special = false
+}
+
+resource "onepassword_item" "pi" {
+  vault    = data.onepassword_vault.secrets.uuid
+  title    = "pi"
+  category = "login"
+  url      = "https://llm.waltr.tech"
+
+  username = "agentgateway"
+  password = random_password.pi_key.result
+}
+
 # Not a client credential: the key that encrypts MCP session IDs.
 #
 # Without it the gateway logs "no session key configured; MCP session IDs are not

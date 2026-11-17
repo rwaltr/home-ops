@@ -92,9 +92,13 @@ to any client that can read its own session id.
 | -------------- | -------------- | ------------------------------------------- | ------------------------------------------ |
 | `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash` | `home-assistant` (read-only)               |
 | `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                       | `home-assistant`, `home-assistant-control` |
+| `pi`           | `pi`           | `claude`                                    | all four targets                           |
 
-Claude is deliberately absent from both allow-lists: it is the paid subscription,
-and a leaked client key should not be able to spend it. `allowedModels` also
+Claude is deliberately absent from the phone clients' allow-lists: it is the paid
+subscription, and a leaked client key should not be able to spend it. `pi` is the
+exception — it is the operator's own agent client, and the subscription is the one
+credential it cannot hold itself. It reaches every other model directly, so its
+allow-list is `claude` alone. `allowedModels` also
 filters `/v1/models`, and a disallowed model is refused before any provider is
 contacted.
 
@@ -117,7 +121,7 @@ Four rules, split by credential rather than by hostname:
 - `/v1` → 8080, `apiKey` strict.
 - `/mcp` → 8081, `apiKey` strict plus the per-client tool rules.
 - `/oauth/mcp` → 8083, rewritten onto `/mcp`. JWT bearer tokens.
-- `/.well-known/oauth-protected-resource` → 8082, the unauthenticated listener. The\n  document has to be readable by a client that holds no credential yet, so it is the\n  one path deliberately published from the internal listener.
+- `/.well-known/oauth-protected-resource` → 8082, the unauthenticated listener. The\n document has to be readable by a client that holds no credential yet, so it is the\n one path deliberately published from the internal listener.
 
 The OAuth surface is a second path to the same servers rather than a second
 hostname, because a client's identity travels in its credential: Grok presents a
