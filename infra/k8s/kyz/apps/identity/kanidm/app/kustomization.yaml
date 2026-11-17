@@ -2,9 +2,6 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# The Kanidm cluster resource is deliberately absent from this revision.
-# `spec.domain` is immutable (the CRD rejects the change outright), so moving the
-# realm means deleting the resource and re-creating it — which cannot happen in a
-# single apply. It returns in the next commit with the new domain.
 resources:
   - ./certificate.yaml
+  - ./kanidm.yaml

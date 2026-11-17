@@ -1,0 +1,86 @@
+---
+# No yaml-language-server schema line: the schema host has no kaniop entry, so a
+# pointer there would 404 and the editor would fall back to guessing anyway.
+#
+# The identity server.
+#
+# `domain` is immutable after first initialisation and is baked into WebAuthn and
+# every principal name (`rwaltr@waltr.tech`), and `origin` must match or descend
+# from it or the server refuses to start. Chosen once, deliberately.
+#
+# Internal only: the HTTPRoute attaches to envoy-internal, which is the gateway
+# external-dns does not publish. Making this reachable from outside is a second
+# route on envoy-external, and that happens when the OAuth flow needs it.
+apiVersion: kaniop.rs/v1beta1
+kind: Kanidm
+metadata:
+  name: kanidm
+spec:
+  # The realm. Principal names are built from it (rwaltr@waltr.tech), and it is
+  # immutable after the first initialisation — changing it means a fresh volume.
+  #
+  # It is deliberately the apex rather than `idm.waltr.tech`: the realm is the
+  # identity namespace for everything in this house, and there is no reason for
+  # it to carry the name of one of the services that speaks it.
+  domain: waltr.tech
+  # The URL the server is reached at. `origin` may match the domain or descend
+  # from it, so a future move to a subdomain would not require a new realm — but
+  # the apex is what was asked for, and WebAuthn is happiest when the RP ID and
+  # the origin host are the same string.
+  origin: https://waltr.tech
+  tlsSecretName: kanidm-tls
+  # Pinned to the version the operator supports, not to "newest".
+  #
+  # The operator's default is `kanidm/server:latest`, which resolved to 1.12.1 —
+  # one minor version ahead of what kaniop 0.23.0 can drive. Its client SDK is
+  # 1.11.2, and Kanidm 1.12 support is still an open issue upstream (#1141). The
+  # mismatch is not cosmetic: the server's access-control behaviour changed
+  # enough that the operator could create an entry but not read it back, so it
+  # concluded every object was missing and looped on 403s.
+  #
+  # Worth knowing: the operator's own compatibility check reported this image as
+  # "compatible / upgrade-check passed" while `kanidmd domain upgrade-check`
+  # was failing to exec inside the pod. The check that should have caught the
+  # mismatch degrades to a pass. Verify versions by hand after any bump.
+  #
+  # Kanidm cannot be downgraded once its database has migrated, so moving to a
+  # newer server line requires a fresh volume — see docs/kanidm.md.
+  image: kanidm/server:1.11.2
+  replicaGroups:
+    - name: default
+      replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          # Kanidm is a Rust server with a small resident set; this is headroom,
+          # not a measurement.
+          memory: 512Mi
+  # Not optional. With no storage specified the operator uses an EmptyDir, so
+  # the identity database would live in a scratch directory and vanish with the
+  # pod — silent data loss on the first restart or node drain.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: openebs-hostpath
+        resources:
+          requests:
+            storage: 5Gi
+  gateway:
+    parentRefs:
+      - name: envoy-internal
+        namespace: network
+        # The https listener. The http listener on this gateway only accepts
+        # routes from the network namespace, and Kanidm needs TLS regardless.
+        port: 443
+    hostnames:
+      - waltr.tech
+    # The gateway must validate the server's certificate on the way in. It is a
+    # publicly trusted Let's Encrypt certificate, so the system trust store is
+    # the whole configuration.
+    backendTlsPolicy:
+      validation:
+        wellKnownCaCertificates: System
