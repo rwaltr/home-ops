@@ -71,6 +71,22 @@ changing it silently invalidates every issued key with no error to point at.
 
 ## Accounts and invitations
 
+### Logging in through Kanidm
+
+HomeBox is configured for OIDC (`HBOX_OIDC_*`), with the client defined as a
+`KanidmOAuth2Client` in this app's directory and its credentials minted by kaniop
+into `homebox-kanidm-oauth2-credentials`. That Secret is taken wholesale via
+`envFrom` because the client resource gives the keys HomeBox's own names
+(`HBOX_OIDC_CLIENT_ID`, `HBOX_OIDC_CLIENT_SECRET`) through `secretKeyAliases`.
+
+`HBOX_OIDC_AUTO_REDIRECT` is **`"false"`**: the login page shows both the Kanidm
+button and the local form. With auto-redirect on, a broken provider would leave no
+way in at all.
+
+`HBOX_OIDC_ISSUER_URL` must match Kanidm's issuer exactly — it is per client, and
+discovery is appended to it — and the redirect URL registered on the client is
+matched exactly, so both have to be the real hostname.
+
 The owner account was created through open self-registration, and
 `HBOX_OPTIONS_ALLOW_REGISTRATION` is now **`"false"`** — the signup form is no
 longer served.
