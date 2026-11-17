@@ -6,4 +6,6 @@ resources:
   - ./externalsecret.yaml
   - ./externalsecret-session.yaml
   - ./helmrelease.yaml
+  - ./httproute.yaml
+  - ./oauth2client.yaml
   - ./ocirepository.yaml

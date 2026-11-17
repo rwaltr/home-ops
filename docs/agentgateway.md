@@ -105,25 +105,71 @@ authentication failed` with no key, and 8080 also rejects the literal string
 `${GROK_API_KEY}`. That second one is the useful one — a literal placeholder would
 have been a known-plaintext key, so a 401 proves the substitution happened.
 
-## Public door — unpublished
+## Public door — published
 
-`llm.waltr.tech` was published and then removed, pending an authorization server.
-The route was `/v1` → 8080 and `/mcp` → 8081, attached to `envoy-external`, with
-external-dns creating the record from the HTTPRoute. Republishing is restoring
-`app/httproute.yaml`; nothing else changed, so there is no Terraform record and no
-tunnel edit to undo either.
+`llm.waltr.tech` is published again: `app/httproute.yaml`, attached to
+`envoy-external`, with external-dns creating the record from the route itself.
+Nothing else is involved — no Terraform record and no tunnel edit — so unpublishing
+is deleting the file, the same as navidrome.
 
-Why it came down: Grok's consumer MCP connector will not accept a static header
-for a server that answers `401`. It probes the URL, sees the challenge, and
-demands an OAuth client — authorization endpoint, token endpoint, PKCE. Our
-gateway authenticates with `apiKey`, which no amount of header configuration
-satisfies. The intended authorization server is Kanidm, whose OAuth2 client
-endpoints (`/oauth2/authorise`, `/oauth2/token`, ES256 JWTs, PKCE-only public
-clients) match that form field for field.
+Four rules, split by credential rather than by hostname:
 
-Until then the surfaces stay cluster-internal. 8082 is not routed at all: it
-stays on the ClusterIP Service for in-cluster callers, which is what the Hermes
-agent's own model config points at.
+- `/v1` → 8080, `apiKey` strict.
+- `/mcp` → 8081, `apiKey` strict plus the per-client tool rules.
+- `/oauth/mcp` → 8083, rewritten onto `/mcp`. JWT bearer tokens.
+- `/.well-known/oauth-protected-resource` → 8083, served by the gateway itself.
+
+The OAuth surface is a second path to the same servers rather than a second
+hostname, because a client's identity travels in its credential: Grok presents a
+token, the ring presents a key, and one URL cannot accept both.
+
+### Why it came down, and what changed
+
+Grok's consumer MCP connector will not accept a static header for a server that
+answers `401`. It probes the URL, sees the challenge, and demands an OAuth client.
+`apiKey` cannot satisfy that, however the header is configured. What changed is not
+the gateway's auth model but the arrival of an authorization server: Kanidm issues
+**RFC 9068 JWT access tokens**, so this gateway can verify a bearer token against
+Kanidm's JWKS instead of needing the token to be opaque to it.
+
+Three details are load-bearing:
+
+- **A fourth listener (8083), not another rule on 8081.** `apiKey` and JWT cannot
+  share a listener — a key is not a token — so the JWT authentication sits at the
+  gateway level, exactly as `apiKey` does for the other two.
+- **`mode: strict`.** `optional` and `permissive` both suppress the 401, and without
+  the 401 no client begins an OAuth flow. The refusal is the feature.
+- **`mcpAuthentication` lives in the `mcp` block's policies with `mode: optional`.**
+  That object is what serves the protected-resource metadata (RFC 9728) a client
+  fetches before it holds a token, and `resourceMetadata` is required on it. It is
+  permissive because `mcp.policies` attaches to every gateway the servers are served
+  on, and the apiKey and internal listeners have to keep working without a token.
+  Enforcement is the gateway-level JWT — the same placement argument as `apiKey`.
+
+### The Kanidm client, and the two values still placeholder
+
+`oauth2client.yaml` in this app's directory is the client the connector signs in with,
+the same shape Grafana's takes. It is confidential rather than public, because xAI's
+connector accepts a client secret and that keeps the token exchange on their server.
+PKCE is required regardless. The operator mints the secret into a Secret in this
+namespace; read it with `kubectl -n default get secret grok-mcp -o jsonpath='{.data}'`.
+
+Two fields are **placeholders**: `origin` and `redirectUrl`. Both are xAI's, not ours.
+They are not in xAI's documentation, and nothing on our side can infer them — the
+connector sends them when it starts a flow. They are set to a reserved `.invalid` host
+so a placeholder cannot be mistaken for a working value, and they are kept consistent
+with each other because Kanidm expects the origin to be the origin of the redirect.
+
+The real values come from the connector UI at `grok.com/connectors`, which shows the
+callback it will use, or from Kanidm's log, which names the rejected `redirect_uri`
+when a first attempt fails. `strictRedirectUrl` is left at its default — exact
+matching — so a wrong value is surfaced rather than papered over by origin-only
+matching.
+
+Until they are replaced the client exists, its signing key resolves, and any
+authorization attempt is refused. That is the correct state for a client whose callback
+is not yet known: it also means the JWT listener's JWKS URL is live rather than
+pointing at a 404.
 
 ## MCP
 
