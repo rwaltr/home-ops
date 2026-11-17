@@ -17,6 +17,14 @@ spec:
     name: kanidm
   personAttributes:
     displayname: rwaltr
+    # Required, not cosmetic: Kanidm only emits the `email` claim when the account
+    # has a primary mail address, and apps key their users on it. HomeBox fails
+    # outright ("no email found in token claims"), and django-allauth and Grafana
+    # both use the address to match or create the local account.
+    #
+    # The first address listed is the primary one.
+    mail:
+      - rwaltr@waltr.tech
   # A day, rather than Kanidm's short default: this is a link a human has to
   # notice in an event stream, not a machine that acts within the hour.
   credentialsTokenTtl: 86400

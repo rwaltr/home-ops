@@ -169,6 +169,22 @@ answer is not to manage built-ins at all: administration belongs to the `idm_adm
 account, and Kanidm's own guidance is to keep a separate administration account
 rather than granting administration to a daily-use person.
 
+**Give the account a mail address.** Kanidm only emits the `email` claim when the
+account has a primary mail attribute set, and clients key their users on it. HomeBox
+refuses the login outright (`no email found in token claims`), and both
+django-allauth (Paperless) and Grafana use the address to match or create the local
+account. `personAttributes.mail` is a list and the first entry is the primary:
+
+```yaml
+personAttributes:
+  displayname: rwaltr
+  mail:
+    - rwaltr@waltr.tech
+```
+
+The address does not have to be deliverable — nothing sends mail to it — but the
+claim is only populated when it exists.
+
 A new person account gets its one-time credential link through a Kubernetes Event,
 which is the operator's default delivery. Email would require `spec.mailSender` on
 the Kanidm cluster, which is not configured, and is not worth standing up a mail
