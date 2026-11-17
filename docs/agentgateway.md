@@ -59,30 +59,70 @@ Every model was called through the service on 8080, from inside the cluster:
 That covers all three upstream credentials: OpenRouter from `hermes-secret`,
 danmanners from the ExternalSecret, and cliproxyapi's Terraform-minted key.
 
-## No inbound auth — deliberate, and temporary
+## Listeners and auth
 
-8080 answers anyone inside the cluster, so any pod can spend these keys. That is the
-same posture the MCP servers in this namespace already have, and it is why the
-service has no HTTPRoute. Before anything outside the cluster calls it, add the
-chart's `policies.apiKey` block:
+Three listeners, two of them authenticated:
 
-```yaml
-llm:
-  policies:
-    apiKey:
-      mode: strict
-      keys:
-        - key: ${SOME_CLIENT_KEY}
-          metadata:
-            client: hermes
-```
+- **8080 `llm-public`** — `apiKey` in strict mode, published at `/v1`.
+- **8081 `mcp-public`** — `apiKey` in strict mode, published at `/mcp`.
+- **8082 `internal`** — no auth, ClusterIP only, never routed.
 
-`mode: strict` rejects unkeyed callers; per-client `allowedModels` limits which
-aliases a key may reach.
+Auth sits at the **gateway** level rather than on the `llm:`/`mcp:` blocks,
+because `llm.policies` and `mcp.policies` apply to every gateway they attach to.
+Port-level placement is therefore the only split that is a real boundary; a
+hostname split would not be, since the `Host` header is client-controlled.
+
+`mode: strict` matters. The default is `optional`, which validates a key when one
+is present and lets unauthenticated requests through.
+
+Keys are minted by `infra/terraform/bootstrap/agentgateway-clients.tf` into the
+`home-ops` vault — one item per client, consumed as `keys[].key` by environment
+substitution. A key's `metadata` carries the client identity, and that becomes the
+CEL variable `apiKey.client`, which the model allow-lists and the MCP
+authorization rules are written against. Clients send it as
+`Authorization: Bearer <key>`; the gateway strips it before forwarding.
+
+`SESSION_KEY` comes from the `agentgateway-session` Secret. Without it MCP session
+IDs are base64 rather than encrypted, which discloses the multiplexed target names
+to any client that can read its own session id.
+
+### Clients
+
+| Client         | 1Password item | Models                                      | MCP targets                                |
+| -------------- | -------------- | ------------------------------------------- | ------------------------------------------ |
+| `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash` | `home-assistant` (read-only)               |
+| `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                       | `home-assistant`, `home-assistant-control` |
+
+Claude is deliberately absent from both allow-lists: it is the paid subscription,
+and a leaked client key should not be able to spend it. `allowedModels` also
+filters `/v1/models`, and a disallowed model is refused before any provider is
+contacted.
+
+### Verified live
+
+After the auth landed, from inside the cluster: 8080 and 8081 both return `401
+authentication failed` with no key, and 8080 also rejects the literal string
+`${GROK_API_KEY}`. That second one is the useful one — a literal placeholder would
+have been a known-plaintext key, so a 401 proves the substitution happened.
+
+## Public door
+
+`llm.waltr.tech` serves both surfaces: `/v1` → 8080, `/mcp` → 8081. The HTTPRoute
+attaches to `envoy-external`, and external-dns publishes only routes attached to
+that gateway, so the route is the entire publish step — no Terraform record and no
+tunnel edit. The tunnel carries `*.waltr.tech` to that gateway with SNI
+`external.waltr.tech`. Unpublishing is deleting `app/httproute.yaml`.
+
+8082 is deliberately not routed: it stays on the ClusterIP Service for in-cluster
+callers, which is what the Hermes agent's own model config points at.
 
 ## MCP
 
-The chart's other gateway (`gateways.mcp` on 8081, `routes[].backends[].mcp`) is
-where the MCP servers get multiplexed behind one endpoint. Not configured yet — that
-arrives with the MCP set, and each route gets its own `urlRewrite` plus an
-`mcpAuthorization` CEL rule.
+8081 multiplexes four servers behind one endpoint — `flux`, `kubectl`,
+`home-assistant`, `mikrotik` — returning 197 tools in a single `tools/list` page
+with no cursor. Per-client subsets come from `mcpAuthorization` CEL rules, and a
+denied tool is hidden from `tools/list` rather than refused when called, so a
+client only ever sees its own surface.
+
+Tool arguments are not visible to `mcpAuthorization`. Argument-level rules would
+belong to `mcpGuardrails`, which filters content rather than identity.
