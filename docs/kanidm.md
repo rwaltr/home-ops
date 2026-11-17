@@ -81,9 +81,8 @@ the UI, then change the passwords there.
 The server image is **pinned** (`kanidm/server:1.11.2`) because the operator's
 default is `:latest`, and `latest` is one minor version ahead of what kaniop
 0.23.0 can drive. Kaniop's client SDK is 1.11.2; Kanidm 1.12 support is an open
-upstream issue. The mismatch is quiet and ugly rather than loud: the operator
-could _create_ an entry but not _read it back_, so it decided every object was
-missing and retried the create, which the server then refused with 403.
+upstream issue. Keep the pin and bump it deliberately, with the SDK version
+checked against it.
 
 Do not trust the operator's own compatibility field after a bump — it reported
 the 1.12.1 image as `compatible / upgrade-check passed` while `kanidmd domain
@@ -91,11 +90,28 @@ upgrade-check` was failing to exec inside the pod. The check that exists to catc
 exactly this mismatch degrades to a pass. Compare the image tag against kaniop's
 `kanidm_client` version by hand.
 
-**Kanidm cannot be downgraded once its database has migrated.** Moving to a newer
-server line therefore means starting from a fresh volume: delete the PVC and the
-`-admin-passwords` Secret, then let the operator re-initialise. Both are
-disposable — the Secret is regenerated and identity resources are re-created from
-git.
+A version mismatch is _not_ what produced the `403 AccessDenied` loop this cluster
+spent an evening in — that was the group resource described under Accounts. Worth
+keeping straight, because the symptom is identical and the fix is unrelated.
+
+**Kanidm cannot be downgraded once its database has migrated**, so moving server
+lines means starting from a fresh volume. The recipe has two steps that are easy
+to get wrong:
+
+1. **Delete the PVC explicitly.** Deleting the `Kanidm` resource does _not_ delete
+   the volume: a StatefulSet's default PVC policy is `Retain`, so a fresh-looking
+   cluster comes up on the old database and reproduces the exact failure you were
+   trying to clear. Delete the pod first — `kubectl delete pvc` blocks until the
+   volume is released, so a `pvc && pod` chain never reaches the second command —
+   and let the StatefulSet build a new PVC from the template.
+2. **Delete the `-admin-passwords` Secret.** The operator defines its `Initialized`
+   condition as `AdminSecretExists` and only runs `recover-account` when that
+   condition is false. A surviving Secret therefore means the operator keeps
+   authenticating with the dead database's credentials and every reconcile fails
+   with `AuthenticationFailed`. Deleting it is the trigger, not a cleanup detail.
+
+Both are disposable — the Secret is regenerated and identity resources are
+re-created from git.
 
 Two settings are load-bearing rather than stylistic: `storage.volumeClaimTemplate`
 (the operator's default is an **EmptyDir**, so omitting it puts the identity
