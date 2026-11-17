@@ -76,6 +76,24 @@ reachable from the internet until a second route is added on purpose.
 The apex itself stays free — the login page is on the subdomain, so nothing about
 this layout claims `waltr.tech` for the IdP.
 
+The gateway-to-server hop has its own trap. Kaniop generates a `BackendTLSPolicy`
+whose `validation.hostname` defaults to `spec.domain` — the **realm** — so with the
+realm at the apex and the server at the subdomain it asks envoy to validate a
+certificate issued for `idm.waltr.tech` against the name `waltr.tech`. The
+handshake fails and the route answers **503** while reporting `Accepted=True`,
+`ResolvedRefs=True` and a ready backend pod; only Kanidm's log admits it
+(`Failed to create TLS stream ... AlertReceived(CertificateUnknown)`). The CR names
+`validation.hostname` explicitly to keep the two in agreement.
+
+The gateway-to-server hop has its own trap. Kaniop generates a `BackendTLSPolicy`
+whose `validation.hostname` defaults to `spec.domain` — the **realm** — so with the
+realm at the apex and the server at the subdomain it asks envoy to validate a
+certificate issued for `idm.waltr.tech` against the name `waltr.tech`. The
+handshake fails and the route answers **503** while reporting `Accepted=True`,
+`ResolvedRefs=True` and a ready backend pod; only Kanidm's log admits it
+(`Failed to create TLS stream ... AlertReceived(CertificateUnknown)`). The CR names
+`validation.hostname` explicitly to keep the two in agreement.
+
 The operator recovers the built-in `admin` and `idm_admin` accounts on first
 initialisation and writes the generated passwords to the `kanidm-admin-passwords`
 Secret in the `identity` namespace. They are Secrets, so the agent cannot read
