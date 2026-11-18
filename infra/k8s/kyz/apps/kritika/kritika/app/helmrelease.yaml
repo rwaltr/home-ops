@@ -23,9 +23,13 @@ spec:
         forgejo:
           host: git.waltr.tech
           accounts: [rwaltr]
-          # audience / runnerAudience come once the `kritika` user's Authorized
-          # Integrations exist: Forgejo fetches this key's public half while
-          # saving them, so kritika must be serving it first (docs/kritika.md).
+          # The `kritika` user's Authorized Integrations (docs/kritika.md). Not
+          # secret; Forgejo shows them once saved, and saving needs kritika
+          # already serving this key's public half — hence a second commit.
+          # `kritika`: read:user, write:repository, write:issue.
+          audience: u:3:8cb5d4f9-f44c-4abf-b279-7ffb30b73328
+          # `kritika-runner`: read:repository — what runner pods fetch with.
+          runnerAudience: u:3:6e468aaf-d16a-466e-a217-06d218c2a874
           privateKey: { env: FORGEJO_PRIVATE_KEY }
           webhookSecret: { env: FORGEJO_WEBHOOK_SECRET }
       providers:
