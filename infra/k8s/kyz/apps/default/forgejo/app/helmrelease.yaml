@@ -30,8 +30,14 @@ spec:
   values:
     image:
       # The chart appends `-rootless` itself (image.rootless defaults true).
-      tag: 15.0.11
-      digest: sha256:3cd6bc2b74c87cbde0a0fd527c9665cb416f5a0540dee54fe5afb3fa2df9f40c
+      #
+      # Ahead of the chart (which ships 15 LTS) on purpose: kritika's Forgejo
+      # connection needs Authorized Integrations, new in 16. 16 is EOL, so 17 —
+      # non-LTS, supported to 2027-01-28; bump each quarter until 19 LTS (2027-04).
+      # Not 17.0.0: it breaks pushes to existing branches (forgejo#14866).
+      # The DB migration is one-way. Snapshot `forgejo-pre-v17` is the way back.
+      tag: 17.0.1
+      digest: sha256:5ef02fbcf22beef56b8c844952ffad58cfe177b6f98e46e6abb5df90b88dc8d3
     deployment:
       annotations:
         reloader.stakater.com/auto: "true"
@@ -120,9 +126,9 @@ spec:
           DEFAULT_KEEP_EMAIL_PRIVATE: true
         oauth2_client:
           ENABLE_AUTO_REGISTRATION: true
-          # Local part of the mail claim (rwaltr@waltr.tech -> rwaltr). Forgejo 15
-          # rejects `preferred_username` (newer releases only) and falls back to
-          # `nickname`, a claim Kanidm does not send. Revisit on a Forgejo bump.
+          # Local part of the mail claim (rwaltr@waltr.tech -> rwaltr). Only
+          # affects new accounts; `preferred_username` works from 16 on, but the
+          # two give the same name here, so there is nothing to change.
           USERNAME: email
           # An existing local account with the same address is linked, not duplicated.
           ACCOUNT_LINKING: auto
