@@ -11,9 +11,15 @@
     "local>rwaltr/home-ops//.renovate/labels",
   ],
   suppressNotifications: ["prIgnoreNotification"],
-  // keep PRs current so the whole-repo oxfmt check always sees the
-  // formatted tree; auto-rebases stale PRs instead of only conflicted ones
-  rebaseWhen: "behind-base-branch",
+  // Rebase only on conflict. "behind-base-branch" re-ran lint on every open PR
+  // after each merge to master; on one node that saturated the NVMe for an hour.
+  // A PR's lint can be a little stale against master, which is fine here.
+  rebaseWhen: "conflicted",
+  // The home-operations preset turns rate limits off (:disableRateLimiting);
+  // put them back so a first run or a big release day doesn't open 50 PRs at
+  // once, each starting a ~2 GB lint job.
+  prConcurrentLimit: 10,
+  prHourlyLimit: 5,
   // Forgejo branch protection (lint + 1 approval, no pushes) refuses branch
   // automerge, so automerge goes through PRs: Renovate opens one and asks
   // Forgejo to merge it once its checks succeed. kritika is the approval —

@@ -55,6 +55,21 @@ PRs that don't match an automerge rule, and every PR from anyone else, wait
 for you. A later kritika review that finds a problem withdraws its approval,
 and a new push dismisses stale approvals.
 
+## Load limits
+
+All of this runs on one node, and every PR starts a lint job that installs
+the whole mise toolset, about 2 GB of disk I/O. Renovate's first run opened
+49 PRs at once, and `rebaseWhen: behind-base-branch` re-linted each of them
+after every merge. That kept the NVMe 70–80% busy, with load around 20, for
+over an hour. `.renovaterc.json5` now sets:
+
+- `rebaseWhen: "conflicted"`: a PR is rebased only when it conflicts.
+  Branch protection doesn't require PRs to be up to date, so automerge
+  still works.
+- `prConcurrentLimit: 10` and `prHourlyLimit: 5`: these override the
+  preset's `:disableRateLimiting`. Updates beyond the limit wait on the
+  Dependency Dashboard.
+
 ## Webhooks
 
 There is one **user-level** webhook on `rwaltr`, so it covers every repo,
