@@ -28,7 +28,8 @@ bot/human ──push/PR──▶ Forgejo (git.waltr.tech) ──review+lint─�
 - Internal only: `envoy-internal`, no `envoy-external`, so no public DNS. HTTPS git
   only; the SSH server is off.
 - Login is Kanidm (`oauth2client.yaml`). Accounts are auto-created on first login
-  with the short username (`rwaltr`). Members of the Kanidm group `forgejo_admins`
+  with the local part of the Kanidm mail address as the username (`rwaltr`), so
+  every person account needs `mail` set — see docs/kanidm.md. Members of the Kanidm group `forgejo_admins`
   (`identity/resources/app/group-forgejo-admins.yaml`) are site admins.
 - Break-glass admin: `forgejo-admin`, password generated into the `forgejo-admin`
   Secret on first install. Use it only for bot accounts and recovery.

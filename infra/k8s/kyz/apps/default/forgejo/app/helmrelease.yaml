@@ -120,8 +120,10 @@ spec:
           DEFAULT_KEEP_EMAIL_PRIVATE: true
         oauth2_client:
           ENABLE_AUTO_REGISTRATION: true
-          # Use Kanidm's short name (rwaltr), not the SPN.
-          USERNAME: preferred_username
+          # Local part of the mail claim (rwaltr@waltr.tech -> rwaltr). Forgejo 15
+          # rejects `preferred_username` (newer releases only) and falls back to
+          # `nickname`, a claim Kanidm does not send. Revisit on a Forgejo bump.
+          USERNAME: email
           # An existing local account with the same address is linked, not duplicated.
           ACCOUNT_LINKING: auto
           OPENID_CONNECT_SCOPES: openid profile email groups
