@@ -1,7 +1,11 @@
-# Cluster alerting and the agent alert feed
+# Cluster alerting
 
 How alerts travel in this cluster: what raises them, which receiver they land on,
-and how Teletran is woken by the same feed that reaches rwaltr's phone.
+and what happens to a page.
+
+**The agent alert feed (Alertmanager → Teletran) was removed on 2026-11-17** at
+rwaltr's request. Routing is notifications-only again; the removal record and the
+restore recipe are at the bottom of this file.
 
 ## Sources
 
@@ -15,7 +19,9 @@ and how Teletran is woken by the same feed that reaches rwaltr's phone.
    `infra/k8s/kyz/apps/flux-system/flux-instance/app/notifications.yaml`.
 
 A review built only from Prometheus therefore under-counts. The
-`cluster-alert-review` skill carries the query set and the counting rules.
+`cluster-alert-review` skill carries the query set and the counting rules; it is
+still the method to use for an on-request review, it just no longer runs itself
+off the feed.
 
 ## Receivers and routing
 
@@ -28,96 +34,50 @@ The live routing table is generated from the `AlertmanagerConfig` CR in
 - `blackhole` — deliberately silent, still visible in the Alertmanager UI and in
   Prometheus. Used for `InfoInhibitor`, `Watchdog`, and Unmanic's by-design CPU
   alerts. Blackholing is a routing decision, never a silence or a deleted rule.
-- `hermes` — the agent feed (below).
 
 Route order matters, because Alertmanager evaluates siblings first-match-wins and
 **falls back to the parent receiver only when no child matched**:
 
-- the three blackhole routes come first, so blackholed alerts never reach the
-  agent;
-- `hermes` (no matchers, `continue: true`) then wakes Teletran for every
-  non-blackholed alert and keeps matching;
-- `pushover` for `severity=critical`, then an explicit `pushover` catch-all —
-  the pair reproduces exactly the paging behaviour that predates the agent feed
-  (one notification per alert, critical or not). The catch-all is required:
-  without it the `hermes` child would match first and the root receiver's
-  fallback would never run, silently removing warning-grade pages.
+- the three blackhole routes come first, so blackholed alerts never dispatch at
+  all;
+- `pushover` for `severity=critical`;
+- an explicit `pushover` catch-all after it — one notification per alert,
+  critical or not. The root receiver is also `pushover`, so this child is
+  redundant in effect and kept only so the paging path does not depend on the
+  root-fallback rule.
 
-## The agent feed
+## The job
 
-Alertmanager cannot sign a Hermes webhook route — it sends no HMAC header, and a
-Hermes route refuses an unauthenticated request on a non-loopback bind — so the
-feed is not a webhook route. It is a **bearer-authenticated trigger into the
-gateway API server**:
+`alert-feed-triage` is a Hermes cron job (id `aa9524f0f633`), not a manifest. It
+lives in the Hermes cron store (`/opt/data/cron/jobs.json` on the data PVC),
+which is agent state rather than git, and it is **paused**. Its record is kept
+rather than deleted so a restore does not have to recreate it — a recreated job
+mints a new id, and any URL pointing at the old one gets a `404`. List it with
+`cronjob_manage action=list` or `GET /api/jobs` (bearer-authenticated).
 
-    POST http://hermes.default.svc.cluster.local:8642/api/jobs/aa9524f0f633/run
-    Authorization: Bearer <API_SERVER_KEY>
-
-- The token comes from `externalsecret-hermes-trigger.yaml` in the same app
-  directory, which reads the **same 1Password field the Hermes pod itself
-  authenticates against** (`hermes` / `api_server_key`). No new credential is
-  minted and no owner step is involved.
-- `sendResolved: false`: one wake-up per firing group; the resolved follow-up
-  would only re-run the triage to report that something stopped.
-- The Alertmanager webhook body is deliberately ignored. The endpoint's optional
-  `prompt` field is the only thing it would read, and Alertmanager cannot
-  template its webhook body — so the job re-derives the state from Prometheus and
-  Alertmanager instead, which is the method `cluster-alert-review` already uses
-  and which sees a cascade as one incident rather than one payload at a time.
-
-### The job
-
-`alert-feed-triage` is a Hermes cron job, not a manifest:
-
-- fired on demand by the route above (the normal path), or by its own weekly
-  schedule (Monday 09:00) as a fallback sweep;
-- loads the `cluster-alert-review` skill, reports to the Discord DM;
-- continuity is on, so a run can see what the previous run already reported;
-- the Hermes scheduler claims each job at most once at a time, so a burst of
-  alert groups collapses into one run instead of a queue of them.
-
-**The job id in the URL is the coupling.** The job lives in the Hermes cron
-store (`/opt/data/cron/jobs.json` on the data PVC), which is agent state rather
-than git. Recreating the job mints a new id, and the Alertmanager URL then points
-at nothing: the trigger gets a `404`, Alertmanager logs a failed notification, and
-the feed goes quiet. Update the `url` line in `alertmanagerconfig.yaml` in the
-same session the job is recreated. List it with `cronjob_manage action=list` or
-`GET /api/jobs` (bearer-authenticated).
-
-## Verifying the feed
-
-1. `flux get ks -n o11y` — the app reconciled to the merge commit.
-2. `GET /api/v2/status` → `config.original`: the `hermes` route and receiver
-   present, with the bearer credentials resolved.
-3. `GET /api/v2/alerts/groups` — a firing group's `receiver` field names the
-   receiver it actually dispatches to. This is the end-to-end check; the config
-   can be right while an existing group still points at the old receiver.
-4. Alertmanager pod log — a trigger that landed shows the job POST; the failure
-   modes below show up here first.
-5. The job's own record: `/opt/data/cron/executions.db` and
-   `/opt/data/cron/output/aa9524f0f633/`.
+Pausing the job alone was not sufficient to stop the triage: the trigger endpoint
+(`POST /api/jobs/<id>/run`) un-pauses the job it fires — it writes `enabled:
+true, state: scheduled, paused_at: null` — so a single firing alert would have
+re-armed it. The route removal below is what makes the disable durable.
 
 ## Paging budget
 
 The standing target is **no more than three alerts a day reaching rwaltr**. A page
-is a notification dispatched to the human-facing receiver — `pushover` today, and
-Teletran's own reports count the same way, because they land on the same phone.
-This integration is therefore additive by design: Teletran is woken by the feed
-and decides what is worth saying, but it does not replace or mute the pushover
-path, and the budget is still measured against the pushover send counter
+is a notification dispatched to the human-facing receiver — `pushover` today —
+and anything the agent sends unprompted lands on the same phone and counts the
+same way. With the feed removed nothing wakes the agent on its own, so the budget
+is now exactly the pushover send counter
 (`cluster-alert-review` → `references/paging-budget.md`).
 
 ## Failure modes
 
-- **Feed silent, alerts still firing.** Job id mismatch (404), the Hermes pod
-  mid-roll (`POST` refused), or the API server unreachable from `o11y`. In every
-  case Alertmanager logs a failed notification and raises
-  `AlertmanagerFailedToSendAlerts`; that alert itself routes to `hermes`, so it
-  wakes the agent rather than hiding the gap.
-- **A trigger during a run is refused, not queued.** That is the at-most-once
-  claim doing natural coalescing on a cascade.
-- **Do not** replace a blackhole with a silence or a deleted rule to quieten the
-  agent feed. Only the notification is unwanted; the condition is real.
+- **A page that never arrives.** Read the Alertmanager log for the failing
+  integration and its transport error before touching the receiver config;
+  `AlertmanagerFailedToSendAlerts` / `AlertmanagerClusterFailedToSendAlerts` are
+  transport failures, not receiver-config failures.
+- **Do not** replace a blackhole with a silence or a deleted rule to quieten
+  something. Only the notification is unwanted; the condition is real. The
+  blackhole already covers that case, permanently and visibly.
 
 ## Silences
 
@@ -136,11 +96,48 @@ from the operator's HelmRelease and cannot be in the same apply.
   practice; a Silence CR with no end date is a permanent mute that nobody will
   remember to remove. Delete the CR once its window has passed rather than
   leaving expired objects in the tree.
-- **The comment is the coordination channel.** The alert-triage agent reads
-  `/api/v2/silences` when it triages, so a silence whose comment names the work
+- **The comment is the coordination channel.** A review reads
+  `/api/v2/silences`, so a silence whose comment names the work
   ("bjw-s parity deployment series in progress") is how it learns that a firing
   alert is expected churn rather than a new incident. Keep that comment accurate.
 - **Temporary silences can also be created over the Alertmanager API**
   (`POST /api/v2/silences`) when a CR cannot land yet — but that state lives
-  outside git and must be expired by hand (`PUT /api/v2/silence/<id>` with an
-  `endsAt` in the past).
+  outside git and must be expired by hand (`DELETE /api/v2/silence/<id>`; the v2
+  API has no `PUT` for a silence).
+
+## Removal record: the agent alert feed (2026-11-17)
+
+The feed woke a Hermes cron job for every non-blackholed alert; the job re-derived
+state from Prometheus and Alertmanager and reported to the phone. It was not a
+webhook route — Alertmanager sends no HMAC header and cannot template one, so a
+Hermes route (which refuses an unauthenticated request on a non-loopback bind)
+could not be the receiver. It was a bearer-authenticated `POST` to the gateway API
+server's `POST /api/jobs/<id>/run`, credentialed from the 1Password field
+`hermes` / `api_server_key`.
+
+Removed in git:
+
+- the `hermes` route child (no matchers, `continue: true`) and the `hermes`
+  receiver in
+  `infra/k8s/kyz/apps/o11y/kube-prometheus-stack/app/alertmanagerconfig.yaml`;
+- `externalsecret-hermes-trigger.yaml` and its line in the app
+  `kustomization.yaml`.
+
+Because Alertmanager's siblings are first-match-wins and a route's own receiver
+is used only when **no child matched**, the bare catch-all `hermes` child was the
+reason the explicit `pushover` catch-all existed: a child matching everything
+would otherwise have silently stopped warning-grade alerts from paging. That
+catch-all is kept.
+
+Two steps git cannot do:
+
+- The External Secrets operator's default `deletionPolicy` is `Retain`, so the
+  `hermes-alert-trigger` Secret in `o11y` outlives its ExternalSecret. It holds
+  the gateway API key and should be deleted by hand:
+  `kubectl -n o11y delete secret hermes-alert-trigger`.
+- The Hermes cron job `alert-feed-triage` (`aa9524f0f633`) is paused, not deleted
+  (`cronjob_manage action=pause`).
+
+To restore: revert the removal commit, then `cronjob_manage action=resume` the
+job. The restored route's `url` must carry the job's id — `aa9524f0f633` while
+the existing record is kept.
