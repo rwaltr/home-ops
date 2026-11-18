@@ -38,7 +38,7 @@ spec:
             # Same image as the app: it ships python3 + CA certs but no curl/wget.
             image:
               repository: docker.io/rhasspy/wyoming-piper
-              tag: 2.5.2@sha256:7d39aafac409c2b6b09d999ed04d84c311d632e558b35baa60fad6aac722af7a
+              tag: 2.5.4@sha256:333622ab9e4bcd00c80a37219b90a1a9d6aa3fd1ad34e0a6e3bddd36ee999efd
             command:
               - /usr/src/.venv/bin/python3
               - -c
@@ -111,7 +111,7 @@ spec:
           app:
             image:
               repository: docker.io/rhasspy/wyoming-piper
-              tag: 2.5.2@sha256:7d39aafac409c2b6b09d999ed04d84c311d632e558b35baa60fad6aac722af7a
+              tag: 2.5.4@sha256:333622ab9e4bcd00c80a37219b90a1a9d6aa3fd1ad34e0a6e3bddd36ee999efd
             # docker_run.sh already passes --uri tcp://0.0.0.0:10200 and
             # --data-dir /data; only the default voice is ours to set. Other
             # voices in /data are advertised and selectable per request.
