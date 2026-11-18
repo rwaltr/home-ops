@@ -1,0 +1,39 @@
+---
+# Forgejo's OAuth2 client in Kanidm, managed by the kaniop operator.
+#
+# Confidential, and PKCE stays enforced: Forgejo has sent a code challenge for
+# openidConnect sources since forgejo#3307. One caveat from upstream reports: the
+# very first login after the source is *created* can skip PKCE, because the provider
+# is registered after the request decided not to send one. If that first attempt
+# fails with "No PKCE code challenge", retry once — it is not a misconfiguration.
+#
+# The chart's `gitea.oauth[].existingSecret` reads fixed keys `key` and `secret`,
+# hence the aliases.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: forgejo
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Forgejo
+  origin: https://git.waltr.tech
+  # /user/oauth2/<source name>/callback — <source name> is `gitea.oauth[0].name`
+  # in the HelmRelease. Rename one, rename both.
+  redirectUrl:
+    - https://git.waltr.tech/user/oauth2/kanidm/callback
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true
+  secretKeyAliases:
+    clientId:
+      - key
+    clientSecret:
+      - secret

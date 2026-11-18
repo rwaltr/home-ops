@@ -1,0 +1,147 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Forgejo — the forge where bots push, review and merge. GitHub becomes a push
+# mirror of master that Flux reads, so the source of truth survives the cluster
+# going down. See docs/forgejo.md for the flow and the cutover order.
+#
+# Internal only (envoy-internal): every writer is in-cluster or on the LAN/tailnet,
+# and nothing on the internet needs to reach it. HTTPS git only — the SSH server is
+# off because there is no route for it and tokens cover every client.
+#
+# SQLite on one PVC, backed up by kopiur like every other app. Same reasoning as
+# Kanidm: one writer, one node, no database operator to keep alive.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: forgejo
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: forgejo
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    image:
+      # The chart appends `-rootless` itself (image.rootless defaults true).
+      tag: 15.0.11
+      digest: sha256:3cd6bc2b74c87cbde0a0fd527c9665cb416f5a0540dee54fe5afb3fa2df9f40c
+    deployment:
+      annotations:
+        reloader.stakater.com/auto: "true"
+    podSecurityContext:
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+    resources:
+      requests:
+        cpu: 20m
+        memory: 256Mi
+      limits:
+        # No CPU limit: git pack operations are bursty. Memory capped (no swap).
+        memory: 1Gi
+    persistence:
+      enabled: true
+      # Pinned name: the kopiur component in ks.yaml refers to it.
+      claimName: forgejo-data
+      size: 10Gi
+      storageClass: openebs-hostpath
+    httpRoute:
+      enabled: true
+      annotations:
+        gatus.home-operations.com/endpoint: |-
+          conditions: ["[STATUS] == 200"]
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/name: Forgejo
+        gethomepage.dev/description: Git forge
+        gethomepage.dev/group: Utilities
+        gethomepage.dev/icon: forgejo.png
+      parentRefs:
+        - name: envoy-internal
+          namespace: network
+      hostnames:
+        - git.waltr.tech
+      # The gateway terminates TLS, so ROOT_URL is rendered as https://.
+      terminate: true
+    gitea:
+      # Local break-glass admin. The chart generates the password into the
+      # `forgejo-admin` Secret on first install and leaves it alone afterwards;
+      # day-to-day login is Kanidm. Not `admin` — Forgejo reserves that name.
+      admin:
+        username: forgejo-admin
+        email: forgejo-admin@waltr.tech
+        passwordMode: initialOnlyNoReset
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+      oauth:
+        # `name` is the source name and part of the callback path registered in
+        # oauth2client.yaml — rename both together.
+        - name: kanidm
+          provider: openidConnect
+          existingSecret: forgejo-kanidm-oauth2-credentials
+          autoDiscoverUrl: https://idm.waltr.tech/oauth2/openid/forgejo/.well-known/openid-configuration
+          scopes: openid profile email groups
+          groupClaimName: groups
+          # Kanidm releases groups as `name@realm` (short names are only applied
+          # to the username via preferShortUsername).
+          adminGroup: forgejo_admins@waltr.tech
+      config:
+        APP_NAME: Forgejo
+        server:
+          # No SSH: no route exists for it, and HTTPS + tokens covers bots and humans.
+          DISABLE_SSH: true
+          START_SSH_SERVER: false
+          LANDING_PAGE: login
+        service:
+          # Accounts come from Kanidm only. Bot accounts are created by the
+          # break-glass admin (`forgejo admin user create`) — see docs/forgejo.md.
+          DISABLE_REGISTRATION: false
+          ALLOW_ONLY_EXTERNAL_REGISTRATION: true
+          SHOW_REGISTRATION_BUTTON: false
+          REQUIRE_SIGNIN_VIEW: true
+          DEFAULT_KEEP_EMAIL_PRIVATE: true
+        oauth2_client:
+          ENABLE_AUTO_REGISTRATION: true
+          # Use Kanidm's short name (rwaltr), not the SPN.
+          USERNAME: preferred_username
+          # An existing local account with the same address is linked, not duplicated.
+          ACCOUNT_LINKING: auto
+          OPENID_CONNECT_SCOPES: openid profile email groups
+        repository:
+          DEFAULT_BRANCH: master
+          DEFAULT_PRIVATE: private
+        mirror:
+          # Push mirror to GitHub (the Flux source) runs on every push via
+          # sync_on_commit; this is only the fallback interval.
+          DEFAULT_INTERVAL: 8h
+          MIN_INTERVAL: 10m
+        actions:
+          ENABLED: true
+          # `uses: actions/checkout@...` resolves against GitHub, so existing
+          # workflows keep working unchanged.
+          DEFAULT_ACTIONS_URL: https://github.com
+        session:
+          COOKIE_SECURE: true
+        security:
+          # Envoy pods live in the k0s pod CIDRs; trust their X-Forwarded-For.
+          REVERSE_PROXY_TRUSTED_PROXIES: 10.244.0.0/16,fdad:207a:f1ab:244::/108
+        cron.update_checker:
+          ENABLED: false

@@ -38,6 +38,7 @@ resources:
   - ./litellm/ks.yaml
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
+  - ./forgejo/ks.yaml
   - ./navidrome/ks.yaml
   - ./kavita/ks.yaml
   - ./audiobookshelf/ks.yaml
