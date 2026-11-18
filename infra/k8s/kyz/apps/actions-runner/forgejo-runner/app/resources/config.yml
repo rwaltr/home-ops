@@ -1,0 +1,34 @@
+# forgejo-runner 13 config. The connection (url/uuid/token) comes from daemon flags
+# in the HelmRelease, so there is deliberately no `server.connections` here — the
+# runner refuses to start when both are set.
+log:
+  level: info
+  job_level: info
+
+runner:
+  # Two concurrent jobs: single node, and every job shares the one DinD daemon.
+  capacity: 2
+  timeout: 1h
+  shutdown_timeout: 5m
+  fetch_interval: 5s
+  # `runs-on: ubuntu-latest` maps to catthehacker's act image (node, git, curl,
+  # docker cli) so GitHub-style workflows run unchanged.
+  labels:
+    - ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-24.04
+    - ubuntu-24.04:docker://ghcr.io/catthehacker/ubuntu:act-24.04
+    - docker:docker://code.forgejo.org/oci/node:22-bookworm
+
+cache:
+  # Built-in actions/cache server, on the runner pod's ephemeral volume.
+  enabled: true
+  dir: /data/cache
+
+container:
+  # Job containers live on the DinD daemon's bridge network, isolated from the
+  # pod network except through the runner's own egress.
+  network: ""
+  privileged: false
+  valid_volumes: []
+  # Jobs do not get the Docker socket.
+  docker_host: "-"
+  force_pull: false

@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: _
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    # The DinD sidecar is privileged; keep it out of every app namespace.
+    pod-security.kubernetes.io/enforce: privileged

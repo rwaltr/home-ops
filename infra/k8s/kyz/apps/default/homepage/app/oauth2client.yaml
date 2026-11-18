@@ -16,6 +16,14 @@ spec:
     name: kanidm
     namespace: identity
   displayname: Homepage
+  # Kanidm signs ID tokens with ES256. Homepage's NextAuth v4 provider verifies
+  # them through openid-client, which assumes RS256 unless the OAuth client
+  # metadata says otherwise — and Homepage exposes no way to say otherwise. Every
+  # callback therefore fails with `unexpected JWT alg received, expected RS256,
+  # got: ES256` and no one can log in. This is the only lever: Kanidm then offers
+  # RS256 for this client (and stops offering ES256 for it). Per-client, so it
+  # costs the other integrations nothing. See docs/homepage.md.
+  jwtLegacyCryptoEnable: true
   origin: https://homepage.waltr.tech
   # NextAuth's callback path, which carries the provider name.
   redirectUrl:

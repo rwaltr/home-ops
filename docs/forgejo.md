@@ -44,6 +44,18 @@ A user who gets admin from the group may need to log out and back in once.
 
 ## Cutover (in order)
 
+Done 2026-11-18 for home-ops, dotfiles, beancount-stack, rwaltpro, branding,
+resume, naming-scheme and waltr-clan-branding: imported with issues/PRs/labels,
+push mirror over an SSH deploy key (all branches + tags, sync on commit, 8h
+interval), and — public repos only, the free plan has no private rulesets — two
+GitHub rulesets (`forgejo-mirror-only-branches` / `-tags`) that only the deploy
+key and repo admins bypass. GitHub Renovate and opencode workflows are disabled.
+
+**Mirror semantics:** Forgejo pushes `--mirror --force`, so GitHub is an exact
+copy. New commits go out on push; **branch deletions only go out at the 8h
+interval** (or _Settings → Mirror → Synchronize now_). Anything written only to
+GitHub is overwritten.
+
 Each step is reversible until step 6.
 
 1. **Merge this, log in** at `https://git.waltr.tech` through Kanidm.
@@ -72,11 +84,25 @@ teletran@waltr.tech --random-password` (exec into the pod as the break-glass
 7. **Close the GitHub side.** Archive open GitHub PRs (or re-open them on Forgejo),
    disable the GitHub `lint`/`meta-*` workflows, and point the README at Forgejo.
 
+## Actions runner
+
+`infra/k8s/kyz/apps/actions-runner/forgejo-runner` — one pod, `forgejo-runner`
+13 plus a **privileged** `docker:dind` sidecar, alone in the `actions-runner`
+namespace (PSA `privileged`) so nothing else shares the blast radius. Jobs run as
+containers on that daemon and never see its socket.
+
+- Labels: `ubuntu-latest` / `ubuntu-24.04` → `ghcr.io/catthehacker/ubuntu:act-24.04`,
+  `docker` → `code.forgejo.org/oci/node:22-bookworm`. GitHub-style workflows run
+  unchanged; `uses:` resolves on github.com.
+- Registration is offline and global: uuid/token minted once with
+  `POST /api/v1/admin/actions/runners` into 1Password item `forgejo-runner`
+  (`uuid`, `token`). No register step, so restarts never duplicate the runner.
+  To rotate: delete the runner in _Site administration → Actions → Runners_,
+  register a new one, update the item.
+- Workflows live in `.forgejo/workflows/` (Forgejo reads that before `.github/`).
+
 ## Not done yet
 
-- **Forgejo runner** (in-cluster, DinD) and `.forgejo/workflows/lint.yml` — the
-  existing `lint.yml` should work as-is since `DEFAULT_ACTIONS_URL` is GitHub.
-  Branch protection's required check waits on this.
 - **Renovate** as an in-cluster CronJob with `platform: forgejo` and its own bot
   account; retire `.github/workflows/renovate.yml` at the same time.
 - **Flux webhook** is unchanged: GitHub still fires the push webhook when the mirror

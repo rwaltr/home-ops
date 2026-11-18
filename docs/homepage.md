@@ -221,6 +221,30 @@ The callback registered with Kanidm is NextAuth's, which carries the provider na
 `HOMEPAGE_OIDC_AUTO_LOGIN` is deliberately left off, so the login page still renders
 and a broken provider leaves a way in rather than a redirect loop.
 
+### Kanidm serves RS256 to this client, on purpose
+
+Kanidm signs ID tokens with **ES256**. Homepage's NextAuth v4 provider hands the
+callback to `openid-client`, which compares the token's `alg` against a client-metadata
+field it defaults to `RS256` — and Homepage exposes no way to set that field. The
+result is a hard login failure, not a warning:
+
+```text
+<nextauth> OAUTH_CALLBACK_ERROR: unexpected JWT alg received, expected RS256, got: ES256
+```
+
+So the `KanidmOAuth2Client` sets `jwtLegacyCryptoEnable: true`, which makes Kanidm sign
+that one client's tokens with RS256 and stop offering ES256 for it (the client's
+discovery document flips to `id_token_signing_alg_values_supported: [RS256]`). It is a
+per-client attribute: every other integration here keeps ES256. NextAuth is the odd one
+out, not Kanidm — the other clients verify whatever alg the token arrives with. RS256 is
+PKCS1 v1.5 SHA-256, the algorithm Entra and Google use, so "legacy" overstates the risk;
+what it does cost is that this client's keys are RSA-only.
+
+Checking it without logging in: fetch
+`https://idm.waltr.tech/oauth2/openid/homepage/.well-known/openid-configuration` and read
+that field. Nothing outside Kanidm changes when the flag flips; a pod restart only drops
+NextAuth's cached discovery document.
+
 The client credentials come from the `KanidmOAuth2Client` in this directory, whose
 `secretKeyAliases` name the variables Homepage reads — so the HelmRelease points each
 variable at the minted Secret without restating any value.

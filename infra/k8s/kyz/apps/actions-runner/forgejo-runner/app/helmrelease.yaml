@@ -1,0 +1,165 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Forgejo Actions runner: forgejo-runner + a Docker-in-Docker sidecar.
+#
+# The DinD sidecar is privileged — dockerd needs it to create namespaces and
+# cgroups for job containers. That is the whole reason this lives in its own
+# `actions-runner` namespace: the blast radius is the node, so nothing else shares
+# the namespace, and the pod gets no service-account token.
+#
+# Only the runner talks to dockerd, over a unix socket on a shared emptyDir; jobs do
+# not get the socket (`container.docker_host: "-"` in config.yml).
+#
+# Registration is offline: uuid + token minted once through the Forgejo admin API
+# into 1Password item `forgejo-runner`. No register step, no .runner file, so a
+# restart never mints a duplicate runner.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: forgejo-runner
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: forgejo-runner
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    fullnameOverride: forgejo-runner
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+    controllers:
+      forgejo-runner:
+        # One pod: its registration is a single runner identity.
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          # Native sidecar (restartPolicy: Always): starts before the runner and
+          # outlives it during shutdown, so in-flight jobs keep their daemon.
+          dind:
+            image:
+              repository: docker.io/library/docker
+              tag: 29.10.0-dind@sha256:4bbc7223f81db790097c6dea42fb93e05b8fead4f0431fbe6ccaba6e8473201c
+            restartPolicy: Always
+            command:
+              - dockerd
+              - --host=unix:///run/dind/docker.sock
+              - --group=1000
+              # Job networks must not collide with the pod (10.244/16) or service
+              # (10.96/12) CIDRs, or job containers cannot reach the cluster.
+              - --default-address-pool=base=172.30.0.0/16,size=24
+            securityContext:
+              privileged: true
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: [docker, --host=unix:///run/dind/docker.sock, info]
+                  periodSeconds: 2
+                  failureThreshold: 30
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                # Job containers count against this sidecar's cgroup.
+                memory: 6Gi
+        containers:
+          app:
+            image:
+              repository: code.forgejo.org/forgejo/runner
+              tag: 13.2.1@sha256:568cea8c15ddc01fc8f330124892f572af7db37fa28344a2c1914405793bf61d
+            command:
+              - forgejo-runner
+              - daemon
+              - --config=/etc/forgejo-runner/config.yml
+              # In-cluster: no hairpin through envoy for the runner's own polling.
+              # Job containers clone through ROOT_URL (https://git.waltr.tech).
+              - --url=http://forgejo-http.default.svc.cluster.local:3000/
+              - --uuid=$(RUNNER_UUID)
+              - --token-url=file:/run/secrets/forgejo-runner/token
+            env:
+              DOCKER_HOST: unix:///run/dind/docker.sock
+              RUNNER_UUID:
+                valueFrom:
+                  secretKeyRef:
+                    name: forgejo-runner
+                    key: RUNNER_UUID
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1000
+              runAsGroup: 1000
+              capabilities:
+                drop:
+                  - ALL
+              seccompProfile:
+                type: RuntimeDefault
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 512Mi
+    persistence:
+      config:
+        type: configMap
+        name: forgejo-runner-config
+        advancedMounts:
+          forgejo-runner:
+            app:
+              - path: /etc/forgejo-runner
+                readOnly: true
+      token:
+        type: secret
+        name: forgejo-runner
+        items:
+          - key: token
+            path: token
+        advancedMounts:
+          forgejo-runner:
+            app:
+              - path: /run/secrets/forgejo-runner
+                readOnly: true
+      dind-sock:
+        type: emptyDir
+        advancedMounts:
+          forgejo-runner:
+            dind:
+              - path: /run/dind
+            app:
+              - path: /run/dind
+      # Runner workdir + actions cache. Scratch: losing it costs a cache miss.
+      data:
+        type: emptyDir
+        advancedMounts:
+          forgejo-runner:
+            app:
+              - path: /data
+      # readOnlyRootFilesystem: the runner stages job archives in /tmp.
+      tmp:
+        type: emptyDir
+        advancedMounts:
+          forgejo-runner:
+            app:
+              - path: /tmp
+      # Image layers + job containers. emptyDir so a restart starts clean; the
+      # limit stops a runaway job from filling the node's disk.
+      docker:
+        type: emptyDir
+        sizeLimit: 50Gi
+        advancedMounts:
+          forgejo-runner:
+            dind:
+              - path: /var/lib/docker
