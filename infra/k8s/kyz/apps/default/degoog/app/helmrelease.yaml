@@ -128,7 +128,7 @@ spec:
           mcp:
             image:
               repository: ghcr.io/degoog-org/mcp
-              tag: 0.3.0@sha256:61c402b08e8a070f3017589552eca4128d1b321ff0cf29aed738bb0267cf60d2
+              tag: 0.4.1@sha256:d8d82d5b8298b23bda4f59155d9850700fe83f6742f77dfb72a7ffee3195cdf2
             env:
               TZ: America/Chicago
               HOME: /tmp
