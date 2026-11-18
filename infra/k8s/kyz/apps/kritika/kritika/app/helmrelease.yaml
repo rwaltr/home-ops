@@ -38,6 +38,11 @@ spec:
           type: openai
           baseUrl: http://litellm.default.svc.cluster.local:4000/v1
           apiKey: { env: LITELLM_API_KEY }
+          # LiteLLM reports no per-call cost, so kritika would show $0. These are
+          # OpenRouter's prices for the model behind the alias, USD per 1M tokens
+          # (from its /api/v1/models, 2026-11-18; re-check if spend looks off).
+          pricing:
+            deepseek-v4.1-flash: { input: 0.0507, output: 0.2028, cacheRead: 0.001 }
       review:
         model: litellm/deepseek-v4.1-flash
       egress:
@@ -83,13 +88,20 @@ spec:
             limits: { memory: 2Gi }
 
     networkPolicy:
-      type: cilium
+      # Plain NetworkPolicies, which Cilium enforces. Not the `cilium` flavor:
+      # its runner policy sends DNS through Cilium's L7 DNS proxy, and on mouse
+      # that proxy takes the queries and never answers (no FQDN cache entries),
+      # so every runner timed out resolving the gateway.
+      # shortcut: runners lose the `*.*.svc.cluster.local` DNS name filter (they
+      # are still confined to DNS + the gateway); retry `cilium` after a Cilium
+      # upgrade, or once the DNS proxy is debugged.
+      type: default
       postgres:
         podSelector:
           cnpg.io/cluster: kritika-postgres
-      # Cilium enforces policy on the translated backend, so a Service or the
-      # gateway VIP is matched as its pods and their container ports — not the
-      # Service port the chart's 443 rule assumes.
+      # Policy applies after Service/VIP translation, so the gateway VIP and
+      # Services are matched as their pods and container ports, not as the
+      # Service port that the chart's 443 rule assumes.
       extraEgress:
         # git.waltr.tech -> envoy-internal pods (Forgejo API, git fetches).
         - to:

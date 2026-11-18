@@ -23,8 +23,8 @@ bot/human ──push/PR──▶ Forgejo (git.waltr.tech) ──review+lint─�
 
 ## Deployment
 
-- `infra/k8s/kyz/apps/default/forgejo` — chart `forgejo-helm` 17.3.2, Forgejo 15
-  rootless, SQLite on a 10Gi `openebs-hostpath` PVC (`forgejo-data`).
+- `infra/k8s/kyz/apps/default/forgejo` — chart `forgejo-helm` 17.3.2 with the image pinned
+  ahead of it to Forgejo **17.0.1** rootless (kritika needs 16+; see docs/kritika.md), SQLite on a 10Gi `openebs-hostpath` PVC (`forgejo-data`).
 - Internal only: `envoy-internal`, no `envoy-external`, so no public DNS. HTTPS git
   only; the SSH server is off.
 - Login is Kanidm (`oauth2client.yaml`). Accounts are auto-created on first login
@@ -56,33 +56,20 @@ copy. New commits go out on push; **branch deletions only go out at the 8h
 interval** (or _Settings → Mirror → Synchronize now_). Anything written only to
 GitHub is overwritten.
 
-Each step is reversible until step 6.
+GitHub had **no** branch protection before the cutover, so nothing was replaced.
 
-1. **Merge this, log in** at `https://git.waltr.tech` through Kanidm.
-2. **Import the repo** (as `forgejo-admin` or yourself): _New migration → GitHub_,
-   `https://github.com/rwaltr/home-ops`, **not** as a mirror, owner `rwaltr`.
-   Re-point your clone: `git remote set-url origin https://git.waltr.tech/rwaltr/home-ops.git`
-   (keep GitHub as a second remote, `github`, for break-glass).
-3. **GitHub credential for the push mirror.** Use a deploy key, not a PAT: scoped to
-   one repo, never expires, no human account.
-   - _Settings → Mirror settings → Push mirror_: remote
-     `git@github.com:rwaltr/home-ops.git`, **Use SSH authentication**, branch
-     filter `master`, **Sync when commits are pushed**, interval `8h`.
-   - Forgejo shows a public key; add it on GitHub as a deploy key **with write**.
-4. **GitHub `master` accepts only the mirror.** Replace the PR-required branch
-   protection with a ruleset on `master`: restrict updates, block force-push, and
-   give the deploy key bypass. Without the bypass every mirror push is rejected.
-5. **Forgejo branch protection on `master`:** require PR, 1 approval, dismiss stale
-   approvals, require the `lint` status check (once the runner exists), no
-   force-push. Forgejo's own push mirror is not affected by this rule.
-6. **Bots move.** Per bot: `forgejo admin user create --username teletran --email
-teletran@waltr.tech --random-password` (exec into the pod as the break-glass
-   admin), then a token with `write:repository` + `write:issue` stored in 1Password
-   and delivered by ExternalSecret. Hermes swaps the `gitcreds` sidecar for that
-   static token and `gh` for `tea`/the API. Add the bot as a repo collaborator
-   (write), **not** an admin, so branch protection still binds it.
-7. **Close the GitHub side.** Archive open GitHub PRs (or re-open them on Forgejo),
-   disable the GitHub `lint`/`meta-*` workflows, and point the README at Forgejo.
+**State now:**
+
+- Forgejo `master` on home-ops is protected. It requires a PR, the
+  `Lint / mise run lint (pull_request)` check and 1 approval. Stale approvals
+  are dismissed, and nobody may push directly. Site admins can still force a
+  merge, which the API exposes as `force_merge`. The push mirror is not
+  affected.
+- Hermes still holds the `teletraan-x` GitHub App. The rulesets reject its
+  GitHub pushes. It moves to a Forgejo bot account with a static token, as a
+  write collaborator and **not** an admin, so branch protection binds it.
+- The GitHub PRs from before the cutover were imported to Forgejo. Close the
+  GitHub copies.
 
 ## Actions runner
 
@@ -99,7 +86,15 @@ containers on that daemon and never see its socket.
   (`uuid`, `token`). No register step, so restarts never duplicate the runner.
   To rotate: delete the runner in _Site administration → Actions → Runners_,
   register a new one, update the item.
-- Workflows live in `.forgejo/workflows/` (Forgejo reads that before `.github/`).
+- Workflows live in `.forgejo/workflows/`. Forgejo reads only that directory when
+  it exists, so the `.github/workflows` jobs stay GitHub-only.
+- The GitHub workflow can't be copied unchanged. On Forgejo, `github.token` and
+  `GITHUB_TOKEN` hold a **Forgejo** job token, and tools that send it to
+  github.com get a 401. That broke mise's attestation checks and zizmor's online
+  audits. `lint.yml` passes no token to mise-action and unsets
+  `GITHUB_TOKEN` for the lint step. `zizmor` rejects an empty value, so it has to
+  be unset. `MISE_SKILLS_FETCH=false` stops the helmfile/pitchfork agent-skill
+  downloads, and `uv` in `.mise.toml` replaces the image's old pipx.
 
 ## Not done yet
 

@@ -68,7 +68,11 @@ kritika's egress gateway also refuses private addresses, so
 
 ## Network policy
 
-The chart's Cilium policies confine runner pods to DNS and kritika's gateway.
+Plain NetworkPolicies (`networkPolicy.type: default`) confine runner pods to
+DNS and kritika's gateway. The chart's `cilium` flavor would also filter DNS
+names, but Cilium's L7 DNS proxy on mouse accepts the queries and never
+answers. Every runner then timed out on `waiting for the gateway`, so that
+flavor is off.
 The serve pods may reach port 443 anywhere, but Cilium matches traffic **after**
 the Service/VIP translation. The serve pods actually hit the envoy-internal
 pods on 10443 and LiteLLM on 4000, so both appear in
