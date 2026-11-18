@@ -2456,6 +2456,30 @@ session. Router-side specifics live in `infra/routeros/README.md`
   discovery — including Thread border router discovery — silently sees only
   `eth0`. See the 2026-09-22 session entry below.
 
+### 2026-11-18 — the alert feed into Teletran is removed
+
+Ask: "disable hermes' connection to alert manager, entirely." Gone from every
+side, not just the noisy half:
+
+- `alertmanagerconfig.yaml` loses the `hermes` route and receiver; the pushover
+  paths and every blackhole are untouched, so routing is back to exactly what it
+  was before 2026-10-30 (critical child, root `pushover` fallback).
+- The `hermes-alert-trigger` ExternalSecret is deleted with its `o11y`
+  kustomization line. One less copy of `hermes` / `api_server_key` in the cluster.
+- The consumer, the `alert-feed-triage` cron job (id `aa9524f0f633`), is deleted
+  from the Hermes cron store via `DELETE /api/jobs/<id>` — the weekly Monday
+  sweep was the other way the agent read Prometheus and Alertmanager on its own,
+  so leaving it would have kept the connection half-open with no route to report
+  through. The `cluster-alert-review` skill stays: it is an on-demand procedure,
+  not a feed.
+- **Lesson**: the paging-budget note said the feed was additive, but an
+  always-firing receiver is drift by construction — it made the routing table
+  truthfully describe a consumer that also had to be deleted out-of-band, and the
+  compensation route (`pushover` catch-all, added only because the catch-all
+  `hermes` child would otherwise swallow warnings) had to be removed with it.
+  Removing (`git revert` of #963, essentially) was cheaper than maintaining the
+  coupling between a git receiver URL and a job id in agent state.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?
