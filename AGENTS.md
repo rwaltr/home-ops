@@ -98,12 +98,16 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/hermes-agent.md` — Hermes agent
 - `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)
 - `docs/beancount-stack.md` — Beancount v3 + Fava (ledger UI, internal-only; example ledger, real data TBD)
+- `docs/pr-review.md` — how a PR is reviewed, and what makes one ready to merge
 - TODOs: `git grep "TODO:"`
 
 ## 🔍 Common Tasks
 
 - **Adding a new service**: add to the Flux GitOps layout under `infra/k8s/kyz/apps/`.
   See the service docs under `docs/`.
+- **Reviewing a PR**: follow `docs/pr-review.md`. The author never reviews their own
+  PR — a separate agent instance does, from the diff, konflate's rendered output and
+  that file.
 - **Checking the cluster's secrets exist**: `mise run secrets:verify` walks every
   ExternalSecret and checks each 1Password item/field it references (labels only,
   never values). It reads the manifests, so it cannot drift from them. It does not
