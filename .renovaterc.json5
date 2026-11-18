@@ -4,7 +4,7 @@
   // helm-values, kubernetes and kustomize managers for infra/k8s/kyz, plus
   // oci:// + "# renovate:" annotated custom managers and container digest handling.
   extends: [
-    "github>home-operations/renovate-presets#8.1.0",
+    "github>home-operations/renovate-presets#12.0.0",
     ":timezone(America/Chicago)",
     // local> resolves on the platform Renovate runs on: Forgejo.
     "local>rwaltr/home-ops//.renovate/autoMerge",
