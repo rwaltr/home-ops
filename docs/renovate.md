@@ -57,13 +57,26 @@ and a new push dismisses stale approvals.
 
 ## Webhooks
 
-The operator adds its own webhook to every discovered repo
-(`webhook.sync.enabled`). That webhook points at
-`https://renovate.waltr.tech/webhook/v1/forgejo`, so ticking a Dependency
-Dashboard or "rebase" checkbox starts a run right away. The webhook is served
-on the UI hostname (`unifiedWebhookHost`) and skips UI auth. It only acts on
-events that carry Renovate's own markers. Forgejo may send webhooks there
-because of `webhook.ALLOWED_HOST_LIST` in the Forgejo HelmRelease.
+There is one **user-level** webhook on `rwaltr`, so it covers every repo,
+including ones added later. It points at
+`https://renovate.waltr.tech/webhook/v1/forgejo` and fires on pull request and
+issue events. Ticking a Dependency Dashboard or "rebase" checkbox starts a run
+right away; without it, the change waits for the hourly run.
+
+The operator's own per-repo webhook sync is off. Forgejo only lets repo
+**admins** manage hooks, and making `renovate` an admin would also exempt it
+from branch protection. The webhook was added once through the API:
+
+```sh
+curl -H "Authorization: token $(fnox get FORGEJO_TOKEN)" -H 'Content-Type: application/json' \
+  -d '{"type":"forgejo","active":true,"events":["pull_request","issues"],"config":{"url":"https://renovate.waltr.tech/webhook/v1/forgejo","content_type":"json"}}' \
+  https://git.waltr.tech/api/v1/user/hooks
+```
+
+The webhook is served on the UI hostname (`unifiedWebhookHost`) and skips UI
+auth. It only acts on events that carry Renovate's own markers. Forgejo may
+send webhooks there because of `webhook.ALLOWED_HOST_LIST` in the Forgejo
+HelmRelease.
 
 ## Policy
 

@@ -50,6 +50,8 @@ spec:
     # reachable on envoy-internal alone; no token to mint or rotate.
     authentication:
       enabled: false
-    # The operator adds/removes its webhook on each discovered repo itself.
+    # No per-repo sync: managing repo hooks needs repo *admin*, which would also
+    # exempt `renovate` from branch protection. One user-level webhook on rwaltr
+    # (docs/renovate.md) covers every repo instead.
     sync:
-      enabled: true
+      enabled: false
