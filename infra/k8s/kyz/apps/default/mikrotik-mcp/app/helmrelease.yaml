@@ -46,7 +46,7 @@ spec:
           identity:
             image:
               repository: ghcr.io/alikarami/mikromcp
-              tag: 1.9.0
+              tag: 1.16.1
             # `envFrom` on the app container does NOT reach an initContainer:
             # env and envFrom are per-container, so the token has to be named
             # here as well. Without it the hash step fails with bcryptjs's
@@ -71,7 +71,7 @@ spec:
           app:
             image:
               repository: ghcr.io/alikarami/mikromcp
-              tag: 1.9.0
+              tag: 1.16.1
             env:
               MIKROMCP_TRANSPORT: http
               MIKROMCP_PORT: "3000"
