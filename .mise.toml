@@ -38,6 +38,10 @@ oxfmt = "0.71.0"
 shellcheck = "latest"
 editorconfig-checker = "latest"
 "npm:markdownlint-cli2" = "latest"
+# uv makes mise install pipx: tools with uv rather than the host's pipx, so CI does
+# not depend on the runner image's pipx (catthehacker ships 1.4.3, which predates
+# `pipx upgrade-shared` and fails `mise install`).
+uv = "latest"
 "pipx:yamllint" = "latest"
 typos = "latest"
 

@@ -20,6 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Agent skills (helmfile, pitchfork) are fetched from raw.githubusercontent.com
+      # and a failed fetch fails `mise install` — and every later mise call, which
+      # re-checks installs. CI never uses skills. Job-level so all steps see it.
+      MISE_SKILLS_FETCH: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,6 +36,14 @@ jobs:
         uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install: true
+          # On Forgejo, `github.token` is a *Forgejo* job token. mise would send it
+          # to github.com, where it is invalid, so the action must not pass it on.
+          github_token: ""
 
       - name: Lint
-        run: mise run lint
+        # GITHUB_TOKEN is the Forgejo job token here. zizmor's online audits send it
+        # to github.com and get a 401; an *empty* value is rejected outright, so it
+        # has to be unset rather than blanked.
+        run: |
+          unset GITHUB_TOKEN
+          mise run lint
