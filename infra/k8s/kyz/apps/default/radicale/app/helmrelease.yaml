@@ -34,7 +34,7 @@ spec:
           bootstrap:
             image:
               repository: ghcr.io/kozea/radicale
-              tag: 3.8.3@sha256:af373da63a9ca4f627de2c818444e6b9b252171e181e08716d2de2f323a10585
+              tag: 3.9.2@sha256:7b3432abfbd5f7513631638ac70cb057f57a5391edb4bd7b09dd6aef3005355a
             command:
               - /bin/sh
               - /etc/radicale/bootstrap.sh
@@ -53,7 +53,7 @@ spec:
           app:
             image:
               repository: ghcr.io/kozea/radicale
-              tag: 3.8.3@sha256:af373da63a9ca4f627de2c818444e6b9b252171e181e08716d2de2f323a10585
+              tag: 3.9.2@sha256:7b3432abfbd5f7513631638ac70cb057f57a5391edb4bd7b09dd6aef3005355a
             # Entrypoint is `/app/bin/python /app/bin/radicale`; these args
             # replace the image CMD (which would otherwise add a [::] listener).
             args:
