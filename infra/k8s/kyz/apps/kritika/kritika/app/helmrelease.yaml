@@ -133,14 +133,17 @@ spec:
       # Services are matched as their pods and container ports, not as the
       # Service port that the chart's 443 rule assumes.
       extraEgress:
-        # git.waltr.tech -> envoy-internal pods (Forgejo API, git fetches).
+        # Both envoy gateways: git.waltr.tech (Forgejo API, git fetches) is on
+        # envoy-internal, and idm.waltr.tech (Kanidm sign-in) is on both, so
+        # split DNS hands out either VIP.
         - to:
             - namespaceSelector:
                 matchLabels:
                   kubernetes.io/metadata.name: network
               podSelector:
                 matchLabels:
-                  gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+                  app.kubernetes.io/name: envoy
+                  app.kubernetes.io/component: proxy
           ports:
             - port: 10443
               protocol: TCP
