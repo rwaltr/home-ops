@@ -6,10 +6,12 @@ kind: Kustomization
 resources:
   - ./apps/actions-runner
   - ./apps/cert-manager
+  - ./apps/cnpg-system
   - ./apps/default
   - ./apps/external-secrets
   - ./apps/flux-system
   - ./apps/identity
+  - ./apps/kritika
   - ./apps/kopiur-system
   - ./apps/kube-system
   - ./apps/network

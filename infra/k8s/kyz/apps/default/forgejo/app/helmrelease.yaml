@@ -153,3 +153,13 @@ spec:
           REVERSE_PROXY_TRUSTED_PROXIES: 10.244.0.0/16,fdad:207a:f1ab:244::/108
         cron.update_checker:
           ENABLED: false
+        # kritika (docs/kritika.md) is reached at its internal hostname, which
+        # resolves to the envoy-internal VIP — a private address that both of
+        # these refuse by default. Named hosts only, never `*` or `private`:
+        # every repo admin can point a webhook anywhere this list allows.
+        webhook:
+          ALLOWED_HOST_LIST: external,kritika.waltr.tech
+        # Forgejo fetches an Authorized Integration issuer's discovery doc and
+        # keys. An allowed domain skips the private-address check.
+        authorized_integration:
+          ALLOWED_DOMAINS: kritika.waltr.tech

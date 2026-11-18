@@ -1,0 +1,74 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/postgresql.cnpg.io/cluster_v1.json
+# kritika's database: Postgres 18 with VectorChord, as kritika's database guide
+# lays it out, cut to one instance — this is a one-node cluster, so a standby
+# would share the node and its disk and protect against nothing.
+#
+# shortcut: no backups. kritika's config lives in git and its code index
+# rebuilds; what is lost with this PVC is review history, findings and usage.
+# Add the Barman Cloud plugin against RustFS if that history starts to matter.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: kritika-postgres
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-standard-bookworm@sha256:30d0a38b6df3da24e89a2cfbe800e422c3ef13fa427aa5523f2a7d3fecb53b34
+  enableSuperuserAccess: false
+  postgresql:
+    extensions:
+      # An image volume (Kubernetes 1.35+, containerd 2.1+; mouse has both).
+      - name: vchord
+        image:
+          reference: ghcr.io/tensorchord/vchord-scratch:pg18-v1.1.1@sha256:bdea43bed2a414e21bbf71767bf6f0739747ac480b267b51772dc214ac28dcb3
+        # The image keeps Debian's paths, not CNPG's /extensions/vchord/*.
+        dynamic_library_path:
+          - /usr/lib/postgresql/18/lib/
+        extension_control_path:
+          - /usr/share/postgresql/18/
+    shared_preload_libraries:
+      - vchord
+  storage:
+    storageClass: openebs-hostpath
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: kritika
+      owner: kritika
+      secret:
+        name: kritika-postgres-credentials
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/postgresql.cnpg.io/database_v1.json
+# The operator creates the extensions as superuser, so the owner never needs it.
+# Move `version` with the vchord-scratch tag: CNPG upgrades the extension to it.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: kritika
+spec:
+  cluster:
+    name: kritika-postgres
+  name: kritika
+  owner: kritika
+  extensions:
+    - name: vector
+      ensure: present
+    - name: vchord
+      version: "1.1.1"
+      ensure: present
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/postgresql.cnpg.io/databaserole_v1.json
+# The application role. It must own nothing: row-level security depends on it.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: kritika-app
+spec:
+  cluster:
+    name: kritika-postgres
+  name: kritika_app
+  login: true
+  passwordSecret:
+    name: kritika-postgres-app
+  # Deleting this resource leaves the role, so a running kritika keeps its connections.
+  databaseRoleReclaimPolicy: retain

@@ -1,0 +1,16 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/generators.external-secrets.io/password_v1alpha1.json
+# The two Postgres role passwords, generated in the cluster: only CNPG and kritika
+# read them, so 1Password would add a step and buy nothing (docs/secrets.md).
+# Each ExternalSecret that references this mints its own value.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: kritika-postgres
+spec:
+  length: 40
+  # Letters and digits only: the value is spliced into a connection URI unescaped.
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true

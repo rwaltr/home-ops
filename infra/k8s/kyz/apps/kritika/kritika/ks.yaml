@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kritika
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/kritika/kritika/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: kritika
+  dependsOn:
+    - name: cloudnative-pg # Cluster / Database / DatabaseRole CRDs
+      namespace: cnpg-system
+    - name: onepassword-connect
+      namespace: external-secrets
+    - name: kube-prometheus-stack # the ServiceMonitor and PrometheusRule CRDs
+      namespace: o11y
+    - name: openebs # Postgres PVC on the openebs-hostpath storage class
+      namespace: openebs
+  wait: false

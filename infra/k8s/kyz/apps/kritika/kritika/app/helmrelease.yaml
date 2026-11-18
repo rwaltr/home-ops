@@ -1,0 +1,117 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# kritika — AI pull request reviewer for git.waltr.tech. See docs/kritika.md.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kritika
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: kritika
+  interval: 1h
+  values:
+    config:
+      # Internal only (envoy-internal + tailnet): the only forge is Forgejo,
+      # which is in this cluster, so nothing outside needs to reach the webhooks.
+      webUrl: https://kritika.waltr.tech
+      auth:
+        admin:
+          password: { env: ADMIN_PASSWORD }
+      forgejo:
+        # The connection's name is its webhook path: /hooks/forgejo.
+        forgejo:
+          host: git.waltr.tech
+          accounts: [rwaltr]
+          # audience / runnerAudience come once the `kritika` user's Authorized
+          # Integrations exist: Forgejo fetches this key's public half while
+          # saving them, so kritika must be serving it first (docs/kritika.md).
+          privateKey: { env: FORGEJO_PRIVATE_KEY }
+          webhookSecret: { env: FORGEJO_WEBHOOK_SECRET }
+      providers:
+        # The in-cluster LiteLLM gateway: one place for keys and spend.
+        litellm:
+          type: openai
+          baseUrl: http://litellm.default.svc.cluster.local:4000/v1
+          apiKey: { env: LITELLM_API_KEY }
+      review:
+        model: litellm/deepseek-v4.1-flash
+      egress:
+        # git.waltr.tech resolves (split DNS) to the envoy-internal VIP. The
+        # gateway refuses private addresses not listed here.
+        allow: [10.10.100.11, "fdad:207a:f1ab:100::11"]
+
+    database:
+      owner:
+        existingSecret: kritika-postgres-credentials
+      app:
+        existingSecret: kritika-postgres-app
+
+    envFrom:
+      - secretRef:
+          name: kritika-credentials
+    podAnnotations:
+      secret.reloader.stakater.com/reload: kritika-credentials
+
+    httpRoute:
+      enabled: true
+      annotations:
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/name: kritika
+        gethomepage.dev/description: AI PR reviews
+        gethomepage.dev/group: Utilities
+        gethomepage.dev/icon: mdi-robot-outline
+      parentRefs:
+        - name: envoy-internal
+          namespace: network
+          sectionName: https
+      hostnames:
+        - kritika.waltr.tech
+
+    runner:
+      podTemplate:
+        spec:
+          # No sandboxed RuntimeClass on mouse (no gVisor/Kata). The runner is
+          # still non-root, read-only, capability-free and fenced by the
+          # NetworkPolicy to DNS + kritika's egress gateway.
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 2Gi }
+
+    networkPolicy:
+      type: cilium
+      postgres:
+        podSelector:
+          cnpg.io/cluster: kritika-postgres
+      # Cilium enforces policy on the translated backend, so a Service or the
+      # gateway VIP is matched as its pods and their container ports — not the
+      # Service port the chart's 443 rule assumes.
+      extraEgress:
+        # git.waltr.tech -> envoy-internal pods (Forgejo API, git fetches).
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: network
+              podSelector:
+                matchLabels:
+                  gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+          ports:
+            - port: 10443
+              protocol: TCP
+        # LiteLLM.
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: default
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: litellm
+          ports:
+            - port: 4000
+              protocol: TCP
+
+    monitoring:
+      serviceMonitor:
+        enabled: true
+      prometheusRule:
+        enabled: true

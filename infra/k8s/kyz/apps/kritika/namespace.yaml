@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: _
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    # kritika serve creates Jobs and Secrets in its own namespace and runs
+    # untrusted review commands in them; nothing else lives here (docs/kritika.md).
+    pod-security.kubernetes.io/enforce: restricted
