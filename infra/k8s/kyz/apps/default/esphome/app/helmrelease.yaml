@@ -25,7 +25,7 @@ spec:
           app:
             image:
               repository: ghcr.io/home-operations/esphome
-              tag: 2026.9.1@sha256:3610f83fecf9ad15ff9939873b3653f7e3ac0c33c25a0c668ed52aa1f6997975
+              tag: 2026.10.2@sha256:24c898d8562cef5d21de1aea31fbe7cfa902571bbc414779a768eeb02395dea2
             env:
               TZ: America/Chicago
               # Status checks via ICMP instead of mDNS (mDNS query contention
