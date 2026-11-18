@@ -5,7 +5,6 @@ kind: Kustomization
 resources:
   - ./alertmanagerconfig.yaml
   - ./externalsecret.yaml
-  - ./externalsecret-hermes-trigger.yaml
   - ./grafanadashboard.yaml
   - ./helmrelease.yaml
   - ./ocirepository.yaml

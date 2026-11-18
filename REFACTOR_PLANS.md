@@ -2382,6 +2382,35 @@ Eighth item of the series: `kubesearch-mcp` (perfectra1n/kubesearch-mcp 1.3.0) a
 
 Operating docs: `docs/kubesearch-mcp.md`, `docs/home-assistant-mcp.md`.
 
+### 2026-11-17 — the agent alert feed is removed
+
+- Ask: "disable your alertmanager triage ability". The feed built 2026-10-30 went
+  the same day, in full: the `hermes` route child and receiver in
+  `alertmanagerconfig.yaml`, `externalsecret-hermes-trigger.yaml` and its
+  `kustomization.yaml` line.
+- **Pausing the cron job does not disable the feed, and this is the part worth
+  remembering.** `POST /api/jobs/<id>/run` — the trigger endpoint Alertmanager
+  calls — runs `trigger_job`, which writes `enabled: true, state: scheduled,
+  paused_at: null` before it fires. A paused job is re-armed by a single firing
+  alert, so the job-level switch is not a disable switch; the sender side has to
+  go. Generalise: when disabling an event-driven consumer, disable the producer,
+  and check whether the trigger path respects the consumer's own disabled state
+  before trusting it.
+- The cron record `alert-feed-triage` (`aa9524f0f633`) is paused rather than
+  deleted — it is the id baked into any restored URL, and a recreated job mints a
+  new one.
+- The `pushover` catch-all child stays. It existed only because the catch-all
+  `hermes` child would otherwise have swallowed the root-receiver fallback, but
+  leaving it keeps the paging path independent of that rule.
+- **A removed ExternalSecret does not remove its Secret.** ESO's default
+  `deletionPolicy` is `Retain`, so `hermes-alert-trigger` in `o11y` — which holds
+  the gateway API key — survives and is a hand step. Worth checking whenever an
+  ExternalSecret is retired.
+- Paging budget accounting gets simpler with the feed gone: nothing wakes the
+  agent on its own any more, so the number is just the pushover send counter.
+
+Operating doc: `docs/alerting.md` (removal record and restore recipe at the end).
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
