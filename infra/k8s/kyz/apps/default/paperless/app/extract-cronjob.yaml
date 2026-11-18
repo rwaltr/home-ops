@@ -39,7 +39,7 @@ spec:
             fsGroup: 65534
           containers:
             - name: extract
-              image: python:3.12-slim
+              image: python:3.15-slim
               command:
                 - python3
                 - /scripts/paperless_extract.py

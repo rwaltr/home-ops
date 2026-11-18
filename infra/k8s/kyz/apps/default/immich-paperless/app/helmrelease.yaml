@@ -56,7 +56,7 @@ spec:
           bridge:
             image:
               repository: python
-              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+              tag: 3.15-slim@sha256:fd2aef5e0d8438208de9fe154ab5b331a2428fc0c9838d41611e611fd7a80d85
             command: ["python3", "/scripts/bridge.py"]
             env:
               IMMICH_URL: http://immich-server.default.svc.cluster.local:2283
@@ -96,7 +96,7 @@ spec:
           realtime:
             image:
               repository: python
-              tag: 3.13-slim@sha256:48d884813cf44e927cf64c5529dd630dd3b18338c6dc727991eef9b71e934a20
+              tag: 3.15-slim@sha256:fd2aef5e0d8438208de9fe154ab5b331a2428fc0c9838d41611e611fd7a80d85
             # Same script, different entry point: it holds Immich's websocket.
             command: ["python3", "/scripts/bridge.py", "--realtime"]
             env:
