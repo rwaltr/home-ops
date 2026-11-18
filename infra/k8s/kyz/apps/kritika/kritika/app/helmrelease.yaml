@@ -16,8 +16,20 @@ spec:
       # which is in this cluster, so nothing outside needs to reach the webhooks.
       webUrl: https://kritika.waltr.tech
       auth:
+        # Break-glass only; day-to-day sign-in is Kanidm below.
         admin:
           password: { env: ADMIN_PASSWORD }
+        oidc:
+          name: Kanidm
+          issuer: https://idm.waltr.tech/oauth2/openid/kritika
+          clientId: { env: CLIENT_ID }
+          clientSecret: { env: CLIENT_SECRET }
+          scopes: [openid, profile, email, groups]
+          rolesClaim: groups
+          # Kanidm names groups by SPN (`kritika_admins@waltr.tech`); the bare
+          # name is accepted too, as Grafana's mapping does. Anyone else is
+          # refused: `defaultRole` stays `none`.
+          roleMappingExpr: '"kritika_admins@waltr.tech" in roles || "kritika_admins" in roles ? "admin" : ""'
       forgejo:
         # The connection's name is its webhook path: /hooks/forgejo.
         forgejo:
@@ -74,8 +86,11 @@ spec:
     envFrom:
       - secretRef:
           name: kritika-credentials
+      # CLIENT_ID / CLIENT_SECRET, minted by kaniop from oauth2client.yaml.
+      - secretRef:
+          name: kritika-kanidm-oauth2-credentials
     podAnnotations:
-      secret.reloader.stakater.com/reload: kritika-credentials
+      secret.reloader.stakater.com/reload: kritika-credentials,kritika-kanidm-oauth2-credentials
 
     httpRoute:
       enabled: true

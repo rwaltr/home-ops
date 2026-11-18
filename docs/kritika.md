@@ -82,16 +82,28 @@ drops with `hubble observe -n kritika --verdict DROPPED` before anything else.
 
 ## Signing in
 
-Open `https://kritika.waltr.tech` from the LAN or tailnet. Sign in as `admin`
-with the password from 1Password item `kritika`, field `password`:
+Open `https://kritika.waltr.tech` from the LAN or tailnet and choose
+**Kanidm**. Members of the Kanidm group `kritika_admins`
+(`identity/resources/app/group-kritika-admins.yaml`) sign in as admins. Everyone
+else is refused. To add someone, add them to that group.
+
+How it fits together:
+
+- `app/oauth2client.yaml` is the Kanidm client. kaniop mints
+  `kritika-kanidm-oauth2-credentials`.
+- The `kritika` namespace is listed in Kanidm's
+  `oauth2ClientNamespaceSelector`.
+- `auth.oidc.roleMappingExpr` maps the group to the admin role.
+
+Kanidm was chosen over "Sign in with Forgejo" because Forgejo signs in through
+Kanidm anyway, and this keeps roles on Kanidm groups.
+
+Break-glass: the local `admin` user, with the password in 1Password item
+`kritika`, field `password`:
 
 ```sh
 op item get kritika --vault home-ops --fields password --reveal
 ```
-
-That local admin is the only sign-in for now. To sign in with your Forgejo
-account instead, add `auth.forgejo` with an OAuth2 application on Forgejo
-(callback `https://kritika.waltr.tech/auth/callback/forgejo`).
 
 ## Models
 

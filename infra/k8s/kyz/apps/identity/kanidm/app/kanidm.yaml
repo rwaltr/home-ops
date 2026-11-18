@@ -62,6 +62,7 @@ spec:
         operator: In
         values:
           - default
+          - kritika
           - o11y
           - kopiur-system
   tlsSecretName: kanidm-tls

@@ -1,0 +1,31 @@
+---
+# kritika's dashboard sign-in through Kanidm, managed by kaniop. The operator
+# mints `kritika-kanidm-oauth2-credentials` (CLIENT_ID, CLIENT_SECRET) in this
+# namespace, which `kritika` is allowed for in Kanidm's
+# `oauth2ClientNamespaceSelector`.
+#
+# Kanidm over Forgejo sign-in: Forgejo signs in through Kanidm anyway, and this
+# keeps roles on Kanidm groups instead of on a forge.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: kritika
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: kritika
+  origin: https://kritika.waltr.tech
+  # <webUrl>/auth/callback/<type>, and the type is `oidc`. Matched exactly.
+  redirectUrl:
+    - https://kritika.waltr.tech/auth/callback/oidc
+  # `groups` carries the kritika_admins membership the role mapping reads.
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true
