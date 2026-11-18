@@ -28,7 +28,7 @@ spec:
           app:
             image:
               repository: docker.io/vectorim/element-web
-              tag: v1.12.33@sha256:b0aa4b5a4fc1afaaff62e2dbd0c92d57e2b20724f3ccb2fef53aae949088c3d2
+              tag: v1.12.35@sha256:406b48b80153818284a235fa3600b2a5b5b6b0aa0e4ef4896b36d8d3461352f3
             probes:
               liveness:
                 enabled: true
