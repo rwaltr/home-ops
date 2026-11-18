@@ -1,0 +1,55 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/renovate-operator.mogenius.com/renovatejob_v1alpha1.json
+# Renovate on git.waltr.tech, as the Forgejo user `renovate` (repo write, not
+# admin, so branch protection binds it). Discovery finds every repo it can
+# push to; a repo without a Renovate config gets an onboarding PR.
+apiVersion: renovate-operator.mogenius.com/v1alpha1
+kind: RenovateJob
+metadata:
+  name: forgejo-rwaltr
+spec:
+  discoveryFilters:
+    - rwaltr/*
+  provider:
+    name: forgejo
+    endpoint: https://git.waltr.tech/api/v1
+  image: ghcr.io/renovatebot/renovate:44.252.6
+  schedule: "0 * * * *"
+  parallelism: 2
+  secretRef: renovate-secret
+  extraEnvFrom:
+    - secretRef:
+        name: renovate-github-com
+  extraEnv:
+    - name: RENOVATE_GIT_AUTHOR
+      value: Renovate Bot <renovate@noreply.waltr.tech>
+    # git.waltr.tech resolves to the envoy-internal VIP (split DNS), which
+    # Renovate refuses as an internal address unless told otherwise.
+    - name: RENOVATE_HOST_RULES
+      value: >-
+        [{"matchHost": "https://git.waltr.tech", "allowInternal": true}]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 2Gi
+  scratchVolume:
+    enabled: true
+    ephemeral:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: openebs-hostpath
+          resources:
+            requests:
+              storage: 10Gi
+  webhook:
+    enabled: true
+    # The receiver only acts on events that carry Renovate's own markers, and is
+    # reachable on envoy-internal alone; no token to mint or rotate.
+    authentication:
+      enabled: false
+    # The operator adds/removes its webhook on each discovered repo itself.
+    sync:
+      enabled: true

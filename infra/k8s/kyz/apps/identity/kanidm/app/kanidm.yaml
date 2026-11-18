@@ -64,6 +64,7 @@ spec:
           - default
           - kritika
           - o11y
+          - renovate
           - kopiur-system
   tlsSecretName: kanidm-tls
   # Pinned to the version the operator supports, not to "newest".

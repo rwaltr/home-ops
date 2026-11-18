@@ -44,6 +44,9 @@ spec:
           runnerAudience: u:3:6e468aaf-d16a-466e-a217-06d218c2a874
           privateKey: { env: FORGEJO_PRIVATE_KEY }
           webhookSecret: { env: FORGEJO_WEBHOOK_SECRET }
+          # Forgejo marks no account as a bot; without this, Renovate's PRs
+          # count as a person's and `pr.bot` below is never true.
+          bots: [renovate]
       providers:
         # agentgateway's unauthenticated in-cluster listener (8082): no key to
         # mint or leak, and the gateway holds every upstream credential. kritika
@@ -65,6 +68,15 @@ spec:
         model: agentgateway/claude-sonnet-5-5
         # Used when the subscription refuses (rate limit, session expired).
         fallback: agentgateway/deepseek-v4.1-flash
+        # The one approval master needs, for Renovate's PRs only: kritika
+        # approves when its review finds nothing at P0/P1, and Forgejo's
+        # merge-when-checks-succeed (requested by Renovate) then merges. Set
+        # here, not in a repo's .kritika.yaml, so a PR cannot widen it.
+        # Everything else — Hermes, people — still needs rwaltr's approval.
+        approve:
+          when:
+            - name: renovate
+              expr: pr.bot && pr.author == "renovate"
       # Similar-code index: what bjw-s runs. Changing model/dims drops every index.
       embedding:
         model: agentgateway/voyage-code-4

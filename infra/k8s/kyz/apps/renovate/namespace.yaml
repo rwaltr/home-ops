@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: _
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    # Renovate jobs clone repos and run package-manager lookups; nothing else here.
+    pod-security.kubernetes.io/enforce: restricted

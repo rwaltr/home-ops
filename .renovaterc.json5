@@ -6,11 +6,18 @@
   extends: [
     "github>home-operations/renovate-presets#8.1.0",
     ":timezone(America/Chicago)",
-    "github>rwaltr/home-ops//.github/renovate/autoMerge",
-    "github>rwaltr/home-ops//.github/renovate/labels",
+    // local> resolves on the platform Renovate runs on: Forgejo.
+    "local>rwaltr/home-ops//.renovate/autoMerge",
+    "local>rwaltr/home-ops//.renovate/labels",
   ],
   suppressNotifications: ["prIgnoreNotification"],
   // keep PRs current so the whole-repo oxfmt check always sees the
   // formatted tree; auto-rebases stale PRs instead of only conflicted ones
   rebaseWhen: "behind-base-branch",
+  // Forgejo branch protection (lint + 1 approval, no pushes) refuses branch
+  // automerge, so automerge goes through PRs: Renovate opens one and asks
+  // Forgejo to merge it once its checks succeed. kritika is the approval —
+  // .kritika.yaml approves Renovate's PRs that its review finds clean.
+  automergeType: "pr",
+  platformAutomerge: true,
 }

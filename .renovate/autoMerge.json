@@ -6,17 +6,15 @@
       "matchUpdateTypes": ["digest"],
       "matchPackageNames": ["/home-operations/"],
       "automerge": true,
-      "automergeType": "pr",
-      "ignoreTests": false
+      "automergeType": "pr"
     },
     {
       "description": "Auto-merge GitHub Actions (minor/patch/digest)",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
-      "automergeType": "branch",
-      "minimumReleaseAge": "3 days",
-      "ignoreTests": true
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
     },
     {
       "description": "Auto-merge trusted GitHub Actions immediately",
@@ -29,18 +27,8 @@
       ],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
-      "automergeType": "branch",
-      "minimumReleaseAge": "1 day",
-      "ignoreTests": true
-    },
-    {
-      "description": "Auto-merge Renovate action updates",
-      "matchDatasources": ["docker", "github-tags"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "matchPackageNames": ["renovatebot/github-action"],
-      "automerge": true,
-      "automergeType": "branch",
-      "requiredStatusChecks": null
+      "automergeType": "pr",
+      "minimumReleaseAge": "1 day"
     }
   ]
 }

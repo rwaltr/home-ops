@@ -158,7 +158,7 @@ spec:
         # these refuse by default. Named hosts only, never `*` or `private`:
         # every repo admin can point a webhook anywhere this list allows.
         webhook:
-          ALLOWED_HOST_LIST: external,kritika.waltr.tech
+          ALLOWED_HOST_LIST: external,kritika.waltr.tech,renovate.waltr.tech
         # Forgejo fetches an Authorized Integration issuer's discovery doc and
         # keys. An allowed domain skips the private-address check.
         authorized_integration:

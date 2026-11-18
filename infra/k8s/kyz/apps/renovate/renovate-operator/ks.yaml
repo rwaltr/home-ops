@@ -1,0 +1,39 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: renovate-operator
+spec:
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/renovate/renovate-operator/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: renovate
+  # wait: true — the RenovateJob CRD comes from this chart.
+  wait: true
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: renovate-jobs
+spec:
+  dependsOn:
+    - name: renovate-operator # the RenovateJob CRD
+    - name: onepassword-connect
+      namespace: external-secrets
+    - name: forgejo
+      namespace: default
+  interval: 1h
+  path: ./infra/k8s/kyz/apps/renovate/renovate-operator/jobs
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: renovate
+  wait: false

@@ -17,3 +17,4 @@ resources:
   - ./apps/network
   - ./apps/o11y
   - ./apps/openebs
+  - ./apps/renovate

@@ -1,0 +1,25 @@
+---
+# The renovate-operator UI's sign-in through Kanidm, managed by kaniop. kaniop
+# mints `renovate-operator-kanidm-oauth2-credentials` (CLIENT_ID, CLIENT_SECRET).
+# Members of `renovate_admins` can trigger runs; everyone else has no access.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: renovate-operator
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Renovate
+  origin: https://renovate.waltr.tech
+  redirectUrl:
+    - https://renovate.waltr.tech/auth/callback
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+  disableConsentPrompt: true
+  preferShortUsername: true

@@ -5,4 +5,5 @@ kind: Kustomization
 resources:
   - ./group-forgejo-admins.yaml
   - ./group-kritika-admins.yaml
+  - ./group-renovate-admins.yaml
   - ./person-rwaltr.yaml

@@ -98,8 +98,7 @@ containers on that daemon and never see its socket.
 
 ## Not done yet
 
-- **Renovate** as an in-cluster CronJob with `platform: forgejo` and its own bot
-  account; retire `.github/workflows/renovate.yml` at the same time.
+- **Renovate** moved to Forgejo, see docs/renovate.md.
 - **Flux webhook** is unchanged: GitHub still fires the push webhook when the mirror
   pushes, so reconciles stay immediate.
 
