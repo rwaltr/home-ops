@@ -38,7 +38,7 @@ spec:
           app:
             image:
               repository: ghcr.io/degoog-org/degoog
-              tag: 0.26.0@sha256:69e28fe2dc8008981b0ea8b9270f6b5b482d107b8a3dfa71d8acdac37f4b77c0
+              tag: 1.2.0@sha256:c3a975a2c512300aae942b2d8713be643e457dabf2475adf187536a4a6c6b3dd
             env:
               TZ: America/Chicago
               DEGOOG_BASE_URL: https://search.waltr.tech
