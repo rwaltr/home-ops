@@ -151,6 +151,11 @@ spec:
                   httpGet:
                     path: /
                     port: &port 8000
+                    # 3.5 enforces ALLOWED_HOSTS on every request and the
+                    # kubelet sends the pod IP as Host (400). localhost is allowed.
+                    httpHeaders: &probeHost
+                      - name: Host
+                        value: localhost
                   periodSeconds: 30
                   timeoutSeconds: 5
                   failureThreshold: 5
@@ -162,6 +167,7 @@ spec:
                   httpGet:
                     path: /
                     port: *port
+                    httpHeaders: *probeHost
                   # First boot runs Django migrations + index build before the
                   # port opens; give it up to 5 minutes.
                   failureThreshold: 30
