@@ -33,18 +33,30 @@ spec:
           privateKey: { env: FORGEJO_PRIVATE_KEY }
           webhookSecret: { env: FORGEJO_WEBHOOK_SECRET }
       providers:
-        # The in-cluster LiteLLM gateway: one place for keys and spend.
-        litellm:
+        # agentgateway's unauthenticated in-cluster listener (8082): no key to
+        # mint or leak, and the gateway holds every upstream credential. kritika
+        # insists on an apiKey reference, so it gets a placeholder; the gateway
+        # replaces the Authorization header with the upstream's own key.
+        agentgateway:
           type: openai
-          baseUrl: http://litellm.default.svc.cluster.local:4000/v1
-          apiKey: { env: LITELLM_API_KEY }
-          # LiteLLM reports no per-call cost, so kritika would show $0. These are
-          # OpenRouter's prices for the model behind the alias, USD per 1M tokens
-          # (from its /api/v1/models, 2026-11-18; re-check if spend looks off).
+          baseUrl: http://agentgateway.default.svc.cluster.local:8082/v1
+          apiKey: { env: AGENTGATEWAY_API_KEY }
+          # List prices (USD per 1M tokens). Sonnet runs on the Claude
+          # subscription and is not billed per call; pricing it anyway makes the
+          # dashboard's spend show what reviews take out of that plan.
           pricing:
+            claude-sonnet-5-5: { input: 2, output: 10, cacheRead: 0.1 }
             deepseek-v4.1-flash: { input: 0.0507, output: 0.2028, cacheRead: 0.001 }
       review:
-        model: litellm/deepseek-v4.1-flash
+        # deepseek-v4.1-flash finished reviews without submitting them
+        # (`stop: no_submit`); Sonnet follows the tool protocol.
+        model: agentgateway/claude-sonnet-5-5
+        # Used when the subscription refuses (rate limit, session expired).
+        fallback: agentgateway/deepseek-v4.1-flash
+      # Similar-code index: what bjw-s runs. Changing model/dims drops every index.
+      embedding:
+        model: agentgateway/voyage-code-4
+        dims: 1024
       egress:
         # git.waltr.tech resolves (split DNS) to the envoy-internal VIP. The
         # gateway refuses private addresses not listed here.
@@ -56,6 +68,9 @@ spec:
       app:
         existingSecret: kritika-postgres-app
 
+    env:
+      # Not a secret: see providers.agentgateway above.
+      AGENTGATEWAY_API_KEY: internal-listener
     envFrom:
       - secretRef:
           name: kritika-credentials
@@ -114,16 +129,16 @@ spec:
           ports:
             - port: 10443
               protocol: TCP
-        # LiteLLM.
+        # agentgateway's internal listener.
         - to:
             - namespaceSelector:
                 matchLabels:
                   kubernetes.io/metadata.name: default
               podSelector:
                 matchLabels:
-                  app.kubernetes.io/name: litellm
+                  app.kubernetes.io/name: agentgateway
           ports:
-            - port: 4000
+            - port: 8082
               protocol: TCP
 
     monitoring:

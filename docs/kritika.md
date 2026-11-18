@@ -5,14 +5,15 @@
 `kritika`. It is defined in `infra/k8s/kyz/apps/kritika/` (the app) and
 `infra/k8s/kyz/apps/cnpg-system/` (its Postgres operator).
 
-|            |                                                                    |
-| ---------- | ------------------------------------------------------------------ |
-| Dashboard  | `https://kritika.waltr.tech` (envoy-internal), user `admin`        |
-| Webhook    | `https://kritika.waltr.tech/hooks/forgejo`, on the `rwaltr` user   |
-| Forge user | `kritika` (Forgejo id 3), repo **admin** collaborator on each repo |
-| Model      | `litellm/deepseek-v4.1-flash` through the in-cluster LiteLLM proxy |
-| Database   | CNPG `kritika-postgres`, Postgres 18 + VectorChord, 1 instance     |
-| Secrets    | 1Password item `kritika`, plus `litellm` / `master_key`            |
+|            |                                                                               |
+| ---------- | ----------------------------------------------------------------------------- |
+| Dashboard  | `https://kritika.waltr.tech` (envoy-internal), user `admin`                   |
+| Webhook    | `https://kritika.waltr.tech/hooks/forgejo`, on the `rwaltr` user              |
+| Forge user | `kritika` (Forgejo id 3), repo **admin** collaborator on each repo            |
+| Model      | `claude-sonnet-5-5` (Claude subscription) via agentgateway; deepseek fallback |
+| Embeddings | `voyage-code-4` (1024 dims) via agentgateway → OpenRouter                     |
+| Database   | CNPG `kritika-postgres`, Postgres 18 + VectorChord, 1 instance                |
+| Secrets    | 1Password item `kritika`; agentgateway holds the model keys                   |
 
 ## How Forgejo and kritika authenticate
 
@@ -75,9 +76,33 @@ answers. Every runner then timed out on `waiting for the gateway`, so that
 flavor is off.
 The serve pods may reach port 443 anywhere, but Cilium matches traffic **after**
 the Service/VIP translation. The serve pods actually hit the envoy-internal
-pods on 10443 and LiteLLM on 4000, so both appear in
+pods on 10443 and agentgateway's internal listener on 8082, so both appear in
 `networkPolicy.extraEgress`. If reviews hang on connect, check the Cilium
 drops with `hubble observe -n kritika --verdict DROPPED` before anything else.
+
+## Signing in
+
+Open `https://kritika.waltr.tech` from the LAN or tailnet. Sign in as `admin`
+with the password from 1Password item `kritika`, field `password`:
+
+```sh
+op item get kritika --vault home-ops --fields password --reveal
+```
+
+That local admin is the only sign-in for now. To sign in with your Forgejo
+account instead, add `auth.forgejo` with an OAuth2 application on Forgejo
+(callback `https://kritika.waltr.tech/auth/callback/forgejo`).
+
+## Models
+
+Reviews use `claude-sonnet-5-5` on the Claude subscription, through
+agentgateway's unauthenticated in-cluster listener (8082). If that fails, they
+fall back to `deepseek-v4.1-flash` on OpenRouter. deepseek alone was not good
+enough: it sometimes finished a review without submitting it. Prices in
+`providers.agentgateway.pricing` are list prices. The subscription is not
+billed per call, so the dashboard's spend shows how much of the plan reviews
+use. kritika sends a placeholder key, which the gateway replaces with each
+upstream's own.
 
 ## Day-2
 

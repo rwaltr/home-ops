@@ -222,6 +222,14 @@ spec:
               apiKey: ${OPENROUTER_API_KEY}
               baseUrl: https://openrouter.ai/api/v1
               model: openai/gpt-5.6-luna
+          # Embeddings for kritika's similar-code index (docs/kritika.md). Served
+          # on /v1/embeddings; 1024 dims. Not on any client's allow-list.
+          - name: voyage-code-4
+            provider: openAI
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: voyageai/voyage-code-4
           # --- Dan Manners' shared gateway: only the hardware-backed aliases ---
           - name: nvidia-llama
             provider: openAI
