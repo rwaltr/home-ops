@@ -44,7 +44,9 @@ CloudNativePG generates `${APP}-postgres-app` in the app's namespace, with
 `uri`. Nothing crosses namespaces and nothing goes through 1Password.
 
 Optional variables are listed at the top of `pg18/cluster.yaml`: database,
-owner, size, memory, schedule and retention.
+owner, owner superuser, size, memory, schedule and retention. An import strips
+superuser from the owner (CloudNativePG does this after `pg_restore`), so an app
+that needs it, like Immich, has to set `CNPG_SUPERUSER: "true"`.
 
 ### The cluster always restores from backup
 

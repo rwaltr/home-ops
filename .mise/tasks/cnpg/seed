@@ -68,8 +68,8 @@ kubectl -n "$ns" wait externalsecret "${cluster}-objectstore" --for=condition=Re
 # the prefix the real cluster later recovers from and archives into.
 #
 # For an import the owner is made superuser before pg_restore runs as it
-# (--role=<owner>), or CREATE EXTENSION vchord/earthdistance fails. The flag is
-# restored with the data, so the real Cluster's owner stays superuser.
+# (--role=<owner>), or CREATE EXTENSION vchord/earthdistance fails. CNPG strips
+# the flag again after the restore; set CNPG_SUPERUSER on the app if it needs it.
 log "creating temporary seed cluster ${seed}"
 yq -r 'select(.kind == "Cluster")' <<<"$manifest" |
   SEED="$seed" DB="$database" OWNER="$owner" HOST="$import_host" SECRET="$import_secret" \

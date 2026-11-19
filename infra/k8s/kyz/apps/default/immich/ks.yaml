@@ -23,6 +23,9 @@ spec:
     substitute:
       APP: immich
       CNPG_CAPACITY: 10Gi
+      # Immich upgrades VectorChord itself on start (ALTER EXTENSION ... UPDATE),
+      # which Postgres only allows a superuser for an untrusted extension.
+      CNPG_SUPERUSER: "true"
       # 30d p95 158Mi, peak 201Mi on the old Deployment.
       CNPG_MEMORY_REQUEST: 384Mi
       CNPG_MEMORY_LIMIT: 2Gi

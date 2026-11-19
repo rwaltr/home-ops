@@ -40,8 +40,8 @@ spec:
               tag: v3.2.4@sha256:d317916b28090c33eb36b308464ea391f8b7df1d850fcfea227a39ec879718c2
             env:
               TZ: America/Chicago
-              # CNPG-generated: user `immich` (superuser, carried over from the
-              # import, which Immich's migrations expect), db `immich`.
+              # CNPG-generated: user `immich` (superuser, CNPG_SUPERUSER in
+              # ../ks.yaml), db `immich`.
               DB_URL:
                 secretKeyRef:
                   name: immich-postgres-app
