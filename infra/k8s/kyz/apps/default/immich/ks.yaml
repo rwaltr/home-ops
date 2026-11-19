@@ -5,16 +5,27 @@ kind: Kustomization
 metadata:
   name: immich
 spec:
+  # Postgres is a CloudNativePG cluster from the shared template
+  # (docs/postgres.md): continuous WAL + nightly base backup to RustFS.
+  # It replaced a hand-rolled PG17 Deployment whose PVC kopiur copied file by
+  # file while Postgres ran. Nothing else here needs a PVC backup: the
+  # library is on tank, the ML cache rebuilds, valkey is ephemeral.
   components:
-    - ../../../../components/kopiur/backup
+    - ../../../../components/cnpg/pg18
+  healthCheckExprs:
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
+      current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/immich/app
   postBuild:
     substitute:
       APP: immich
-      PVC: immich-postgres
-      KOPIUR_CRON: "H 3 * * *"
-      KOPIUR_RUNAS: "999"
+      CNPG_CAPACITY: 10Gi
+      # 30d p95 158Mi, peak 201Mi on the old Deployment.
+      CNPG_MEMORY_REQUEST: 384Mi
+      CNPG_MEMORY_LIMIT: 2Gi
   prune: true
   sourceRef:
     kind: GitRepository
@@ -24,4 +35,8 @@ spec:
   dependsOn:
     - name: openebs # PVCs on the openebs-hostpath storage class
       namespace: openebs
+    - name: cloudnative-pg-barman-plugin # Cluster bootstraps from its ObjectStore
+      namespace: cnpg-system
+    - name: onepassword-connect # the cnpg-rustfs S3 keys
+      namespace: external-secrets
   wait: false

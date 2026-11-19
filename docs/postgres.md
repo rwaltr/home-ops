@@ -66,7 +66,7 @@ once:
 # app committed locally, not merged yet
 mise run cnpg:seed <namespace> <kustomization>
 # or import a running database (writes to it must be stopped):
-mise run cnpg:seed default immich --import-host immich-postgres --import-secret immich-postgres-import --import-db immich
+mise run cnpg:seed <namespace> <kustomization> --import-host <host> --import-secret <basic-auth secret> --import-db <db>
 ```
 
 The seed renders the same manifests Flux will apply. It creates a temporary
@@ -104,3 +104,19 @@ kubectl get cluster -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.n
 `ContinuousArchiving` in `kubectl describe cluster` must be `True`. A failing
 WAL archive fills the PVC; `max_slot_wal_keep_size: 2GB` caps the slot side of
 that.
+
+## History: Immich's move (2026-11-19)
+
+Immich ran a hand-rolled `ghcr.io/immich-app/postgres:17-vectorchord` Deployment
+on PVC `immich-postgres`, which kopiur copied file by file while Postgres ran.
+The move went like this:
+
+1. Took kopiur snapshot `immich-pre-cnpg` (Retain) of that PVC.
+2. Scaled down every writer: Immich server and ML, and the paperless bridge.
+3. Ran `cnpg:seed` with `--import-host immich-postgres`. That's CNPG's
+   `pg_dump` import into PG18, then the first base backup.
+4. Merged, so Flux created `immich-postgres` from that backup.
+
+The old PVC kept `helm.sh/resource-policy: keep`. Delete it, the 1Password
+item `immich`, the `immich-postgres-import` Secret and the snapshot once the new
+cluster has run for a while.
