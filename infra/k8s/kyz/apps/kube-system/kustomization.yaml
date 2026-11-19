@@ -21,4 +21,3 @@ resources:
   # - ./multus/ks.yaml
   # - ./ocharted/ks.yaml
   # - ./snapshot-controller/ks.yaml
-  # - ./spegel/ks.yaml
