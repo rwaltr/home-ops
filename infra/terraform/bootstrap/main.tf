@@ -26,7 +26,7 @@ terraform {
     # happens to be a credential.
     tailscale = {
       source  = "tailscale/tailscale"
-      version = "0.29.3"
+      version = "0.30.0"
     }
     # 1Password, because the output of this project is an item, not a URL.
     onepassword = {
