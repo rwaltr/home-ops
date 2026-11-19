@@ -285,6 +285,9 @@ spec:
               # hermes-secret (1P item `home-assistant-secret`); enables the
               # `homeassistant` toolset for device control.
               HASS_URL: http://home-assistant.default.svc.cluster.local:8123
+              # agentgateway's in-cluster listener has no auth; the OpenAI-shaped
+              # client still refuses a provider with no key at all.
+              AIGW_API_KEY: unused
             envFrom:
               - secretRef:
                   name: hermes-secret
@@ -457,18 +460,22 @@ spec:
             model:
               provider: openrouter
               default: deepseek/deepseek-v4.1-flash
-            # Local models via the in-cluster LiteLLM proxy (Ollama backend).
-            # Not the default — pick with `hermes model` or `hermes fallback
+            # Self-hosted models via agentgateway's internal listener (8082, no
+            # auth). Not the default — pick with `hermes model` or `hermes fallback
             # add`. SemIf-style decisions: max_tokens=1 + logprobs=true +
             # top_logprobs=20, read option odds off the first token.
             providers:
-              litellm:
-                name: litellm
-                base_url: http://litellm.default.svc.cluster.local:4000/v1
-                key_env: LITELLM_API_KEY
+              agentgateway:
+                name: agentgateway
+                base_url: http://agentgateway.default.svc.cluster.local:8082/v1
+                key_env: AIGW_API_KEY
                 models:
-                  qwen3-1.7b-nothink:
-                    context_length: 8192
+                  nvidia-llama:
+                    context_length: 151000
+                  intel-llama:
+                    context_length: 229000
+                  gptoss-llama:
+                    context_length: 114000
             # Minimal, CLI-first toolset (like pi) + web search via self-hosted
             # SearXNG. The API server and CLI platforms otherwise fall back to the
             # full `hermes-*-server`/`hermes-cli` presets (~50 tool schemas/turn).

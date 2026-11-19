@@ -65,8 +65,8 @@ HTTPS/443 behind Cloudflare is expensive here.
 
 `Open WebUI` (or CopilotKit's AG-UI) is a _frontend_, not a transport, so it is
 complementary rather than an alternative: Open WebUI talks the OpenAI API and
-would point straight at the existing LiteLLM gateway
-(`http://litellm.default.svc.cluster.local:4000/v1`), giving a rich desktop chat
+would point straight at the existing agentgateway LLM endpoint
+(`http://agentgateway.default.svc.cluster.local:8082/v1`), giving a rich desktop chat
 console. The Matrix channel matters for the cases a single web app does not
 cover — mobile push, multiple devices, async delivery, and long-lived per-room
 state. If a custom agent frontend is built later, AG-UI is the protocol to embed

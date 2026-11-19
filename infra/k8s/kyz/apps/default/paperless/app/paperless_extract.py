@@ -5,7 +5,7 @@ Paperless' built-in "Apply AI suggestions" action can only write title, tags,
 correspondent, document type, storage path and created date — it has no
 custom-field path at all (`AISuggestionField` and `documents/workflows/ai.py`).
 This job closes that gap: for documents typed Invoice or Receipt, it asks the
-same LLM (intel-vl via LiteLLM) for the total, currency, card and reference,
+same LLM (intel-vl via agentgateway) for the total, currency, card and reference,
 then PATCHes the custom fields.
 
 It reads OCR text, not the image, so a receipt photographed with no usable text yields
@@ -19,9 +19,9 @@ has a Total is skipped, so re-runs only fill blanks.
 Env:
   PAPERLESS_URL        default http://paperless-app.default.svc.cluster.local:8000
   PAPERLESS_API_TOKEN  from the paperless-secret
-  LITELLM_BASE_URL     default http://litellm.default.svc.cluster.local:4000/v1
-  LITELLM_API_KEY      litellm-secret/LITELLM_MASTER_KEY
-  LITELLM_MODEL        default intel-vl
+  AIGW_BASE_URL        default http://agentgateway.default.svc.cluster.local:8082/v1
+  AIGW_API_KEY         placeholder; gateway's internal listener has no auth
+  AIGW_MODEL           default intel-vl
   MAX_DOCS             default 25
 """
 
@@ -39,9 +39,9 @@ PAPERLESS = os.environ.get(
     "http://paperless-app.default.svc.cluster.local:8000",
 ).rstrip("/")
 TOKEN = os.environ.get("PAPERLESS_API_TOKEN", "").strip()
-LITELLM = os.environ.get("LITELLM_BASE_URL", "http://litellm.default.svc.cluster.local:4000/v1").rstrip("/")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "").strip()
-MODEL = os.environ.get("LITELLM_MODEL", "intel-vl")
+AIGW = os.environ.get("AIGW_BASE_URL", "http://agentgateway.default.svc.cluster.local:8082/v1").rstrip("/")
+AIGW_KEY = os.environ.get("AIGW_API_KEY", "unused").strip()
+MODEL = os.environ.get("AIGW_MODEL", "intel-vl")
 MAX_DOCS = int(os.environ.get("MAX_DOCS", "25"))
 
 FINANCIAL_TYPES = ("Invoice", "Receipt")
@@ -109,9 +109,9 @@ def extract(content: str) -> dict:
     }
     reply = request(
         "POST",
-        f"{LITELLM}/chat/completions",
+        f"{AIGW}/chat/completions",
         body,
-        {"Authorization": f"Bearer {LITELLM_KEY}"},
+        {"Authorization": f"Bearer {AIGW_KEY}"},
     )
     choice = reply["choices"][0]
     text = choice["message"].get("content")
@@ -152,8 +152,8 @@ def custom_field_values(document: dict, ids: dict[str, int], values: dict) -> li
 
 
 def main() -> None:
-    if not TOKEN or not LITELLM_KEY:
-        sys.exit("PAPERLESS_API_TOKEN and LITELLM_API_KEY are required")
+    if not TOKEN:
+        sys.exit("PAPERLESS_API_TOKEN is required")
 
     fields = {f["name"]: f["id"] for f in list_all("/api/custom_fields/")}
     types = {t["name"]: t["id"] for t in list_all("/api/document_types/")}

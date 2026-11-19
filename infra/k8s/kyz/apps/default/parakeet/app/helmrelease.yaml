@@ -11,9 +11,9 @@
 # One container serves BOTH protocols, which is the point:
 #   tcp://parakeet.default.svc.cluster.local:10300   Wyoming  -> Home Assistant
 #   http://parakeet.default.svc.cluster.local:10301/v1/audio/transcriptions
-#                                                    OpenAI   -> litellm, if wanted
-# So HA does not need a Wyoming->OpenAI shim, and litellm can drop the whisper
-# copy from speaches when its `whisper` model_list entry is repointed here.
+#                                                    OpenAI   -> agentgateway, if wanted
+# So HA does not need a Wyoming->OpenAI shim, and speaches (with the litellm
+# pod) went away with that proxy as of 2026-11-18; repoint HA here if wanted.
 #
 # The image is a community build (gargomoma/parakeet-docker) around the
 # istupakov ONNX export; it is digest-pinned below. It runs as root by default
@@ -108,7 +108,7 @@ spec:
         ports:
           wyoming:
             port: *port
-          # OpenAI-compatible transcriptions; unused until litellm is repointed.
+          # OpenAI-compatible transcriptions; unused — nothing calls this port yet.
           openai:
             port: 10301
     persistence:

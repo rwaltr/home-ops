@@ -2480,6 +2480,62 @@ side, not just the noisy half:
   Removing (`git revert` of #963, essentially) was cheaper than maintaining the
   coupling between a git receiver URL and a job id in agent state.
 
+### 2026-11-18 (later) — litellm is deleted, agentgateway is the only door
+
+Ask: "agentgateway has fully replaced litellm, remove litellm and everything
+dependent on it." Deleted whole: the app, `litellm-config`, `litellm-secret`, the
+`litellm-models` PVC (20Gi), the `litellm.waltr.tech` route, its Homepage tile and
+`docs/local-llm.md`. Four apps and one CronJob pointed at port 4000 and now point at
+agentgateway's **8082**, the unauthenticated in-cluster listener:
+
+| Consumer            | Model               | Env                         |
+| ------------------- | ------------------- | --------------------------- |
+| `hermes`            | local aliases       | `providers.agentgateway`    |
+| `homebox-companion` | `qwen3.8-omni-flash`| `HBC_LLM_API_BASE`          |
+| `immich-paperless`  | `intel-vl`          | `AIGW_URL`                  |
+| `paperless`         | `intel-vl`          | `PAPERLESS_AI_LLM_ENDPOINT` |
+| `paperless-extract` | `intel-vl`          | `AIGW_BASE_URL`             |
+
+8082 is the right landing spot rather than a minted per-client key: all of them
+already shared litellm's single master key, so a key each would have been new
+blast-radius accounting for no actual separation. Their `LITELLM_*` env vars were
+renamed to `AIGW_*` and their keys deleted — the listener has no auth, so what is
+left is a literal `unused` where an OpenAI-shaped client insists on a bearer.
+
+**Audio did not survive, and should not have.** The speaches sidecar (whisper/piper)
+was a second copy of what the `wyoming-*` pods already serve HA, and nothing in the
+cluster ever called litellm's port 8000. `parakeet` on 10301 is the OpenAI-compatible
+STT door if one is wanted again. `homebox-companion` still imports the litellm
+*Python library* — that is the app's own code, not our proxy, and it does not require
+the proxy to exist.
+
+**What git could not move.** Home Assistant's native LiteLLM integration is
+config-flow only and lives in `.storage` on the HA PVC. It must be repointed by hand
+to `http://agentgateway.default.svc.cluster.local:8082`, and the existing
+`conversation.deepseek_v4_1_flash` entity kept in the Glados pipeline. This is the
+same class of coupling as the alert-feed job id in the entry above: a git-owned
+upstream with a UI-owned consumer, which will drift silently.
+
+Lost with litellm, deliberately: `drop_params: true` and `num_retries: 2`. An
+unsupported parameter or a dead alias now surfaces instead of being stripped or
+retried, which is the behaviour we want from a proxy that is the only door.
+
+**Lessons.**
+- **A parallel front door is cheap to run and expensive to remove.** agentgateway ran
+  beside litellm from 2026-11-14 with every upstream duplicated, and the cutover
+  still touched nine manifests for URL and key plumbing. Front both doors at one
+  config where possible; the cost lands on the day you delete one.
+- **`docs/local-llm.md` was carrying knowledge with no other home** (the HA
+  integration's config-flow-only nature, the Dan Manners spend-log retention, the
+  ollama decision-quality measurements). Deleting an app should mean moving its
+  operational notes into the surviving app's doc in the same commit, not just
+  deleting the file.
+- **Verified before cutting over, not after**: `/v1/models` and a real
+  `deepseek-v4.1-flash` completion through 8082 from another pod. The vision aliases
+  could not be verified because Dan's gateway was returning `503 upstream connection
+  failed` through *both* proxies at the time — a pre-existing outage, and the reason
+  the cutover looks safe rather than proven for `intel-vl`.
+
 ## Open questions
 
 - [ ] Controlled reboot mechanism for OS updates: kured vs manual?

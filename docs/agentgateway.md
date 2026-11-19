@@ -1,44 +1,137 @@
 # agentgateway
 
-`cr.agentgateway.dev/charts/agentgateway-standalone` — one LLM endpoint in front of
-several upstreams, plus (later) an MCP multiplexer. Runs in `default`, cluster-internal
-only, `mode: readonly` so the config comes from git and the admin API is off.
+`cr.agentgateway.dev/charts/agentgateway-standalone` — the cluster's only LLM
+endpoint, in front of several upstreams, plus an MCP multiplexer. Runs in `default`,
+`mode: readonly` so the config comes from git and the admin API is off.
 
 The chart is not app-template. Its `config` value renders verbatim into a ConfigMap
 key named `config.yaml`, and the container is started with `-f /config/config.yaml`.
 The chart also injects `config.storage.mode: file` itself; `session.secretName` is
 optional and unused here (that is only for the admin UI's cookie).
 
-## Why it exists next to litellm
+## Replaced litellm (2026-11-18)
 
-litellm stays the endpoint hermes and homebox-companion use. agentgateway is a
-second, independent front door carrying the same upstreams, and it is deliberately
-**not** chained to litellm — a hop through our own proxy would add a failure mode
-without adding anything.
+litellm was the first door: one OpenAI-compatible proxy in front of OpenRouter and
+Dan Manners' gateway, with a speaches sidecar for whisper/piper audio. It ran until
+2026-11-18 and was deleted whole — app, `litellm-config`, `litellm-secret`, the
+`litellm-models` PVC, the `litellm.waltr.tech` route, its Homepage tile and its docs.
+`docs/local-llm.md` is gone; anything still true from it lives here.
+
+**Audio went with it.** agentgateway is chat/completions, not STT/TTS, so the
+`whisper` and `piper` aliases had no successor and neither did the speaches sidecar.
+Nothing in the cluster called litellm's port 8000 — Home Assistant has always used
+the `wyoming-*` pods over the Wyoming protocol — so the second copy of whisper/piper
+(and the ~20Gi PVC holding its HF cache) was duplication all along. `parakeet` serves
+OpenAI-compatible transcriptions on 10301 if that door is ever wanted again.
+
+Everything that used to point at `litellm.default.svc.cluster.local:4000` now points
+at **8082, the unauthenticated in-cluster listener** — same trust boundary as before,
+since every one of them shared litellm's master key:
+
+| Consumer            | Model                | Env                         |
+| ------------------- | -------------------- | --------------------------- |
+| `hermes`            | local aliases        | `providers.agentgateway`    |
+| `homebox-companion` | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`          |
+| `immich-paperless`  | `intel-vl`           | `AIGW_URL`                  |
+| `paperless`         | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT` |
+| `paperless-extract` | `intel-vl`           | `AIGW_BASE_URL`             |
+
+8082 wants no key, so each of those app configs carries a placeholder (`unused`)
+rather than a Secret — the OpenAI-shaped clients refuse to run without one.
+
+**One consumer cannot move in git.** Home Assistant's native LiteLLM integration
+(Settings → Devices & services) is config-flow only and lives in `.storage` on the HA
+PVC. It needs repointing by hand: set the base URL to
+`http://agentgateway.default.svc.cluster.local:8082` and any non-empty key, then keep
+the existing `conversation.deepseek_v4_1_flash` entity in the Glados pipeline. 8082
+comes from a ClusterIP Service, so a pod in this cluster reaches it the same way HA
+reached litellm.
+
+What litellm did that agentgateway does not: `drop_params: true` and `num_retries: 2`.
+A parameter or alias an upstream rejects is now surfaced rather than retried or
+stripped — which is the better default for a proxy whose failures should be visible.
 
 `${VAR}` in the config is interpolated at runtime from the container environment, so
-no key ever appears in the ConfigMap or in git. Three keys are wired the same way
-litellm wires them:
+no key ever appears in the ConfigMap or in git. Three keys are wired this way:
 
 | Env                      | Source                                             |
 | ------------------------ | -------------------------------------------------- |
-| `OPENROUTER_API_KEY`     | `hermes-secret` — the same item litellm reads      |
+| `OPENROUTER_API_KEY`     | `hermes-secret` — the same item hermes reads       |
 | `DANMANNERS_LLM_API_KEY` | 1P `llm.cloud.danmanners.com` / `credential`       |
 | `CLIPROXYAPI_API_KEY`    | 1P `cliproxyapi` / `password`, minted by Terraform |
 
 ## Models
 
-Seven aliases, mirroring litellm's list exactly: `deepseek-v4.1-flash`,
-`qwen3.8-omni-flash`, `gpt-5.6-luna` (OpenRouter), `nvidia-llama`, `intel-llama`,
-`intel-vl`, `gptoss-llama` (Manners' gateway), plus three subscription aliases that
-resolve through cliproxyapi to the account logged in there — `claude-sonnet-5-5`,
-`claude-opus-5-5`, `claude-haiku-5-5`. Each alias is the upstream id verbatim, so a
-response always names the model that answered.
+`deepseek-v4.1-flash`, `qwen3.8-omni-flash`, `gpt-5.6-luna` (OpenRouter) and
+`voyage-code-4` (embeddings, for kritika's index); `nvidia-llama`, `intel-llama`,
+`intel-vl`, `gptoss-llama` (Manners' gateway); `go/deepseek-v4.1-flash` (OpenCode Go);
+and three subscription aliases that resolve through cliproxyapi to the account logged
+in there — `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`. Each alias is
+the upstream id verbatim, so a response always names the model that answered.
 
-Two litellm aliases are **not** here: `whisper` and `piper`. They point at
-`127.0.0.1:8000`, a sidecar inside the litellm pod, and they are transcription and
-synthesis endpoints rather than chat completions. Copying the alias without the
-sidecar would produce a model that always fails.
+Where each one really runs matters more than the alias, because it decides whether a
+request leaves the house and whether it is billed:
+
+| Alias                 | Backend       | Notes                                                                   |
+| --------------------- | ------------- | ----------------------------------------------------------------------- |
+| `deepseek-v4.1-flash` | OpenRouter    | Cloud, billed. The default for hermes and the phone clients.            |
+| `qwen3.8-omni-flash`  | OpenRouter    | Cloud. **Vision + audio + video.** homebox-companion's default.         |
+| `gpt-5.6-luna`        | OpenRouter    | Cloud. **Vision**; 404s on a video part.                                |
+| `voyage-code-4`       | OpenRouter    | Cloud. Embeddings, 1024 dims. Not on any client's allow-list.           |
+| `nvidia-llama`        | Dan's gateway | Self-hosted **Qwen3-32B** (vLLM, nvfp4), 151k context. Best local pick. |
+| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware, 229k context. PARKED on his side.  |
+| `intel-vl`            | Dan's gateway | **Vision**: Qwen3-VL-8B on an Intel Arc. Paperless + Immich use it.     |
+| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`, 114k context.                            |
+| `claude-*-5-5`        | cliproxyapi   | The paid subscription. `pi` only — see the allow-lists below.           |
+
+The two OpenRouter vision aliases exist for photo/video intake (homebox-companion and
+the walkthrough-to-CSV route). Both read image barcodes well enough to be useful but
+not perfectly: on a 49-frame test, each produced one ISBN-13 whose check digit did
+**not** validate, while the same library read in a single native-video pass
+validated 3/3. Validate the check digit before trusting a barcode, and prefer a
+video pass to supply ISBNs — rationale and numbers in `REFACTOR_PLANS.md`.
+
+## Dan Manners' gateway
+
+A shared LiteLLM proxy at `https://llm.cloud.danmanners.com/v1`, reached with its own
+outbound key (1P `llm.cloud.danmanners.com` / `credential`). It exposes ~28 models;
+only the four backed by hardware on his network are aliased here — the rest of his
+catalog is cloud-backed and proxying it would just be a second hop to
+OpenRouter/Z.ai.
+
+**What it retains.** Prompt/response content is **not** stored —
+`store_prompts_in_spend_logs` is unset (→ false), and spend-log rows come back with
+`messages={}` / `response={}` / `proxy_server_request={}`. Metadata _is_ kept:
+`maximum_spend_logs_retention_period` is unset (→ no pruning), so the model, token
+counts, cost, timing, hashed key, requester IP and user agent of every request
+persist indefinitely. The key we hold is admin-level — an unfiltered `/spend/logs`
+returns global rows from other users, and `/config/list` answers — so treat it as
+broad read on his proxy, not a scoped virtual key.
+
+Useful distinction when adding more: query `GET /v1/model/info` with the key and read
+`litellm_params.model` / `litellm_params.api_base`. Anything with an `api_base`
+pointing at `*.aiml.svc.cluster.local` or a LAN IP is self-hosted; an empty `api_base`
+with an `openrouter/...` or vendor `/...` model is cloud. Names can lie — his
+`media-analysis`, `decision` and `embed-text` are cloud (Google, OpenAI, OpenRouter),
+not local.
+
+## Adding a model
+
+Add an entry to the `llm.models` list in this app's `helmrelease.yaml`:
+
+```yaml
+- name: <alias>
+  provider: openAI
+  params:
+    apiKey: ${OPENROUTER_API_KEY}
+    baseUrl: https://openrouter.ai/api/v1
+    model: <vendor>/<model>
+```
+
+Flux reconciles the ConfigMap and the pod rolls itself (`mode: readonly`, file
+config). Outside Git/Flux: `kubectl rollout restart deploy/agentgateway -n default`.
+The alias is the upstream id verbatim by convention, so a response names what
+answered.
 
 ## Calling it
 
@@ -178,6 +271,32 @@ Until they are replaced the client exists, its signing key resolves, and any
 authorization attempt is refused. That is the correct state for a client whose callback
 is not yet known: it also means the JWT listener's JWKS URL is live rather than
 pointing at a 404.
+
+## Rolling restarts
+
+A restart of this pod used to break whatever was mid-request, and it was not the
+rollout strategy's fault: `maxUnavailable` resolves to 0 at one replica, so a new pod
+is always Ready before the old one goes. The problem was the old pod's own shutdown.
+agentgateway's drain is bounded by two config fields, and both defaults are hostile to
+a long-lived LLM response — `connectionMinTerminationDeadline` defaults to **zero**, so
+the listener closes the instant SIGTERM arrives, and `connectionTerminationDeadline`
+falls back to **5s** when the pod's grace period is not in the environment (the chart
+sets no `TERMINATION_GRACE_PERIOD_SECONDS`, and no value for the pod's grace period).
+Any completion slower than five seconds was cut as a bare EOF with no status code, and
+any connection still being routed to the dying pod was refused.
+
+Three settings now fix that, and they have to agree with each other:
+
+| Setting                            | Where                                            | Value                                                               |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| `connectionMinTerminationDeadline` | the config                                       | `10s` — keep accepting while endpoints converge                     |
+| `connectionTerminationDeadline`    | the config                                       | `295s` — the total drain window for in-flight streams               |
+| `terminationGracePeriodSeconds`    | pod spec, via `postRenderers` in the HelmRelease | `300` — must exceed the drain window, or kubelet SIGKILLs mid-drain |
+
+The chart has no value for the pod's grace period, which is why it arrives through a
+post-renderer rather than `values`. Readiness flips immediately on SIGTERM, so the pod
+leaves the Service at once while it finishes what it was doing; the proxy exits as soon
+as its connections are done, so the 300s ceiling costs nothing on an idle roll.
 
 ## MCP
 

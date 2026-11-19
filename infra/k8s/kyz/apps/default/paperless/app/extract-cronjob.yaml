@@ -5,7 +5,7 @@
 # documents. Paperless' AI suggestion action cannot write custom fields —
 # AISuggestionField stops at the created date and documents/workflows/ai.py
 # never touches them — so this job asks the same LLM directly (intel-vl via
-# LiteLLM) and PATCHes the document through the API.
+# agentgateway) and PATCHes the document through the API.
 #
 # Covers documents that did not come through the Immich bridge — an emailed PDF or a
 # manual upload — because the bridge only enriches the files it sent, joined by name.
@@ -53,14 +53,12 @@ spec:
                     secretKeyRef:
                       name: paperless-secret
                       key: PAPERLESS_API_TOKEN
-                - name: LITELLM_BASE_URL
-                  value: http://litellm.default.svc.cluster.local:4000/v1
-                - name: LITELLM_API_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: litellm-secret
-                      key: LITELLM_MASTER_KEY
-                - name: LITELLM_MODEL
+                - name: AIGW_BASE_URL
+                  value: http://agentgateway.default.svc.cluster.local:8082/v1
+                # 8082 is unauthenticated in-cluster; the key just has to be non-empty.
+                - name: AIGW_API_KEY
+                  value: unused
+                - name: AIGW_MODEL
                   value: intel-vl
               securityContext:
                 allowPrivilegeEscalation: false

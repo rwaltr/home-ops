@@ -1,8 +1,8 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# agentgateway — one LLM endpoint in front of the same upstreams litellm carries,
+# agentgateway — the only LLM endpoint now: the upstreams litellm used to carry,
 # plus cliproxyapi's subscription-backed models. Deliberately NOT chained to our
-# own litellm: this is a parallel front door, not a second hop.
+# old litellm proxy (deleted 2026-11-18), so there is no second hop to add.
 #
 # Inbound auth is absent on purpose. 8080 is cluster-internal and unauthenticated,
 # so any pod can spend these keys; that is the same posture as the MCP servers in
@@ -17,12 +17,32 @@ spec:
     kind: OCIRepository
     name: agentgateway
   interval: 30m
+  # The chart exposes no value for the pod's terminationGracePeriodSeconds (30s by
+  # default), and its drain is capped by it: without TERMINATION_GRACE_PERIOD_SECONDS
+  # in the env the proxy allows itself 5s. A chat completion routinely runs longer,
+  # so every roll cut in-flight LLM streams. The config's connectionTerminationDeadline
+  # below must stay under this value or kubelet SIGKILLs mid-drain.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: agentgateway
+            patch: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: agentgateway
+              spec:
+                template:
+                  spec:
+                    terminationGracePeriodSeconds: 300
   values:
     nameOverride: agentgateway
     mode: readonly
     replicaCount: 1
     extraEnv:
-      # Same 1P item litellm uses for its OpenRouter calls; no copy in our secret.
+      # Same 1P item hermes uses for its OpenRouter calls; no copy in our secret.
       - name: OPENROUTER_API_KEY
         valueFrom:
           secretKeyRef:
@@ -116,6 +136,14 @@ spec:
         adminAddr: "off"
         statsAddr: 0.0.0.0:15020
         readinessAddr: 0.0.0.0:15021
+        # SIGTERM drains instead of cutting. Readiness fails the moment the signal
+        # lands, but the proxy keeps ACCEPTING for `min` so requests kube-proxy is
+        # still routing to this pod are answered; in-flight streams then get until
+        # `max` to finish. The defaults are the opposite of non-breaking: min 0 and
+        # max 5s, so a roll closes the listener immediately and severs any
+        # completion that takes more than five seconds.
+        connectionMinTerminationDeadline: 10s
+        connectionTerminationDeadline: 295s
       # Three listeners, two of them authenticated.
       #
       # apiKey sits at the GATEWAY level rather than on the llm/mcp blocks because
@@ -203,7 +231,7 @@ spec:
       llm:
         gateways: [llm-public, internal]
         models:
-          # --- OpenRouter: the same three aliases litellm exposes ---
+          # --- OpenRouter: the three cloud aliases ---
           - name: deepseek-v4.1-flash
             provider: openAI
             params:
