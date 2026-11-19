@@ -135,10 +135,10 @@ upstream's own.
 
 ## Known gaps
 
-- **No database backups.** Review history, findings and usage live only on the
-  `openebs-hostpath` PVC. Config is in git and the code index rebuilds. If
-  that history starts to matter, add the CNPG Barman Cloud plugin pointed at
-  RustFS.
+- **Database backups** go to RustFS through the Barman Cloud plugin: nightly
+  base backup plus continuous WAL, 30 days (`s3://cnpg/kritika-postgres-pg18`).
+  The cluster still bootstraps with `initdb`. Restoring is the manual swap in
+  [docs/postgres.md](postgres.md#kritika).
 - **No sandboxed runtime.** mouse has no gVisor or Kata. Runner pods are still
   non-root, read-only, capability-free and network-fenced.
 - **Forgejo off LTS.** 17 is supported until 2027-01-28. Bump Forgejo every

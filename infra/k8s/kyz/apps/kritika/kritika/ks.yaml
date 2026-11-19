@@ -5,6 +5,13 @@ kind: Kustomization
 metadata:
   name: kritika
 spec:
+  # Backups only (ObjectStore, ScheduledBackup, PodMonitor); the Cluster is
+  # app/postgres.yaml. See the note there.
+  components:
+    - ../../../../components/cnpg/base
+  postBuild:
+    substitute:
+      APP: kritika
   interval: 1h
   path: ./infra/k8s/kyz/apps/kritika/kritika/app
   prune: true
@@ -15,6 +22,8 @@ spec:
   targetNamespace: kritika
   dependsOn:
     - name: cloudnative-pg # Cluster / Database / DatabaseRole CRDs
+      namespace: cnpg-system
+    - name: cloudnative-pg-barman-plugin # ObjectStore CRD, WAL archiving
       namespace: cnpg-system
     - name: onepassword-connect
       namespace: external-secrets

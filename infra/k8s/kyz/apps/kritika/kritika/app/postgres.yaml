@@ -4,9 +4,17 @@
 # lays it out, cut to one instance — this is a one-node cluster, so a standby
 # would share the node and its disk and protect against nothing.
 #
-# shortcut: no backups. kritika's config lives in git and its code index
-# rebuilds; what is lost with this PVC is review history, findings and usage.
-# Add the Barman Cloud plugin against RustFS if that history starts to matter.
+# Backed up by the Barman Cloud plugin to RustFS (docs/postgres.md): the
+# ObjectStore, ScheduledBackup and PodMonitor come from components/cnpg/base,
+# pulled in by ../ks.yaml. Not the full components/cnpg/pg18 Cluster: that one
+# lets CNPG generate `<cluster>-app`, which this chart already uses for its own
+# non-owner role (kritika_app, below), and kritika keeps a fixed owner password
+# from kritika-postgres-credentials.
+#
+# Restoring: this Cluster still bootstraps with initdb. To restore, swap
+# bootstrap for the recovery stanza in components/cnpg/pg18/cluster.yaml (source
+# kritika-postgres, serverName kritika-postgres-pg18), delete the Cluster and its
+# PVC, and let Flux recreate it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -31,6 +39,13 @@ spec:
   storage:
     storageClass: openebs-hostpath
     size: 10Gi
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: kritika-postgres
+        # The prefix inside s3://cnpg/. -pg18 so a major upgrade gets its own.
+        serverName: kritika-postgres-pg18
   bootstrap:
     initdb:
       database: kritika
