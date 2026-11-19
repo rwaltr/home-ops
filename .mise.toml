@@ -56,7 +56,7 @@ pitchfork = "latest"
 
 # Git hooks (hk.pkl) — hk needs pkl to evaluate its config.
 # hk is pinned to match the version hk.pkl amends; bump both together.
-hk = "1.45.0"
+hk = "2.13.0"
 pkl = "latest"
 
 # Tasks are file-based tasks in .mise/tasks/ — `mise tasks` is the index.
