@@ -5,8 +5,19 @@ kind: Kustomization
 metadata:
   name: mosquitto
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/mosquitto/app
+  postBuild:
+    substitute:
+      APP: mosquitto
+      # Live PVC name, checked with `kubectl get pvc -n default` (2026-11-19).
+      PVC: mosquitto
+      # Retained messages (HA discovery, availability) are load-bearing; losing
+      # them leaves devices unavailable until each republishes. Runs as 1000,
+      # the component default.
+      KOPIUR_CRON: "H 18 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

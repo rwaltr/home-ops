@@ -10,32 +10,27 @@ spec:
   route:
     receiver: pushover
     repeatInterval: 12h
+    # Policy: every alert must be actionable, or removed (docs/adr/0018,
+    # openspec/specs/alert-routing). Blackhole is only for alerts that must keep
+    # firing because something depends on them; each route says what. A
+    # non-actionable alert is removed at its rule, not routed here.
     routes:
+      # Never actionable on its own: the chart ships it to drive an inhibit rule
+      # that mutes info-severity alerts. This config loads no such rule (only the
+      # two under inhibitRules below), so today it inhibits nothing. Open item
+      # under the policy: wire that inhibit rule or disable the alert at source.
       - receiver: blackhole
         matchers:
           - name: alertname
             value: InfoInhibitor
             matchType: =
-      # always-firing heartbeat; no heartbeat consumer exists — don't push it
+      # Must fire: always-on dead-man heartbeat. Kept firing so a heartbeat
+      # consumer can be wired to it; until then nothing reads it.
       - receiver: blackhole
         matchers:
           - name: alertname
             value: Watchdog
             matchType: =
-      # Unmanic is a deliberately CPU-saturating background transcoder
-      # (priorityClass unmanic-background), so CPU alerts about that pod are
-      # expected steady state, not signal. Blackholed, not silenced: they stay
-      # visible in the Alertmanager UI and in Prometheus, they just do not page.
-      # Matches the pod name prefix, so it covers any CPU alert now or later
-      # (CPUThrottlingHigh today) for the pod, whatever its hash suffix.
-      - receiver: blackhole
-        matchers:
-          - name: pod
-            value: unmanic-.*
-            matchType: =~
-          - name: alertname
-            value: .*CPU.*
-            matchType: =~
       - receiver: pushover
         matchers:
           - name: severity

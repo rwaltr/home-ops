@@ -5,8 +5,19 @@ kind: Kustomization
 metadata:
   name: cliproxyapi
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/cliproxyapi/app
+  postBuild:
+    substitute:
+      APP: cliproxyapi
+      # Live PVC name, checked with `kubectl get pvc -n default` (2026-11-19).
+      PVC: cliproxyapi-auth
+      # Rotating OAuth token pairs; losing them means a hand login per account.
+      # The image runs as 10000 (fsGroup 10000), so the mover matches it.
+      KOPIUR_RUNAS: "10000"
+      KOPIUR_CRON: "H 21 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

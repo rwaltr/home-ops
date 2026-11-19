@@ -3,6 +3,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: otbr-bootstrap
+  annotations:
+    # The script uses shell ${state}/${OTBR_DATASET_TLV}; without this Flux's
+    # postBuild substitution (added for the kopiur backup component) would
+    # replace them with empty strings and seed an empty dataset.
+    kustomize.toolkit.fluxcd.io/substitute: disabled
 data:
   seed-dataset.sh: |-
     #!/usr/bin/env bash

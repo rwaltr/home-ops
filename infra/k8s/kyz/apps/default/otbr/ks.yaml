@@ -5,8 +5,20 @@ kind: Kustomization
 metadata:
   name: otbr
 spec:
+  components:
+    - ../../../../components/kopiur/backup
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/otbr/app
+  postBuild:
+    substitute:
+      APP: otbr
+      # Live PVC name, checked with `kubectl get pvc -n default` (2026-11-19).
+      PVC: otbr
+      # The Thread network dataset, as rewritten by otbr-agent after the first
+      # seed from 1Password. The agent runs privileged as root and its files are
+      # mode 0600 root:root, so the mover has to read them as 0.
+      KOPIUR_RUNAS: "0"
+      KOPIUR_CRON: "H 20 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

@@ -10,19 +10,11 @@ kind: Kustomization
 metadata:
   name: slskd
 spec:
-  components:
-    - ../../../../components/kopiur/backup
+  # Disabled app: no kopiur backup. On re-enable, add the kopiur backup
+  # component back with PVC `slskd` (not `slskd-app-data` — app-template only
+  # suffixes the name once a second PVC exists) — see openspec/specs/pvc-backups.
   interval: 1h
   path: ./infra/k8s/kyz/apps/default/slskd/app
-  postBuild:
-    substitute:
-      APP: slskd
-      # The PVC renders as `slskd`, not `slskd-app-data` — app-template only
-      # suffixes the name once a second PVC exists. Corrected on re-enable; the
-      # old value named a claim that does not exist, so the kopiur policy would
-      # have failed instead of backing anything up.
-      PVC: slskd
-      KOPIUR_CRON: "H 10 * * *"
   prune: true
   sourceRef:
     kind: GitRepository

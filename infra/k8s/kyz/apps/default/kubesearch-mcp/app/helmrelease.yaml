@@ -99,6 +99,8 @@ spec:
           http:
             port: 3000
     persistence:
+      # The kubesearch SQLite index, fetched from GitHub releases on start:
+      # re-downloadable, so no kopiur backup (openspec/specs/pvc-backups).
       data:
         type: persistentVolumeClaim
         accessMode: ReadWriteOnce
