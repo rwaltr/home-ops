@@ -20,6 +20,6 @@ spec:
     # fails against a proxy that isn't up.
     - name: homebox
       namespace: default
-    - name: litellm
+    - name: agentgateway
       namespace: default
   wait: false

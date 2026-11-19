@@ -126,10 +126,10 @@ both AI integrations authenticate:
 
 - **homebox-companion** — photo in, structured item out (vision model extracts
   name, quantity, serial, price), plus an AI chat that can edit inventory. It
-  uses the LiteLLM _library_, so `HBC_LLM_API_BASE` points at our own proxy and
-  `HBC_LLM_MODEL` names an alias in `litellm-config`'s `model_list`
+  uses the LiteLLM _library_, so `HBC_LLM_API_BASE` points at agentgateway's
+  internal listener and `HBC_LLM_MODEL` names an alias in the agentgateway config
   (`openai/qwen3.8-omni-flash`) — a nonstandard alias also needs
-  `HBC_LLM_ALLOW_UNSAFE_MODELS=true`, or LiteLLM's capability check refuses it.
+  `HBC_LLM_ALLOW_UNSAFE_MODELS=true`, or the library's capability check refuses it.
 - **homebox-mcp** — inventory Q&A / intake over MCP (`dgahagan/homebox-mcp`).
   Not a cluster workload: pi spawns it over stdio from `.pi/mcp.json`, reading
   `HOMEBOX_URL` + `HOMEBOX_TOKEN` (1Password `homebox-mcp`/`API_KEY`) via fnox.

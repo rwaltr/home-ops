@@ -47,11 +47,10 @@ correspondent, document type, storage path, dates), **document chat** and
 **similar documents** (RAG). The non-LLM classifier still runs alongside it.
 
 - **Generation** — `intel-vl`, a **Qwen3-VL-8B** on an Intel Arc in Dan Manners'
-  cluster, reached through the local LiteLLM alias, so nothing is billed to a
-  model provider. The key is `litellm-secret` / `LITELLM_MASTER_KEY`. His proxy
-  does **not** store prompt or response content, so document text never reaches
-  his spend logs — it is still processed in memory on his hardware. See
-  `docs/local-llm.md`.
+  cluster, reached through the local agentgateway alias, so nothing is billed to a
+  model provider. His proxy does **not** store prompt or response content, so
+  document text never reaches his spend logs — it is still processed in memory on
+  his hardware. See `docs/agentgateway.md`.
 - **Embeddings** — `huggingface` with `sentence-transformers/all-MiniLM-L6-v2`,
   running in-process. No embedding backend, no API key, nothing leaves the
   cluster. Cache lives on the tank (see storage); first use downloads ~90 MB.
@@ -197,7 +196,7 @@ Limits worth knowing:
 Paperless' AI suggestion action cannot write custom fields, so a CronJob fills
 the financial ones. `paperless-extract` (`paperless_extract.py`, every 5
 minutes) scans documents typed `Invoice` or `Receipt`, asks `intel-vl` through
-LiteLLM for the values, and PATCHes the document:
+agentgateway for the values, and PATCHes the document:
 
 | Field            | Example     |
 | ---------------- | ----------- |

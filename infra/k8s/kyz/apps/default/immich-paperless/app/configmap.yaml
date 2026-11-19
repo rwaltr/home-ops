@@ -69,9 +69,10 @@ data:
     # VISION_MODEL points at intel-vl (Qwen3-VL-8B on Dan's Intel Arc), so that call
     # costs nothing and the photo stays off a model provider.
     MAX_VISION_CALLS = int(os.environ.get("MAX_VISION_CALLS", "20"))
-    LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm.default.svc.cluster.local:4000")
+    AIGW_URL = os.environ.get("AIGW_URL", "http://agentgateway.default.svc.cluster.local:8082")
     VISION_MODEL = os.environ.get("VISION_MODEL", "intel-vl")
-    VISION_KEY = os.environ.get("LITELLM_API_KEY", "")
+    # 8082 carries no auth, so this is a placeholder: the request shape wants a bearer.
+    VISION_KEY = os.environ.get("AIGW_API_KEY", "unused")
 
     # The closed vocabulary the model must choose from. Free-form tags sprawl into
     # hundreds nobody can filter on, so anything outside this set is dropped and
@@ -215,8 +216,6 @@ data:
         be treated as a rejection: an outage would otherwise teach the library that
         every unreadable asset is junk, and that verdict is cached as a tag.
         """
-        if not VISION_KEY:
-            return None, "no LITELLM_API_KEY"
         try:
             image = api(f"/assets/{asset_id}/thumbnail?size=preview", raw=True)
         except SystemExit as err:
@@ -237,7 +236,7 @@ data:
             ],
         }
         req = urllib.request.Request(
-            LITELLM_URL.rstrip("/") + "/v1/chat/completions",
+            AIGW_URL.rstrip("/") + "/v1/chat/completions",
             method="POST",
             data=json.dumps(body).encode(),
             headers={"Authorization": f"Bearer {VISION_KEY}", "Content-Type": "application/json"},
@@ -246,9 +245,9 @@ data:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 payload = json.loads(resp.read().decode() or "{}")
         except urllib.error.HTTPError as err:
-            return None, f"litellm {err.code}"
+            return None, f"agentgateway {err.code}"
         except Exception as err:  # noqa: BLE001 - any transport failure means no answer
-            return None, f"litellm unreachable ({err})"
+            return None, f"agentgateway unreachable ({err})"
         text = ((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         return parse_verdict(text)
 
@@ -517,7 +516,7 @@ data:
             ],
         }
         req = urllib.request.Request(
-            LITELLM_URL.rstrip("/") + "/v1/chat/completions",
+            AIGW_URL.rstrip("/") + "/v1/chat/completions",
             method="POST",
             data=json.dumps(body).encode(),
             headers={"Authorization": f"Bearer {VISION_KEY}", "Content-Type": "application/json"},
@@ -526,9 +525,9 @@ data:
             with urllib.request.urlopen(req, timeout=180) as resp:
                 payload = json.loads(resp.read().decode() or "{}")
         except urllib.error.HTTPError as err:
-            return None, f"litellm {err.code}"
+            return None, f"agentgateway {err.code}"
         except Exception as err:  # noqa: BLE001 - any transport failure means no answer
-            return None, f"litellm unreachable ({err})"
+            return None, f"agentgateway unreachable ({err})"
         text = ((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:

@@ -24,6 +24,15 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: agentgateway
+  annotations:
+    # Listed on the Homepage dashboard — see docs/homepage.md. The old litellm tile
+    # went with its route; this is the same door under its only name.
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: agentgateway
+    gethomepage.dev/description: OpenAI-compatible LLM gateway + MCP multiplex
+    gethomepage.dev/group: AI
+    gethomepage.dev/icon: sh-agentgateway
+    gethomepage.dev/href: https://llm.waltr.tech
 spec:
   hostnames:
     - llm.waltr.tech

@@ -8,9 +8,11 @@
 # holds a Homebox API key that can read and write the entire inventory, and
 # anyone who can reach the UI acts as that key's owner.
 #
-# It calls the in-cluster LiteLLM proxy with the LiteLLM *library*, so
-# HBC_LLM_MODEL is addressed as openai/<alias> against HBC_LLM_API_BASE — the
-# alias must exist in litellm-config's model_list (litellm app, same namespace).
+# It calls agentgateway on its unauthenticated in-cluster listener (8082), which
+# serves the same aliases an OpenAI-compatible /v1 would. It uses the LiteLLM
+# *library* to do it, so HBC_LLM_MODEL is addressed as openai/<alias> against
+# HBC_LLM_API_BASE, and the alias must exist in the agentgateway config (same
+# namespace). That library dependency is the app's own code, not our proxy.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -49,14 +51,16 @@ spec:
               # Item/location links in the chat UI are for the human's browser, so
               # these must be the reachable hostname, not the service DNS above.
               HBC_LINK_BASE_URL: https://homebox.waltr.tech
-              HBC_LLM_API_BASE: http://litellm.default.svc.cluster.local:4000/v1
+              HBC_LLM_API_BASE: http://agentgateway.default.svc.cluster.local:8082/v1
+              # 8082 has no auth; the OpenAI-shaped client still insists on a key.
+              HBC_LLM_API_KEY: unused
               # Measured on a real 49-frame walkthrough before picking this over
               # gpt-5.6-luna: 3/3 book titles exact, 3/4 barcodes with a valid
               # ISBN-13 check digit, and the only alias that also takes audio and
               # video. Slower per photo than luna (19.3s avg, 96.7s worst frame
               # vs 9.0s/18.1s) — change this line, not the UI, if that bites.
               HBC_LLM_MODEL: openai/qwen3.8-omni-flash
-              # Required for any alias LiteLLM's model database doesn't know:
+              # Required for any alias the library's model database doesn't know:
               # capability detection otherwise refuses the model outright.
               HBC_LLM_ALLOW_UNSAFE_MODELS: "true"
               # Keep the photos the app uploads to Homebox at full quality; the

@@ -176,7 +176,7 @@ const NODES = [
 
   { id: "vision", col: 0, row: 6, title: "intel-vl vision", actor: "dan", flows: ["upload", "decide", "backstop"],
     sub: "Qwen3-VL-8B · temperature 0 · JSON mode",
-    detail: "One call, one JSON object: <code>description</code>, <code>tags</code>, <code>document</code>, <code>useful</code>, <code>confidence</code>, <code>kind</code>.<br><br>The model is the <b>only</b> classifier — there is no CLIP gate and no local-OCR gate. It runs on an Intel Arc in Dan's cluster through our own LiteLLM alias, so the photo stays off a model provider and nothing is billed. It also flaps while its owner redeploys it, which is why a failure is never cached as a verdict." },
+    detail: "One call, one JSON object: <code>description</code>, <code>tags</code>, <code>document</code>, <code>useful</code>, <code>confidence</code>, <code>kind</code>.<br><br>The model is the <b>only</b> classifier — there is no CLIP gate and no local-OCR gate. It runs on an Intel Arc in Dan's cluster through our own agentgateway alias, so the photo stays off a model provider and nothing is billed. It also flaps while its owner redeploys it, which is why a failure is never cached as a verdict." },
 
   { id: "d-junk", col: 0, row: 7, title: "document, and worth keeping?", actor: "bridge", flows: ["decide", "backstop"],
     kind: "decision",

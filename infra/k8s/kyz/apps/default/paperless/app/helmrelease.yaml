@@ -119,19 +119,18 @@ spec:
               # is separate until it is linked in the UI.
               PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
               # Native AI (Paperless 3.0+), off by default. Generation —
-              # suggestions and document chat — runs on Qwen3-32B through the
-              # local LiteLLM, which proxies Dan Manners' self-hosted vLLM (his
-              # proxy does not store prompt/response content; see
-              # docs/local-llm.md). Embeddings stay local in-process, so the RAG
+              # suggestions and document chat — runs on intel-vl through
+              # agentgateway's internal listener, which proxies Dan Manners'
+              # self-hosted vLLM (his proxy does not store prompt/response
+              # content; see docs/agentgateway.md). Embeddings stay local in-process, so the RAG
               # index needs no second backend and no embedding API key.
               PAPERLESS_AI_ENABLED: "true"
               PAPERLESS_AI_LLM_BACKEND: openai-like
               PAPERLESS_AI_LLM_MODEL: intel-vl
-              PAPERLESS_AI_LLM_ENDPOINT: http://litellm.default.svc.cluster.local:4000/v1
-              PAPERLESS_AI_LLM_API_KEY:
-                secretKeyRef:
-                  name: litellm-secret
-                  key: LITELLM_MASTER_KEY
+              PAPERLESS_AI_LLM_ENDPOINT: http://agentgateway.default.svc.cluster.local:8082/v1
+              # Port 8082 is the unauthenticated in-cluster listener, so this is a
+              # placeholder: the OpenAI backend refuses an empty key, nothing checks it.
+              PAPERLESS_AI_LLM_API_KEY: unused
               PAPERLESS_AI_LLM_EMBEDDING_BACKEND: huggingface
               PAPERLESS_AI_LLM_EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
               # Model cache. The default is the data dir (the kopia-backed PVC),
@@ -346,8 +345,7 @@ spec:
             app:
               - path: /usr/src/paperless/consume
       # Hugging Face cache for the local embedding model (HF_HOME above).
-      # Re-downloadable, so deliberately not kopia-backed — same call as the
-      # LiteLLM model weights.
+      # Re-downloadable, so deliberately not kopia-backed.
       models:
         type: hostPath
         hostPath: /var/tank/nas/paperless/models

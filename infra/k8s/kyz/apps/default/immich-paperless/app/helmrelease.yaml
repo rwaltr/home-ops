@@ -9,8 +9,8 @@
 #
 # "Look like a document" is a cascade, cheapest evidence first: CLIP smart search
 # for recall (free, over-suggests), Immich's stored OCR text for confirmation
-# (free, local), and only then a vision model through LiteLLM - which is NOT free
-# and does send the image to OpenRouter. MAX_VISION_CALLS caps that per run, and
+# (free, local), and only then a vision model through agentgateway - which is NOT
+# free and does send the image to OpenRouter. MAX_VISION_CALLS caps that per run, and
 # the vision stage is skipped entirely once OCR has been backfilled, because most
 # assets then answer for themselves.
 #
@@ -65,11 +65,11 @@ spec:
               # Tag applied after a successful handoff; also the idempotency key.
               SENT_TAG: paperless-sent
               CONSUME_DIR: /consume
-              # Vision confirm stage. LITELLM_API_KEY arrives with envFrom below.
-              # intel-vl is Qwen3-VL-8B on Dan's Intel Arc, reached through our own
-              # LiteLLM alias - self-hosted, not a model provider. Anything else
-              # named here (e.g. qwen3.8-omni-flash) sends the photo to OpenRouter.
-              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              # Vision confirm stage. intel-vl is Qwen3-VL-8B on Dan's Intel Arc,
+              # reached through our own agentgateway alias - self-hosted, not a model
+              # provider. Anything else named here (e.g. qwen3.8-omni-flash) sends the
+              # photo to OpenRouter. 8082 needs no key.
+              AIGW_URL: http://agentgateway.default.svc.cluster.local:8082
               VISION_MODEL: intel-vl
               # Immich OCR must beat this score to count as evidence of text.
               # Per run, so a 500-photo day cannot quietly run up a bill.
@@ -106,7 +106,7 @@ spec:
               IMMICH_ALBUM: Paperless
               SENT_TAG: paperless-sent
               CONSUME_DIR: /consume
-              LITELLM_URL: http://litellm.default.svc.cluster.local:4000
+              AIGW_URL: http://agentgateway.default.svc.cluster.local:8082
               VISION_MODEL: intel-vl
               MAX_VISION_CALLS: "20"
               # Long enough for Immich's own OCR job to finish and become evidence.
