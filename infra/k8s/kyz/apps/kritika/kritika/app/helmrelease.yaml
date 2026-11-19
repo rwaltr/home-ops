@@ -68,15 +68,16 @@ spec:
         model: agentgateway/claude-sonnet-5-5
         # Used when the subscription refuses (rate limit, session expired).
         fallback: agentgateway/deepseek-v4.1-flash
-        # The one approval master needs, for Renovate's PRs only: kritika
-        # approves when its review finds nothing at P0/P1, and Forgejo's
-        # merge-when-checks-succeed (requested by Renovate) then merges. Set
+        # The one approval master needs, for Renovate's and rwaltr's PRs:
+        # kritika approves when its review finds nothing at P0/P1. For
+        # Renovate, Forgejo's merge-when-checks-succeed then merges. Set
         # here, not in a repo's .kritika.yaml, so a PR cannot widen it.
-        # Everything else — Hermes, people — still needs rwaltr's approval.
+        # Add future bot accounts to `bots` above and to this expression.
+        # Everything else still needs rwaltr's approval.
         approve:
           when:
-            - name: renovate
-              expr: pr.bot && pr.author == "renovate"
+            - name: trusted-authors
+              expr: (pr.bot && pr.author == "renovate") || pr.author == "rwaltr"
       # Similar-code index: what bjw-s runs. Changing model/dims drops every index.
       embedding:
         model: agentgateway/voyage-code-4

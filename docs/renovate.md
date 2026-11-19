@@ -46,14 +46,15 @@ here. Instead:
 1. Renovate opens the PR. Where a `.renovate/autoMerge.json` rule matches,
    it asks Forgejo to merge once checks pass (`platformAutomerge`).
 2. Lint runs on the in-cluster runner.
-3. kritika reviews. It approves **only** PRs opened by `renovate`
-   (`review.approve.when` in kritika's HelmRelease, which a repo's
+3. kritika reviews. It approves **only** PRs opened by `renovate` or
+   `rwaltr` (`review.approve.when` in kritika's HelmRelease, which a repo's
    `.kritika.yaml` can't widen), and only when it finds nothing at P0 or P1.
 4. Forgejo merges once lint passes and the approval lands.
 
-PRs that don't match an automerge rule, and every PR from anyone else, wait
-for you. A later kritika review that finds a problem withdraws its approval,
-and a new push dismisses stale approvals.
+PRs that don't match an automerge rule wait for you to merge, and PRs from
+any other account wait for your approval too. A later kritika review that
+finds a problem withdraws its approval, and a new push dismisses stale
+approvals.
 
 ## Load limits
 
