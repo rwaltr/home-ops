@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+#MISE description="Seed a new CloudNativePG backup prefix (once per database; see docs/postgres.md)"
+#USAGE arg "<namespace>" help="Namespace the app's Cluster lives in"
+#USAGE arg "<kustomization>" help="The app's Flux Kustomization name (its ks.yaml metadata.name)"
+#USAGE flag "--import-host <host>" help="Import this live database instead of starting empty (pg_dump via CNPG's microservice import)"
+#USAGE flag "--import-secret <secret>" help="basic-auth Secret (username/password) for --import-host, in <namespace>"
+#USAGE flag "--import-db <db>" help="Database to import (default: the Cluster's database)"
+#USAGE flag "--yes" help="Skip the confirmation prompt"
+#
+# Ported from bjw-s-labs/home-ops `just k8s seed-cnpg`. components/cnpg/pg18
+# bootstraps by RECOVERING from the object store, so a brand-new database has
+# nothing to recover from until this writes a first base backup into the exact
+# prefix (serverName) the real Cluster will use. Run it ONCE per new database,
+# from a working tree with the app committed locally but not yet merged. It is
+# never needed for disaster recovery, only at creation or if the bucket is lost.
+#
+# A temporary `<cluster>-seed` Cluster is rendered from the same manifests Flux
+# will apply, with bootstrap.recovery swapped for initdb (optionally importing an
+# existing database), backed up once, then deleted.
+set -euo pipefail
+source "${MISE_PROJECT_ROOT}/.mise/lib/common.sh"
+
+ns="${usage_namespace:?}"
+ks="${usage_kustomization:?}"
+import_host="${usage_import_host:-}"
+import_secret="${usage_import_secret:-}"
+import_db="${usage_import_db:-}"
+if [[ -n "$import_host" && -z "$import_secret" ]]; then
+  die "--import-host needs --import-secret"
+fi
+
+ksfile=$(grep -rlE "^  name: ${ks}$" "${MISE_PROJECT_ROOT}/infra/k8s/kyz/apps" --include=ks.yaml | head -1)
+[[ -n "$ksfile" ]] || die "no ks.yaml with metadata.name ${ks}"
+path=$(yq -r "select(.metadata.name == \"${ks}\") | .spec.path" "$ksfile")
+manifest=$(flux build kustomization "$ks" --path "${MISE_PROJECT_ROOT}/${path#./}" \
+  --kustomization-file "$ksfile" --dry-run 2>/dev/null)
+
+cluster=$(yq -r 'select(.kind == "Cluster") | .metadata.name' <<<"$manifest")
+[[ -n "$cluster" ]] || die "no CloudNativePG Cluster rendered by ${ks}"
+if kubectl -n "$ns" get cluster "$cluster" &>/dev/null; then
+  die "Cluster ${ns}/${cluster} already exists, refusing to seed"
+fi
+database=$(yq -r 'select(.kind == "Cluster") | .spec.bootstrap.recovery.database' <<<"$manifest")
+owner=$(yq -r 'select(.kind == "Cluster") | .spec.bootstrap.recovery.owner' <<<"$manifest")
+server=$(yq -r 'select(.kind == "Cluster") | .spec.plugins[0].parameters.serverName' <<<"$manifest")
+
+log "seed ${ns}/${cluster}: database=${database} owner=${owner} prefix=s3://cnpg/${server}"
+[[ -n "$import_host" ]] && log "importing ${import_db:-$database} from ${import_host} (writes to the source must be stopped)"
+if [[ -z "${usage_yes:-}" ]]; then
+  read -r -p "Continue? [y/N] " ok
+  [[ "$ok" == [yY] ]] || die "aborted"
+fi
+
+seed="${cluster}-seed"
+backup="${seed}-$(date +%s)"
+trap 'kubectl -n "$ns" delete cluster "$seed" --ignore-not-found --wait=true >/dev/null' EXIT
+
+log "applying object store and credentials"
+ES="${cluster}-objectstore" yq -r '
+    select(.kind == "ObjectStore"
+           or (.kind == "ExternalSecret" and .metadata.name == strenv(ES)))
+  ' <<<"$manifest" |
+  kubectl -n "$ns" apply --server-side --force-conflicts --field-manager=kustomize-controller -f - >/dev/null
+kubectl -n "$ns" wait externalsecret "${cluster}-objectstore" --for=condition=Ready --timeout=2m >/dev/null
+
+# Same Cluster Flux will apply, renamed, with initdb instead of recovery.
+# serverName is left exactly as rendered: the seed writes its base backup into
+# the prefix the real cluster later recovers from and archives into.
+#
+# For an import the owner is made superuser before pg_restore runs as it
+# (--role=<owner>), or CREATE EXTENSION vchord/earthdistance fails. The flag is
+# restored with the data, so the real Cluster's owner stays superuser.
+log "creating temporary seed cluster ${seed}"
+yq -r 'select(.kind == "Cluster")' <<<"$manifest" |
+  SEED="$seed" DB="$database" OWNER="$owner" HOST="$import_host" SECRET="$import_secret" \
+    IDB="${import_db:-$database}" yq -r '
+    .metadata.name = strenv(SEED)
+    | .spec.instances = 1
+    | del(.spec.externalClusters)
+    | .spec.bootstrap = {"initdb": {"database": strenv(DB), "owner": strenv(OWNER)}}
+    | (select(strenv(HOST) != "") | .spec.bootstrap.initdb.import = {
+        "type": "microservice",
+        "databases": [strenv(IDB)],
+        "source": {"externalCluster": "import-source"}
+      }
+      | .spec.bootstrap.initdb.postInitSQL = ["ALTER ROLE \"" + strenv(OWNER) + "\" SUPERUSER"]
+      | .spec.externalClusters = [{
+        "name": "import-source",
+        "connectionParameters": {"host": strenv(HOST), "user": "postgres", "dbname": strenv(IDB), "sslmode": "disable"},
+        "password": {"name": strenv(SECRET), "key": "password"}
+      }]) // .
+  ' |
+  kubectl -n "$ns" apply --server-side --force-conflicts -f - >/dev/null
+
+kubectl -n "$ns" wait cluster "$seed" --for=condition=Ready --timeout=20m >/dev/null ||
+  die "seed cluster never became Ready: kubectl -n ${ns} describe cluster ${seed}"
+
+log "triggering initial base backup ${backup}"
+BACKUP="$backup" SEED="$seed" yq -n '{
+    "apiVersion": "postgresql.cnpg.io/v1",
+    "kind": "Backup",
+    "metadata": {"name": strenv(BACKUP)},
+    "spec": {
+      "cluster": {"name": strenv(SEED)},
+      "method": "plugin",
+      "pluginConfiguration": {"name": "barman-cloud.cloudnative-pg.io"}
+    }
+  }' | kubectl -n "$ns" apply --server-side -f - >/dev/null
+
+while true; do
+  phase=$(kubectl -n "$ns" get backup "$backup" -o jsonpath='{.status.phase}')
+  case "$phase" in
+    completed) break ;;
+    failed) die "backup failed: kubectl -n ${ns} describe backup ${backup}" ;;
+    *)
+      log "waiting for backup (${phase:-pending})"
+      sleep 10
+      ;;
+  esac
+done
+kubectl -n "$ns" delete backup "$backup" --wait=false >/dev/null
+log "seeded s3://cnpg/${server}; merge the app and let Flux create ${cluster}"

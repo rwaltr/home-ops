@@ -1,0 +1,107 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/postgresql.cnpg.io/cluster_v1.json
+#
+# One PostgreSQL 18 cluster per app, ported from bjw-s-labs/home-ops
+# (components/cnpg). Instantiated from the app's ks.yaml:
+#
+#   spec:
+#     components:
+#       - ../../../../components/cnpg/pg18
+#     postBuild:
+#       substitute:
+#         APP: immich
+#
+# CloudNativePG generates ${APP}-postgres-app (username, password, uri, host...)
+# in the app's namespace; point the app at its `uri`. A brand-new database must
+# be seeded first: `mise run cnpg:seed <namespace> <kustomization>`
+# (docs/postgres.md), because the bootstrap below recovers rather than initdb's.
+#
+# Variables (all optional except APP):
+#   CNPG_DATABASE / CNPG_OWNER   database and owning role (default: ${APP})
+#   CNPG_CAPACITY                PVC size (default 8Gi)
+#   CNPG_MEMORY_REQUEST/LIMIT    default 256Mi / 1Gi
+#   CNPG_BACKUP_SCHEDULE         six-field cron (default 02:00 daily)
+#   CNPG_RETENTION               backup retention (default 30d)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${APP}-postgres
+  annotations:
+    # Every incarnation of this cluster recovers from, and then archives back into,
+    # the same serverName prefix, so the prefix is never empty and the empty-WAL-
+    # archive check would refuse to start archiving. Skipping it is what makes the
+    # recovery stanza below reusable instead of one-shot.
+    cnpg.io/skipEmptyWalArchiveCheck: "enabled"
+spec:
+  # Permanent disaster-recovery stanza. `bootstrap` and `externalClusters` are read
+  # ONLY when the Cluster is first created, so this is inert for the life of a
+  # running cluster.
+  #
+  #   - no recoveryTarget -> latest base backup, WAL replayed to the end
+  #   - no secret         -> CNPG generates ${APP}-postgres-app with a fresh random
+  #                          password and, because `owner` matches its username,
+  #                          resets the restored role's password to match.
+  #
+  # Recovery only fires when CNPG creates a NEW data directory. To restore, delete
+  # the Cluster *and* its PVC; a dangling PVC is reused instead.
+  bootstrap:
+    recovery:
+      source: ${APP}-postgres
+      database: ${CNPG_DATABASE:=${APP}}
+      owner: ${CNPG_OWNER:=${APP}}
+  enablePDB: false # one instance: a PDB would only block node drains
+  enableSuperuserAccess: false
+  externalClusters:
+    - name: ${APP}-postgres
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: ${APP}-postgres
+          serverName: ${CNPG_SERVER_NAME:=${APP}-postgres-pg18}
+  # `standard`, not bjw-s's `minimal`: it ships pgvector (Immich's VectorChord
+  # needs it) and the contrib extensions Immich uses (cube, earthdistance,
+  # pg_trgm, unaccent, uuid-ossp). Backups go through the plugin either way.
+  #
+  # MAJOR UPGRADES: do not edit this in place. Copy this directory to ../pg19,
+  # change the image major, the vchord image and the -pgNN suffix on
+  # CNPG_SERVER_NAME there, and repoint the app's ks.yaml. pg_upgrade resets the
+  # timeline to 1 and the plugin does not separate archives on its own, so reusing
+  # the prefix would let the upgraded cluster overwrite the old one's WAL.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-standard-bookworm@sha256:30d0a38b6df3da24e89a2cfbe800e422c3ef13fa427aa5523f2a7d3fecb53b34
+  instances: 1 # single node: a replica would share the same disk
+  plugins:
+    # serverName is pinned rather than left to default to the cluster name,
+    # because the seed cluster (${APP}-postgres-seed) writes into this same prefix
+    # and it has to stay changeable for major upgrades. One variable feeds both
+    # the archiver here and the recovery source above, so the two cannot drift.
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: ${APP}-postgres
+        serverName: ${CNPG_SERVER_NAME:=${APP}-postgres-pg18}
+  postgresql:
+    # VectorChord, loaded in every cluster: it is an image volume, not part of
+    # the postgres image, and costs nothing until a database creates it.
+    extensions:
+      - name: vchord
+        image:
+          reference: ghcr.io/tensorchord/vchord-scratch:pg18-v1.1.1@sha256:bdea43bed2a414e21bbf71767bf6f0739747ac480b267b51772dc214ac28dcb3
+        dynamic_library_path:
+          - /usr/lib/postgresql/18/lib/
+        extension_control_path:
+          - /usr/share/postgresql/18/
+    shared_preload_libraries:
+      - vchord
+    parameters:
+      max_slot_wal_keep_size: 2GB
+  primaryUpdateMethod: switchover
+  primaryUpdateStrategy: unsupervised
+  resources:
+    requests:
+      cpu: ${CNPG_CPU_REQUEST:=50m}
+      memory: ${CNPG_MEMORY_REQUEST:=256Mi}
+    limits:
+      memory: ${CNPG_MEMORY_LIMIT:=1Gi}
+  storage:
+    size: ${CNPG_CAPACITY:=8Gi}
+    storageClass: openebs-hostpath

@@ -97,6 +97,7 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
   requirement that put it on the list
 - `docs/forgejo.md` — Forgejo forge (git.waltr.tech): bots work here, `master` push-mirrors to GitHub for Flux; cutover order
 - `docs/kritika.md` — kritika AI PR reviewer on Forgejo: JWT authorized integrations (why Forgejo is on 17), the two-step install, egress allow-list
+- `docs/postgres.md` — CloudNativePG: one cluster per app (components/cnpg/pg18), Barman backups to RustFS, `mise run cnpg:seed`, restores and major upgrades
 - `docs/renovate.md` — Renovate on Forgejo via renovate-operator: bot token, App-minted github.com token, PR automerge through lint + kritika approval
 - `docs/hermes-agent.md` — Hermes agent
 - `docs/comms-demos.md` — Matrix comms-channel demo (internal-only; agent not wired in)

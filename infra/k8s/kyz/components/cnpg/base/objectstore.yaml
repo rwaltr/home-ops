@@ -1,0 +1,34 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/barmancloud.cnpg.io/objectstore_v1.json
+# Where this database's base backups and WAL go: RustFS (tank/backup/k8s), the
+# same backend kopiur uses, over plain in-cluster HTTP.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: ${APP}-postgres
+spec:
+  configuration:
+    # serverName must NOT be set here. The CRD rejects it and points at the
+    # serverName plugin parameter on the Cluster, which is what gives every
+    # database its own prefix inside the shared bucket.
+    destinationPath: s3://cnpg/
+    endpointURL: http://rustfs-svc.kopiur-system.svc.cluster.local:9000
+    s3Credentials:
+      accessKeyId:
+        name: ${APP}-postgres-objectstore-secret
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKey:
+        name: ${APP}-postgres-objectstore-secret
+        key: AWS_SECRET_ACCESS_KEY
+    data:
+      compression: gzip
+    wal:
+      compression: gzip
+      maxParallel: 2
+  instanceSidecarConfiguration:
+    resources:
+      requests:
+        cpu: 10m
+      limits:
+        memory: 256Mi
+  retentionPolicy: ${CNPG_RETENTION:=30d}
