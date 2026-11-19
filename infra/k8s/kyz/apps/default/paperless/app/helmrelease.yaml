@@ -93,6 +93,10 @@ spec:
               # PAPERLESS_URL seeds ALLOWED_HOSTS, CORS and CSRF origins. Without
               # it the login POST fails CSRF verification behind the gateway.
               PAPERLESS_URL: https://paperless.waltr.tech
+              # 3.5 enforces ALLOWED_HOSTS; these add to PAPERLESS_URL's host so
+              # in-cluster callers (paperless-extract, immich-paperless-bridge)
+              # that use the Service name don't get 400.
+              PAPERLESS_ALLOWED_HOSTS: paperless-app.default.svc.cluster.local,paperless-app
               PAPERLESS_USE_X_FORWARD_HOST: "true"
               PAPERLESS_USE_X_FORWARD_PORT: "true"
               PAPERLESS_PROXY_SSL_HEADER: '["HTTP_X_FORWARDED_PROTO", "https"]'
