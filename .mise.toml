@@ -38,6 +38,11 @@ oxfmt = "0.71.0"
 shellcheck = "latest"
 editorconfig-checker = "latest"
 "npm:markdownlint-cli2" = "latest"
+
+# Spec-driven change planning (openspec/). npm backend, not aqua: openspec ships only
+# as @fission-ai/openspec, and the unscoped `openspec` package on npm is an unrelated
+# placeholder that resolves to 0.0.0.
+"npm:@fission-ai/openspec" = "latest"
 # uv makes mise install pipx: tools with uv rather than the host's pipx, so CI does
 # not depend on the runner image's pipx (catthehacker ships 1.4.3, which predates
 # `pipx upgrade-shared` and fails `mise install`).
@@ -69,3 +74,5 @@ pkl = "latest"
 
 [env]
 _.file = ".env"
+# openspec phones home by default; this repo's specs are infrastructure detail.
+OPENSPEC_TELEMETRY = "0"

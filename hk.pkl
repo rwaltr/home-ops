@@ -34,6 +34,8 @@ local fast = new Mapping<String, Step> {
         check = "yamllint -c .github/linters/yamllint.yaml {{files}}"
     }
     ["markdownlint"] {
+        // .agents/skills/openspec-* are ignored for MD036/MD031 via
+        // .markdownlint-cli2.yaml, not the --config rules file.
         glob = List("**/*.md", "**/*.markdown")
         check = "markdownlint-cli2 --config .github/linters/markdownlint.yaml {{files}}"
         fix = "markdownlint-cli2 --config .github/linters/markdownlint.yaml --fix {{files}}"
@@ -68,6 +70,12 @@ local slow = new Mapping<String, Step> {
     // trivy scans IaC trees, so it always runs repo-wide.
     ["trivy"] {
         check = "trivy config --quiet --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .vm --ignorefile .github/linters/trivyignore.yaml ."
+    }
+    // Validates openspec/ artifacts repo-wide: a change spans proposal, deltas,
+    // design and tasks, so per-file checking is meaningless. Says nothing about
+    // whether a manifest renders — that is what the flatcar/k0s VM tasks are for.
+    ["openspec-validate"] {
+        check = "openspec validate --all --strict --no-interactive"
     }
     // Full git history (~3k commits, <1s), which the staged scan cannot see:
     // secrets committed before this hook existed are still live secrets.

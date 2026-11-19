@@ -79,7 +79,13 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 
 ## 📚 Documentation Index
 
-- `REFACTOR_PLANS.md` — historical decisions and lessons
+- `REFACTOR_PLANS.md` — historical decisions and lessons (frozen long-form log)
+- `docs/adr/` — architecture decision records: the decisions that still bind, one
+  short file each, with a pointer back to the REFACTOR_PLANS entry. Add one when a
+  decision is hard to reverse, surprising, and a real trade-off.
+- `openspec/` — spec-driven change planning: durable capability specs under
+  `openspec/specs/`, in-flight proposals under `openspec/changes/`. See
+  `openspec/README.md`. Specs describe behaviour; they are not a deploy approval.
 - `docs/jellyfin-metadata.md`, `docs/jellyfin-direct-play.md`, `docs/jellyfin-language-filtering.md`
 - `docs/agentgateway.md` — the LLM door: OpenRouter chat, self-hosted aliases, subscription models, MCP multiplex (replaced litellm 2026-11-18)
 - `docs/tailscale.md` — Tailnet: Terraform-owned policy/DNS/settings, the Kubernetes operator credential, and the manual bootstrap step
@@ -107,6 +113,10 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 
 - **Adding a new service**: add to the Flux GitOps layout under `infra/k8s/kyz/apps/`.
   See the service docs under `docs/`.
+- **Changing existing behaviour**: `/skill:openspec-propose "<idea>"` to write the
+  proposal, spec delta, design, and tasks; implement with
+  `/skill:openspec-apply-change` in a later request. `mise run lint` validates the
+  artifacts (`openspec validate --all --strict`).
 - **Checking the cluster's secrets exist**: `mise run secrets:verify` walks every
   ExternalSecret and checks each 1Password item/field it references (labels only,
   never values). It reads the manifests, so it cannot drift from them. It does not

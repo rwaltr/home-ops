@@ -1,0 +1,50 @@
+---
+schema: spec-driven
+
+context: |
+  Single-user homelab: Flatcar host (mouse) + single-node k0s/Cilium cluster,
+  reconciled by Flux from infra/k8s/kyz. AGENTS.md is canonical policy; do not
+  restate it here or in specs.
+
+  These artifacts describe behaviour and contracts, not a manifest inventory.
+  A spec states observable, testable requirements; REFACTOR_PLANS.md stays the
+  historical decision log and docs/*.md stays the per-service runbook.
+
+  Separate what the repo shows from what is assumed and from what was verified
+  live. Repo edits, planning artifacts, and archive never authorize a deploy,
+  a merge, a Terraform apply, or any change to running infrastructure.
+
+  Host config belongs in infra/flatcar, workloads belong in the cluster, and
+  secrets come from 1Password via External Secrets — never plaintext, and never
+  referenced by value in an artifact.
+
+rules:
+  proposal:
+    - State the outcome, the affected capability, and explicit non-goals.
+    - Call out availability, data-loss, and access-control risk where relevant.
+  specs:
+    - Write observable behaviour with concrete scenarios, not copies of YAML.
+    - Do not promote accidental implementation details to requirements.
+    - Preserve capability paths; express behaviour change as a delta.
+    - Additional destructuring of existing docs is not a goal — one baseline per
+      capability that a real change needs.
+  design:
+    - Trace resource ownership and the Flux reconciliation path before choosing
+      an approach.
+    - Cover deployment impact, the validation that proves it, and rollback for
+      anything disruptive (storage, namespaces, bootstrap, prune).
+    - Name secret references and their consumers; never include values.
+  tasks:
+    - Use concrete repo paths and the mise task that executes the validation.
+    - Separate local edits from operational steps needing explicit approval.
+    - Add recovery checks for storage, namespace, bootstrap, or ownership changes.
+
+operations:
+  apply:
+    guidance:
+      - Run `mise run lint` and any task-level validation before reporting done.
+      - Report local validation separately from deployment and runtime verification.
+      - Leave unapproved operational steps pending; do not mark them completed.
+  archive:
+    guidance:
+      - Report unresolved validation gaps and deployment status explicitly.
