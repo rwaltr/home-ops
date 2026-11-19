@@ -205,13 +205,12 @@ offline.
   takes. Its 250m CPU request keeps the cgroup CPU weight low for the same
   reason: it only gets CPU nobody else wants, and a killed transcode is
   re-queued rather than lost.
-- **Its CPU alerts do not page**: the blackhole route is now a guard, not a
-  standing condition. With no CPU quota there is no CFS throttling, so
-  `CPUThrottlingHigh` (severity `info`) should stop firing entirely — it was
-  firing around the clock solely because of the removed 4-core cap. A route in
-  `infra/k8s/kyz/apps/o11y/kube-prometheus-stack/app/alertmanagerconfig.yaml`
-  still sends CPU alerts for `pod =~ "unmanic-.*"` to the `blackhole` receiver,
-  so a re-introduced cap stays visible in the Alertmanager UI without paging.
+- **No CPU alerts**: with no CPU quota there is no CFS throttling, so
+  `CPUThrottlingHigh` cannot fire for Unmanic — it was firing around the clock
+  solely because of the removed 4-core cap. The old blackhole route for
+  `pod =~ "unmanic-.*"` CPU alerts was removed on 2026-11-19 (no such alert in 30
+  days of Prometheus retention) under the every-alert-actionable policy
+  (`docs/adr/0018-every-alert-actionable.md`). Do not re-add a CPU limit.
 - Libraries: **TV** `/media/tv` and **Movies** `/media/movies`,
   scanner + inotify enabled, scan every 60 min.
 

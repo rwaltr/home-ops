@@ -6,6 +6,9 @@ The cluster side of this peering lives in
 
 ## BGP: accept Cilium LB VIPs from mouse
 
+Decision record: [ADR 0003](../../docs/adr/0003-cilium-bgp-vips.md). Split DNS below
+is part of `openspec/specs/service-exposure`.
+
 **Two sessions, one per family.** A v4-transport session advertising v6 NLRI
 yields a v4-mapped next-hop (`::ffff:10.10.0.10` — 6PE/MPLS semantics), which
 RouterOS cannot use for plain-Ethernet v6 forwarding. Splitting the families

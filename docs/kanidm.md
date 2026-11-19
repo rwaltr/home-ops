@@ -1,8 +1,10 @@
 # Kanidm
 
 Identity provider for the cluster, deployed with **kaniop**, the third-party
-Kubernetes operator for Kanidm. Not yet serving anything — this records the
-decisions so far and what it is for.
+Kubernetes operator for Kanidm. It serves `idm.waltr.tech` on both gateways and
+is the OIDC/OAuth2 issuer for Forgejo, FreshRSS, HomeBox, Homepage, Paperless,
+kritika, renovate-operator, Grafana, and agentgateway's `/oauth/mcp` door — each
+holds a `KanidmOAuth2Client` in its own `app/oauth2client.yaml`.
 
 ## Why it exists
 
@@ -12,8 +14,11 @@ authorization endpoint, token endpoint, PKCE. agentgateway authenticates with
 `apiKey`, which no header configuration satisfies. Something has to issue tokens,
 and the same requirement applies to any other client that only speaks OAuth.
 
-That is why `llm.waltr.tech` is unpublished. The gateway is fine; the door has
-nothing that can authenticate an OAuth-only client.
+That was why `llm.waltr.tech` was unpublished until Kanidm existed: the gateway
+was fine, but the door had nothing that could authenticate an OAuth-only client.
+It is published again with a JWT-verified `/oauth/mcp` path — see
+`docs/agentgateway.md`. Once the issuer was there, the other apps' logins moved
+onto it too.
 
 ## Why kaniop, and why not PostgreSQL
 
@@ -321,11 +326,14 @@ consent screen is the cost.
 
 ## Not done yet
 
-The OAuth2 client and the gateway's `jwtAuth` policy, which is what Grok needs.
-That is also when `llm.waltr.tech` gets republished, since the flow needs both
-the authorization server and the MCP endpoint reachable from outside.
+Grok's OAuth2 client (`apps/default/agentgateway/app/oauth2client.yaml`) and the
+gateway's `jwtAuth` policy are deployed, but the client's `origin` and
+`redirectUrl` are still `.invalid` placeholders: xAI does not publish its
+callback. Until they are replaced, every authorization attempt is refused —
+deliberately. See the comment at the top of that file for where the real values
+come from.
 
-Publishing the IdP is a route move and nothing else: `idm.waltr.tech` is already
+Publishing the IdP was a route move and nothing else: `idm.waltr.tech` is already
 covered by the tunnel's `*.waltr.tech` rule, so no tunnel change is needed. (This
 was two changes while the login page sat on the apex, because a wildcard does not
 match the apex — moving it to the subdomain removed that whole class of problem.)

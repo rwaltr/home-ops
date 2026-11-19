@@ -6,6 +6,9 @@ alert-triage job is gone (2026-11-18, see `REFACTOR_PLANS.md`).
 
 ## Sources
 
+Contract: `openspec/specs/alert-routing`. Policy: every alert must be actionable, or
+removed (`docs/adr/0018-every-alert-actionable.md`).
+
 1. **Prometheus rules → Alertmanager.** Everything in the
    `kube-prometheus-stack` rule set. This is the visible path: it exists as
    `ALERTS` series in Prometheus, so a window can be counted and attributed
@@ -27,14 +30,15 @@ The live routing table is generated from the `AlertmanagerConfig` CR in
 
 - `pushover` — the human receiver. Everything that pages a phone goes here.
 - `blackhole` — deliberately silent, still visible in the Alertmanager UI and in
-  Prometheus. Used for `InfoInhibitor`, `Watchdog`, and Unmanic's by-design CPU
-  alerts. Blackholing is a routing decision, never a silence or a deleted rule.
+  Prometheus. Used only for alerts that must keep firing but are never actionable
+  alone: `InfoInhibitor` and `Watchdog`. A non-actionable alert is not blackholed;
+  its rule is fixed or removed.
 
 There is no agent receiver. Route order only decides which blackholes win
 (Alertmanager evaluates siblings first-match-wins and falls back to the root
 `pushover` when no child matched):
 
-- the three blackhole routes come first;
+- the two blackhole routes come first;
 - `pushover` for `severity=critical`, then the root `pushover` fallback for
   everything else — one notification per alert, critical or not.
 
@@ -59,8 +63,10 @@ the budget is measured against the pushover send counter
 - **An alert fires and nothing pages.** Check `GET /api/v2/alerts/groups` for the
   receiver the group dispatches to, then the Alertmanager pod log: a failing
   notification is logged there and raises `AlertmanagerFailedToSendAlerts`.
-- **Do not** replace a blackhole with a silence or a deleted rule to quieten a
-  notification. Only the notification is unwanted; the condition is real.
+- **Do not** quieten a noisy alert with a silence or a new blackhole route. If the
+  page has no action, fix the rule's threshold or `for:` so it fires only when
+  action is needed, or remove the rule (for chart rules, disable it in the
+  chart's values).
 
 ## Silences
 
@@ -74,7 +80,8 @@ from the operator's HelmRelease and cannot be in the same apply.
 - **A silence is a notification decision, not a fix.** It suppresses delivery;
   the alert keeps firing and stays visible in the Alertmanager UI and Prometheus.
   The distinction from `blackhole` routing matters: blackhole is permanent and
-  declares a condition by-design, a silence is time-bounded.
+  only for alerts something depends on, a silence is time-bounded and only for
+  planned work.
 - **Every silence is dated and disposable.** `spec.endsAt` is required in
   practice; a Silence CR with no end date is a permanent mute that nobody will
   remember to remove. Delete the CR once its window has passed rather than

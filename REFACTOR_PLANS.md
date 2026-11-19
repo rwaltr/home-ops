@@ -1,6 +1,9 @@
 # Refactor Plans: Flatcar + k0s + GitOps
 
-> **Status**: Planning / Phase 0 (Flatcar validation)
+> **Status**: Historical. The migration is done and mouse runs this stack; this file
+> is a frozen decision log and lessons file. Decisions that still bind are
+> summarised as ADRs in [`docs/adr/`](docs/adr/), and durable contracts live in
+> [`openspec/specs/`](openspec/specs/).
 > **Reference architecture**: [onedr0p/home-ops](https://github.com/onedr0p/home-ops) (reviewed 2026-08; local clone at `~/src/onedr0p/home-ops`)
 > **Owner**: @rwaltr
 
@@ -8,36 +11,37 @@
 
 Migrate the homelab from uCore + Quadlets to a GitOps-managed Kubernetes stack:
 
-````text
-Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
 ```text
+Flatcar (ZFS sysext) → k0sctl/k0s → Cilium (BGP) → Envoy Gateway → Flux
+```
 
 Single node (`mouse`) serves **both** ZFS storage and primary compute. Nodes live in
 the management VLAN but must directly serve a second VLAN.
 
 ## Key decisions
 
-| Decision      | Choice                                                                            | Rationale                                                                                                                                                                                                             |
-| ------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host OS       | **Flatcar** (replacing uCore)                                                     | A/B updates, smaller surface, official ZFS sysext since 3913.0.0 (dm-verity signed, Secure Boot OK, version-locked to release). Caveat: tagged "experimental", not for root partition (data pools only — fine for us) |
-| Cluster       | **k0s via k0sctl**                                                                | Already deployed on mouse; k0sctl is SSH-based, distro-agnostic. ⚠️ Do NOT use `--profile flatcar` (stale docs — no such worker profile exists; silently wedges the node)                                             |
-| CNI           | **Cilium** (`provider: custom` in k0s config, kube-proxy replacement)             | BGP control plane replaces MetalLB/L2 announcements                                                                                                                                                                   |
-| LB/VIPs       | **Cilium BGP** (`CiliumBGPClusterConfig` + `CiliumLoadBalancerIPPool`)            | Router supports BGP peering; VIPs live in dedicated service CIDR announced as /32s                                                                                                                                    |
-| Ingress       | **Envoy Gateway** (Gateway API)                                                   | Two Gateways (internal/external) with pinned VIPs via `lbipam.cilium.io/ips`; apps attach via app-template `route:`                                                                                                   |
-| GitOps        | **Flux** (flux-operator + flux-instance)                                          | onedr0p layout: single root ks → `kubernetes/apps`, Kustomize components for cross-cutting concerns                                                                                                                   |
-| Charts        | **bjw-s app-template via OCIRepository** for all apps                             | One values schema, digest-pinned images                                                                                                                                                                               |
-| Storage       | **OpenEBS localpv-provisioner hostpath** on OS NVMe (non-default class)           | ~~ZFS LocalPV~~ rejected: `poolname` must be a zpool (topology match), and tank stays outside the PVC lifecycle by design                                                                                             |
-| Backups       | kopiur-style snapshots → **RustFS** (S3)                                          | Our RustFS is the S3 backend, like onedr0p's expanse                                                                                                                                                                  |
-| Logs          | **VictoriaLogs single + Fluent Bit** (OCIRepository charts)                       | Slim by design: no Loki cache/compactor/index tiers and no separate index store, so it fits a node with no swap. 64Mi request / 256Mi limit; 14d + 8Gi retention caps. See `docs/logging.md`                        |
-| Calendar      | **Radicale 3.8.1 + CalDAV** (shared calendar, Remind as a read-only feed)         | The only protocol iOS Calendar, Android (DAVx⁵) and HA's CalDAV integration all speak natively. mTLS rejected — see `docs/calendar.md`. Collections pre-seeded by an init container, sharing by `map` (a rights file breaks client discovery) |
-| VLAN L2 needs | Multus + macvlan NAD **only** for discovery-dependent apps (home-assistant class) | BGP/routed VIPs cover everything else                                                                                                                                                                                 |
+| Decision      | Choice                                                                                                                      | Rationale                                                                                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host OS       | **Flatcar** (replacing uCore)                                                                                               | A/B updates, smaller surface, official ZFS sysext since 3913.0.0 (dm-verity signed, Secure Boot OK, version-locked to release). Caveat: tagged "experimental", not for root partition (data pools only — fine for us)                         |
+| Cluster       | **k0s via k0sctl**                                                                                                          | Already deployed on mouse; k0sctl is SSH-based, distro-agnostic. ⚠️ Do NOT use `--profile flatcar` (stale docs — no such worker profile exists; silently wedges the node)                                                                     |
+| CNI           | **Cilium** (`provider: custom` in k0s config, kube-proxy replacement)                                                       | BGP control plane replaces MetalLB/L2 announcements                                                                                                                                                                                           |
+| LB/VIPs       | **Cilium BGP** (`CiliumBGPClusterConfig` + `CiliumLoadBalancerIPPool`)                                                      | Router supports BGP peering; VIPs live in dedicated service CIDR announced as /32s                                                                                                                                                            |
+| Ingress       | **Envoy Gateway** (Gateway API)                                                                                             | Two Gateways (internal/external) with pinned VIPs via `lbipam.cilium.io/ips`; apps attach via app-template `route:`                                                                                                                           |
+| GitOps        | **Flux** (flux-operator + flux-instance)                                                                                    | onedr0p layout: single root ks → `kubernetes/apps`, Kustomize components for cross-cutting concerns                                                                                                                                           |
+| Charts        | **bjw-s app-template via OCIRepository** for all apps                                                                       | One values schema, digest-pinned images                                                                                                                                                                                                       |
+| Storage       | **OpenEBS localpv-provisioner hostpath** on OS NVMe (non-default class)                                                     | ~~ZFS LocalPV~~ rejected: `poolname` must be a zpool (topology match), and tank stays outside the PVC lifecycle by design                                                                                                                     |
+| Backups       | kopiur-style snapshots → **RustFS** (S3)                                                                                    | Our RustFS is the S3 backend, like onedr0p's expanse                                                                                                                                                                                          |
+| Logs          | ~~**VictoriaLogs single + Fluent Bit**~~ — decommissioned 2026-11-07, see [ADR 0013](docs/adr/0013-no-cluster-log-store.md) | Slim by design: no Loki cache/compactor/index tiers and no separate index store, so it fits a node with no swap. 64Mi request / 256Mi limit; 14d + 8Gi retention caps. See `docs/logging.md`                                                  |
+| Calendar      | **Radicale 3.8.1 + CalDAV** (shared calendar, Remind as a read-only feed)                                                   | The only protocol iOS Calendar, Android (DAVx⁵) and HA's CalDAV integration all speak natively. mTLS rejected — see `docs/calendar.md`. Collections pre-seeded by an init container, sharing by `map` (a rights file breaks client discovery) |
+| VLAN L2 needs | Multus + macvlan NAD **only** for discovery-dependent apps (home-assistant class)                                           | BGP/routed VIPs cover everything else                                                                                                                                                                                                         |
 
 ### Deferred
 
 - **Istio ambient** — revisit only if workload mTLS/SPIFFE identity becomes a concrete
   need. Requires `socketLB.hostNamespaceOnly: true` + `cni.exclusive: false` with
   kube-proxy replacement, and default-deny policies block kubelet probes. Not worth it day one.
-- **Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.
+- ~~**Secrets**: currently SOPS+age; onedr0p uses 1Password Connect + ESO. Decide before Phase 3.~~
+  Decided: 1Password Connect + ESO — see [ADR 0012](docs/adr/0012-1password-connect-and-eso-for-secrets.md).
 
 ### Additional decisions (2026-09-10 ~4am, smarthome stack on the SLZB-Ultima3)
 
@@ -458,7 +462,7 @@ the management VLAN but must directly serve a second VLAN.
   accept = 127.0.0.1:16994
   connect = 10.10.0.9:16995
   options = ALLOW_UNSAFE_LEGACY_RENEGOTIATION
-```text
+  ```
 
   ```bash
   podman run -d --name amt-bridge --rm --network host \
@@ -471,7 +475,7 @@ the management VLAN but must directly serve a second VLAN.
     docker.io/library/node:22-slim bash -c \
     "cd /tmp && npm install meshcommander --no-audit --no-fund --loglevel=error && node node_modules/meshcommander"
   # → http://localhost:3000, Add Computer = 127.0.0.1, admin + MEBx pw, TLS OFF
-```bash
+  ```
 
   Direct curl works with an OPENSSL_CONF allowing UnsafeLegacyRenegotiation (SECLEVEL=1).
   AMT DHCP mode = shared host IP (snoops host's DHCP) — host is static, so AMT must be static.
@@ -485,7 +489,7 @@ the management VLAN but must directly serve a second VLAN.
   kernel_arguments:
     should_exist:
       - console=ttyS0,115200n8
-```text
+  ```
 
   systemd auto-spawns serial-getty on console= ports, so that's the whole OS side.
   Client: `amtterm -h 127.0.0.1 -u admin -p <MEBx pw>` (amtterm pkg) through the
@@ -533,7 +537,7 @@ impression:
    fails, and the app never wakes. Upstream avoids this only by probing
    something that is up independently of the app. Real wake-on-request needs
    KEDA's HTTP add-on to intercept and buffer the request at the ingress.
-3. **The *arr stack calls itself on a schedule, outside any user request.**
+3. **The \*arr stack calls itself on a schedule, outside any user request.**
    sonarr/radarr poll prowlarr for RSS/indexer sync every 15-60 min, bazarr and
    seerr query sonarr/radarr, recyclarr syncs on a cron. Idling prowlarr or
    sonarr breaks those callers, and a request-driven trigger never sees the
@@ -568,23 +572,24 @@ second node appears and something like KEDA is wanted for its own sake.
    `sources` list cannot be templated, so `home-assistant` (two PVCs) keeps a
    hand-written `kopia.yaml`. onedr0p has the same exception.
 5. **Compensating control:** Flux honours `kustomize.toolkit.fluxcd.io/substitute: disabled`
-   on *any* kind, not just ConfigMaps/Secrets. Adding `postBuild` to an app makes
+   on _any_ kind, not just ConfigMaps/Secrets. Adding `postBuild` to an app makes
    Flux substitute into every manifest it renders, which silently blanks shell
    `${VAR}` in HelmRelease values (`hermes`'s `${GH}`/`${GO}` init container).
-   `otbr` has the same latent hazard and is only safe because it has no `postBuild` yet.
+   `otbr` had the same latent hazard; since 2026-11-19 it has `postBuild` (kopiur
+   backup) and its ConfigMap carries `kustomize.toolkit.fluxcd.io/substitute: disabled`.
 6. **Kopiur's `H` is Jenkins-style but bare-only** — `croner` + `substitute_h`
    replaces a field only when it is exactly `H`, so `H(2-5)` is invalid and hour
    windows cannot be expressed. `H H * * *` would spread all apps across the
    full day automatically (and drop `KOPIUR_CRON` from every ks.yaml) —
    deliberately not done here to keep the refactor behavior-preserving.
 7. **Verify rendered policies against the live cluster** — `flux build kustomization <app>
-   --path <app> --kustomization-file <ks.yaml> --dry-run` renders locally
+--path <app> --kustomization-file <ks.yaml> --dry-run` renders locally
    without a round-trip, so a wrong PVC name can be caught before it burns a night.
-4. **Bootstrap as explicit DAG** (helmfile `needs:`), CRDs applied out-of-band to kill dependsOn chains
-5. **Zero secrets in git** — resolved at render/apply time
-6. **Renovate does the heavy lifting** — shared presets, digest automerge, min release age
-7. **CI pulls images on PR** to catch dead registries before merge
-8. Webhook `Receiver` for push-to-reconcile (seconds, not the 1h interval)
+8. **Bootstrap as explicit DAG** (helmfile `needs:`), CRDs applied out-of-band to kill dependsOn chains
+9. **Zero secrets in git** — resolved at render/apply time
+10. **Renovate does the heavy lifting** — shared presets, digest automerge, min release age
+11. **CI pulls images on PR** to catch dead registries before merge
+12. Webhook `Receiver` for push-to-reconcile (seconds, not the 1h interval)
 
 ## Lessons from knuckle (`~/src/knuckle`, projectbluefin Flatcar installer)
 
@@ -702,21 +707,21 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
   frigate integration (MQTT auto-discovery, URL
   `http://frigate.default.svc.cluster.local:5000`) + frigate-card with
   `live_provider: go2rtc, modes: [webrtc]` + `menu.buttons.microphone`.
-- **k8s-gateway upstream migration** (was broken ~2 days unnoticed — chart
-  - pod kept running, only the helmrepo refresh 404'd):
-  * `k8s-gateway.github.io` index → 404; true new home is the
+- **k8s-gateway upstream migration** (was broken ~2 days unnoticed — chart +
+  pod kept running, only the helmrepo refresh 404'd):
+  - `k8s-gateway.github.io` index → 404; true new home is the
     `k8s-gateway/k8s_gateway` fork (GitHub read-only mirror + codeberg),
     Helm repo `https://k8s-gateway.kryptonian.kapsi.fi/`, chart 3.7.3,
     image `codeberg.org/k8s-gateway/k8s_gateway:1.8.3` (public).
-  * intermediate detour through `ori-edge.github.io` was a dead end:
+  - intermediate detour through `ori-edge.github.io` was a dead end:
     chart 2.4.0 defaults to `quay.io/oriedge/k8s_gateway` which went
     **private** (401) — do NOT pin that.
-  * debugging notes: a wedged kustomization reconcile survived `--force`;
+  - debugging notes: a wedged kustomization reconcile survived `--force`;
     clearing required deleting the ks object + restarting
     kustomize-controller. Helm upgrade loops showed "release is in a
     failed state" while waiting on the crashlooping deployment.
-  * split-DNS verified restored (v4+v6 records for envoy VIPs).
-  * backlog idea (user): replace k8s-gateway with
+  - split-DNS verified restored (v4+v6 records for envoy VIPs).
+  - backlog idea (user): replace k8s-gateway with
     `mirceanton/external-dns-provider-mikrotik` (records written into
     RouterOS DNS — survives cluster outages; cost: router-side state).
 
@@ -835,15 +840,15 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
     silently truncated. Measured: a 1.33 GB video died at exactly 15.0 s through
     `envoy-internal` when throttled (and via CF), while sub-15 s media
     completed — hence "some videos" failing. Fixed by `timeout.http.requestTimeout:
-    0s` on the shared `BackendTrafficPolicy/envoy` (`envoy.yaml`); the stream
+0s` on the shared `BackendTrafficPolicy/envoy` (`envoy.yaml`); the stream
     idle timeout still reaps dead connections.
   - **QUIC connector stalls.** The cloudflared connector also used the default
     QUIC edge protocol, whose connection-level flow-control credit (`MAX_DATA`)
     intermittently stalls while the edge keeps routing requests to it
     (cloudflared#1767, #1519; signature `stream N canceled by remote with error
-    code 0` + repeated QUIC reconnects). Forced `--protocol http2` in the
+code 0` + repeated QUIC reconnects). Forced `--protocol http2` in the
     cloudflare-tunnel args; verify with `grep protocol=` (expect `protocol=http2`).
-  - LAN traffic never touches the tunnel, but it *does* cross the gateway — the
+  - LAN traffic never touches the tunnel, but it _does_ cross the gateway — the
     timeout affected internal playback too.
 
 ### 2026-09-22 — OTBR moved in-cluster; HA zeroconf needed per-VLAN enablement
@@ -945,9 +950,9 @@ is not available`). Commission via My Leviton app + share, or GMS phone.
 `Committed_AS` 37.9Gi while PSI stayed 0.00 — no stalls yet, but no spike
 headroom either. Three findings, all fixed (commit `e382efd0`):
 
-- **ZFS ARC was effectively uncapped.** `zfs_arc_max=0` is *not* "default
+- **ZFS ARC was effectively uncapped.** `zfs_arc_max=0` is _not_ "default
   50%" on OpenZFS 2.2+ — it means **all RAM minus 1Gi** (`c_max` was 30Gi on
-  this box). ARC held 8.1Gi for an 11Gi pool. ARC is *not* page cache: it
+  this box). ARC held 8.1Gi for an 11Gi pool. ARC is _not_ page cache: it
   counts as **used**, and the OOM killer fires before ARC shrinks. Capped at
   4Gi via `/etc/modprobe.d/zfs.conf`.
 - **`kopiur-webhook` leaked to 1.8Gi** against a 64Mi request with no limit,
@@ -969,7 +974,7 @@ Gotchas from the audit:
   `/proc/<pid>/cgroup` → `kubepods/…/pod<UID>` → match the UID against
   `kubectl get pods -A -o json`. It was kopiur-webhook; degoog was fine.
 - **Ignition only runs on first boot.** Butane changes pin the ARC cap and
-  zram for a *future reprovision*, but a plain reboot loses anything applied
+  zram for a _future reprovision_, but a plain reboot loses anything applied
   live with `echo > /sys` or `modprobe`. Both were also written to the running
   host (`/etc/modprobe.d/zfs.conf`, `zram-swap.service` + `systemctl enable`).
 - Per-pod numbers come from cgroup v2 `memory.current`/`memory.peak` under
@@ -982,7 +987,7 @@ endpoint (`litellm.default.svc.cluster.local:4000`, UI at
 documented in [`docs/local-llm.md`](docs/local-llm.md); the lessons:
 
 - **ollama's OpenAI endpoint silently DROPS `think`.** Only the native
-  `/api/chat` honours it (verified all three paths). So *any* thinking model
+  `/api/chat` honours it (verified all three paths). So _any_ thinking model
   reached through LiteLLM thinks unconditionally — 500-1500 tokens of preamble
   per reply, i.e. 20-60s of dead air, which reads as "broken". Workaround:
   rebuild the model with the nothink generation prompt baked into its template
@@ -990,25 +995,25 @@ documented in [`docs/local-llm.md`](docs/local-llm.md); the lessons:
   exists. Putting `/no_think` in the prompt does **not** work — the template
   injects an empty think block; the model does not read the text token.
 - **MiniCPM5-2B was the wrong model for chat, right for decisions.** It's the
-  smallest *useful* decision model (SemIf's ladder: 0.686 balanced accuracy vs
+  smallest _useful_ decision model (SemIf's ladder: 0.686 balanced accuracy vs
   Qwen3.5-4B's 0.813) — but a reasoning model at 2B on CPU. Dropped from chat;
   weights pruned. Keep the distinction in mind before re-adding.
 - **`acon96/Home-FunctionGemma-270m` loops forever on ollama** — it repeats the
   same `<start_function_call>` until `num_predict` runs out. The GGUF's
-  template emits the end token as *text*, so nothing stops generation, and
+  template emits the end token as _text_, so nothing stops generation, and
   270M is too small to recover from re-prompting. Pruned. The GGUF-download
   init container went with it. Expect the same class of problem with any
   acon96 GGUF until ollama parses FunctionGemma's format.
 - **`roryeckel/wyoming_openai` is the opposite direction to its name** — it's
-  a *Wyoming server* fronting OpenAI backends, not an OpenAI shim for Wyoming
-  services. LiteLLM cannot front the wyoming-* pods (TCP protocol), so audio
+  a _Wyoming server_ fronting OpenAI backends, not an OpenAI shim for Wyoming
+  services. LiteLLM cannot front the `wyoming-*` pods (TCP protocol), so audio
   is a **speaches** sidecar: a second copy of whisper/piper, bounded by
   `STT_MODEL_TTL=300`. Consolidation path (bridge + delete wyoming-* pods) is
   noted in the release comments.
 - **1Password Connect caches vault contents.** A newly created item is
   invisible to ESO ("key not found in 1Password Vaults") until the connect pod
   is restarted. Force ESO after: `kubectl annotate externalsecret <n>
-  force-sync=$(date +%s) --overwrite`.
+force-sync=$(date +%s) --overwrite`.
 - **HA 2026.9 ships a native LiteLLM integration** (conversation agent,
   auto-discovers models from `/v1/models`). HA's own OpenAI integration is
   hardcoded to OpenAI with no base-URL option, so this is the supported path.
@@ -1038,7 +1043,7 @@ Full write-up and reproduce steps: **`docs/jellyfin-direct-play.md`**.
 
 **Prevention (Recyclarr, `72cbb61d`).** The profile the library actually uses,
 `HD-1080p` (id 4), was unmanaged — only `WEB-2160p (Combined)` was in the
-config, and the Radarr half used **Sonarr's trash_ids**, so Radarr had *zero*
+config, and the Radarr half used **Sonarr's trash_ids**, so Radarr had _zero_
 custom formats and logged `Invalid trash_id` every night. Both apps now manage
 `HD-1080p` by explicit `name` (343 movie / 80 series assignments survive),
 `upgrade: false` so adopting the TRaSH quality set does not trigger a mass
@@ -1058,13 +1063,13 @@ plugin that returns a verdict, and plugins execute in
 `LibraryPluginFlow.position` order — not the order `POST /plugins/flow`
 reports.** The ffprobe gate (`limit_library_search_by_ffprobe_data`) only ever
 sets `add_file_to_pending_tasks = False`; put it last and it never runs, so
-`video_transcoder` votes first and *every* H.264/HEVC file gets queued. Gate
+`video_transcoder` votes first and _every_ H.264/HEVC file gets queued. Gate
 first, `add_all_matching_values: false`. Caught on a probe file with workers
 paused, so nothing was re-encoded.
 
 Also: `number_of_workers` was `null` — the `NUMBER_OF_WORKERS` env alone did
 not create workers. Unmanic's own schema examples point at
-`Josh5/unmanic-plugins` (the author's *personal* repo, 10 plugins); the official
+`Josh5/unmanic-plugins` (the author's _personal_ repo, 10 plugins); the official
 feed is `Unmanic/unmanic-plugins` (56). Unmanic refuses to delete its
 "default" library, so that row was repurposed as TV rather than duplicated.
 Output profile: libx264 veryfast CRF 20 + AAC (channels preserved) → MKV, with
@@ -1083,9 +1088,9 @@ watching: Sonarr started re-searching everything, and the downloadathon pulled
 **`docs/jellyfin-language-filtering.md`**.
 
 **Audit.** Jellyfin's `MediaStreams` over 6,307 items found exactly **8** with
-foreign-only audio: Bluey S01E06/E11/E12/E13 (`fre`), *Dead Space: Downfall*
-(`ger`), *The 24 Hour War* (`war` — a bogus tag, audio is English),
-*Belle de Jour* (`fra`) and *Malena* (`ita`) — the last two are correct,
+foreign-only audio: Bluey S01E06/E11/E12/E13 (`fre`), _Dead Space: Downfall_
+(`ger`), _The 24 Hour War_ (`war` — a bogus tag, audio is English),
+_Belle de Jour_ (`fra`) and _Malena_ (`ita`) — the last two are correct,
 they are original-language films. The 275 items tagged `unk` were resolved by
 **ASR**, not ffprobe: `unk` is written into the file's stream tag, so ffprobe
 just echoes it back. Sampling 30 s from each and transcribing via
@@ -1093,24 +1098,24 @@ just echoes it back. Sampling 30 s from each and transcribing via
 0.10** — all English.
 
 **The mechanism** (Sonarr history, Bluey S01E06): correct English BluRay
-*grabbed* 19:42 → *downloadFailed* 19:47 → `Bluey.S01E06.TRUEFRENCH…-FTMVHD`
-*grabbed* 19:48 → imported 19:59. Nothing objected to the language.
+_grabbed_ 19:42 → _downloadFailed_ 19:47 → `Bluey.S01E06.TRUEFRENCH…-FTMVHD`
+_grabbed_ 19:48 → imported 19:59. Nothing objected to the language.
 
 **Lessons.**
+
 - **Sonarr v4 quality profiles have no `language` field at all** — the API
   returns only `cutoff, cutoffFormatScore, formatItems, id, items,
-  minFormatScore, minUpgradeFormatScore, name, upgradeAllowed`. Language is a
+minFormatScore, minUpgradeFormatScore, name, upgradeAllowed`. Language is a
   custom-format concern now, not a profile setting.
-- Sonarr *does* auto-create a `Language: Not Original` CF (`-10000`, on profile
-  4) and it rejects `TRUEFRENCH` correctly **now** — but it did not at grab
+- Sonarr _does_ auto-create a `Language: Not Original` CF (`-10000`, on profile 4) and it rejects `TRUEFRENCH` correctly **now** — but it did not at grab
   time, so it is not sufficient on its own. Radarr's equivalent
   (`Original Language (English) is wanted, but found German`) worked fine.
 - **A release profile is the guard that actually holds.** `Block Non-English
-  Releases` in both apps, `tags: []` (empty ⇒ all series/movies), `ignored:
-  TRUEFRENCH VFF VFQ VOSTFR SUBFRENCH DEUTSCH CASTELLANO LATINO ITALIAN.DL
-  SPANISH.DL PORTUGUESE.DL RUSSIAN.DL DUTCH.DL`. Bare `FRENCH`/`GERMAN`/`ITALIAN`
+Releases` in both apps, `tags: []` (empty ⇒ all series/movies), `ignored:
+TRUEFRENCH VFF VFQ VOSTFR SUBFRENCH DEUTSCH CASTELLANO LATINO ITALIAN.DL
+SPANISH.DL PORTUGUESE.DL RUSSIAN.DL DUTCH.DL`. Bare `FRENCH`/`GERMAN`/`ITALIAN`
   are **excluded on purpose** — these are substring matches and would block
-  *The French Connection* / *The Italian Job*. So is `MULTI`; most of the
+  _The French Connection_ / _The Italian Job_. So is `MULTI`; most of the
   working Bluey library is `MULTI` **with** English.
 - **Release profiles are not Recyclarr-managed**, so they live only in the app
   databases — a config wipe loses them. Recreate recipe is in the doc.
@@ -1120,9 +1125,9 @@ just echoes it back. Sampling 30 s from each and transcribing via
 - `kubectl exec` **without `-i` forwards no stdin** — a `while read` loop fed
   that way silently produced zero rows and looked like a probe bug.
 
-Also retagged *The 24 Hour War*'s audio stream `war` → `eng` in place
+Also retagged _The 24 Hour War_'s audio stream `war` → `eng` in place
 (`-map 0 -c copy -metadata:s:a:0 language=eng`, no re-encode).
-*Dead Space: Downfall* is deleted but not yet replaced: every English release
+_Dead Space: Downfall_ is deleted but not yet replaced: every English release
 Radarr finds is blocklisted, dead, or under the 3.7 GB profile size floor.
 Left monitored so RSS picks it up if one appears.
 
@@ -1146,7 +1151,7 @@ and no bitrate setting so ffmpeg falls back to ~128k):
 
 **The lesson:** `normalize_audio_volume` is a hidden `sub_setting` and is
 inert on its own — in `plugin_stream_mapper.py` the loudnorm append lives
-*inside* `if enable_smart_audio_filters:`. Flipping it alone returned
+_inside_ `if enable_smart_audio_filters:`. Flipping it alone returned
 `{"success": true}` and changed nothing. Both flags must be set. Same failure
 signature as the gate-ordering trap from 2026-09-25: a plugin setting that
 reports success while doing nothing.
@@ -1181,7 +1186,7 @@ not a HA-specific shim.
   is `victoria-logs-victoria-logs-single-server`, and that name has to appear in
   two other files (the Grafana datasource URL, the Fluent Bit output host). One
   pin, two short names.
-- **Retention is age *and* disk:** `14d` plus `retentionDiskSpaceUsage: 8Gi`, so
+- **Retention is age _and_ disk:** `14d` plus `retentionDiskSpaceUsage: 8Gi`, so
   a log burst cannot fill the node's only OS disk. The chart's `vlogs.args`
   template `fail`s outright if none of the three retention knobs is set.
 - **`Keep_Log On`** in the Fluent Bit `kubernetes` filter is load-bearing. The
@@ -1213,14 +1218,14 @@ Not verified in-cluster — the PR is the review point.
 **konflate review on PR #870** raised two cautions; both are handled in the same
 branch, and the second is the one worth remembering.
 
-- *New cluster-wide ClusterRoleBinding* — it is the chart's own ServiceAccount
+- _New cluster-wide ClusterRoleBinding_ — it is the chart's own ServiceAccount
   role: `get`/`list`/`watch` on `pods` and `namespaces` only, no secrets, no
   `nodes`/`nodes/proxy` (`rbac.nodeAccess`/`eventsAccess` stay off). Cluster-wide
   is required — the `kubernetes` filter enriches records from every namespace.
   Now stated in the HelmRelease comment and `docs/logging.md`.
-- *`flush`/`logLevel` set as values no chart template consumes* — correct, and
+- _`flush`/`logLevel` set as values no chart template consumes_ — correct, and
   subtle. Both keys exist in the chart's `values.yaml`, but **no template reads
-  them**: only the chart's *default* `config.service` string references them.
+  them**: only the chart's _default_ `config.service` string references them.
   Because we override that string, the override renders correctly (`flush: 7` →
   `Flush 7`, verified) while depending on templating inside an overridden value —
   a shape that would break silently on a chart refactor. Both are now literals in
@@ -1255,7 +1260,7 @@ speak natively — iOS Calendar needs no app, Android needs one (DAVx⁵), and H
 core `caldav` integration exposes a calendar entity with `CREATE_EVENT`, so
 automations can add events too.
 
-- **mTLS was researched and rejected, not skipped.** Cloudflare *can* do it
+- **mTLS was researched and rejected, not skipped.** Cloudflare _can_ do it
   (edge mTLS on any plan with a Cloudflare-managed CA, and `Client-Cert`
   RFC 9440 forwarding to the origin via Transform Rules) and DAVx⁵ supports
   client certificates. iOS Calendar.app does not: Apple's CalDAV payload has
@@ -1269,10 +1274,10 @@ automations can add events too.
   auto-discovered, and every phone discovers calendars by PROPFIND on its own
   principal. `rwaltr/family` is therefore presented inside `sam`'s and
   `home-assistant`'s principals, and both personal calendars are mirrored
-  read-only (`r`) into the other person's principal *and* into HA's — only Family
+  read-only (`r`) into the other person's principal _and_ into HA's — only Family
   is writable by a non-owner. Seed the rows, do not create them through
   `/.sharing/v1/map/create`: the API hard-codes `EnabledByUser=False,
-  HiddenByUser=True` for a share to another user, so the recipient has to accept
+HiddenByUser=True` for a share to another user, so the recipient has to accept
   it in the WebUI before it appears — seeded rows skip that and a brand-new client
   discovers everything on its first PROPFIND.
 - **The init container is what makes it declarative.** Radicale's storage is
@@ -1328,7 +1333,7 @@ ships external-dns v0.22.0. That release changed the default
 carried `external-dns.alpha.kubernetes.io/target: external.waltr.tech`; v0.22.0
 ignored it, so the `gateway-httproute` source fell back to the Gateway's
 `status.addresses` — the private dual-stack LB VIPs (10.10.100.12 /
-fdad:207a:f1ab:100::12). Cloudflare rejects a *proxied* record pointing at a
+fdad:207a:f1ab:100::12). Cloudflare rejects a _proxied_ record pointing at a
 private IP (`9003: Target 10.10.100.12 is not allowed for a proxied record`),
 the whole DNS batch fails, and `--policy=sync` had already deleted the
 previously correct CNAMEs, so nothing was left to resolve.
@@ -1389,7 +1394,7 @@ Two decisions worth recording:
   provision in 1Password, nothing secret in git.
 - **The API is off after that install.** The web wizard never touches
   `api_enabled`, and `config.default.php` ships it `false`, so mobile clients
-  (Reeder, NetNewsWire, FeedMe) will fail until *Allow API access* is ticked in
+  (Reeder, NetNewsWire, FeedMe) will fail until _Allow API access_ is ticked in
   the admin UI and a per-user API password is set. Not a bug — just not
   discoverable from the wizard.
 
@@ -1450,7 +1455,7 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   tunnel restricts who reaches the login page; the app's auth and Jellyfin
   sign-in are the only gate in front of it.
 - Post-merge check: `scripts/public-dns-check.sh seerr.waltr.tech
-  jellyfin.waltr.tech` should show two edge IPs for both, and
+jellyfin.waltr.tech` should show two edge IPs for both, and
   `kubectl get httproute seerr -n default` should report two accepted parents.
 
 ### 2026-10-24 — Navidrome deployed (navidrome.waltr.tech, internal only)
@@ -1501,13 +1506,13 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   `tls-wildcard` Certificate already covers `*.waltr.tech` on both gateways.
   The parentRef **is** the publication step, in both directions.
 - **The gate is the app's own auth.** Public traffic terminates TLS at
-  Cloudflare's edge, so nothing declared in `infra/k8s` restricts *who* reaches
+  Cloudflare's edge, so nothing declared in `infra/k8s` restricts _who_ reaches
   the login page — a `ClientTrafficPolicy`/IP allowlist on `envoy-external`
   would cover LAN and tailnet clients only. Navidrome's own login plus the
   Subsonic credentials are the access control, and that is the recorded
   intent of this exposure.
 - The first-run step is done: the pod log shows `Creating initial user
-  user=rwaltr` and a NavidromeUI player registration, so the admin exists in the
+user=rwaltr` and a NavidromeUI player registration, so the admin exists in the
   `navidrome-data` PVC and a rebuild from manifests + a PVC restore does not
   repeat it.
 - Still internal-only, deliberately and unaffected: the arrs (bazarr, sonarr,
@@ -1550,8 +1555,8 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   the cluster default" — and this cluster deliberately has none
   (`localpv-provisioner.hostpathClass.isDefaultClass: false`, so
   `openebs-hostpath` is never the default). The kopiur CRD documents exactly
-  this: *"StorageClass for the ephemeral scratch PVC; absent uses the cluster
-  default"*.
+  this: _"StorageClass for the ephemeral scratch PVC; absent uses the cluster
+  default"_.
 - Fix: set `storageClassName: ${KOPIUR_VERIFY_SCRATCH_CLASS:=openebs-hostpath}`
   in `components/kopiur/backup/snapshotpolicy.yaml`.
 - **Lesson**: on a cluster with no default StorageClass, every PVC-shaped
@@ -1570,9 +1575,9 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   both sides. `find infra/k8s/kyz/apps -name 'kopia.yaml'` is the enumeration;
   the two by-hand policies already carry a "keep the two in step" comment and it
   was still missed.
-- Verification in full: source-controller's *first* fetch of the upstream openebs
+- Verification in full: source-controller's _first_ fetch of the upstream openebs
   artifact failed with `failed to extract the first layer from artifact: ... dial
-  tcp [2606:50c0:8000::154]:443: i/o timeout` — an IPv6 dial into the ghcr CDN,
+tcp [2606:50c0:8000::154]:443: i/o timeout` — an IPv6 dial into the ghcr CDN,
   which this cluster can never complete (dual-stack over ULA, no v6 delegation).
   The identical token → manifest → layer fetch succeeds from a pod here, and a
   `delete pod -l app=source-controller` (forcing an immediate re-reconcile) made
@@ -1582,14 +1587,14 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
 ### 2026-10-30 — kopiur quick verification fails for policies whose source never changes
 
 - Four policies — `esphome`, `matter-server`, `wyoming-piper`, `wyoming-whisper` —
-  failed quick verification on *every* run from the day `verification:` landed,
+  failed quick verification on _every_ run from the day `verification:` landed,
   while the other sixteen passed. The four are exactly the policies whose
   snapshot content is byte-identical run after run (one distinct `sizeBytes`
   across all fifteen retained snapshots each; every other policy has several).
 - The mover's failure is `successExpr` returning false, not a kopia error. Its
   `quick_coverage` fills `stats.files` from the manifest's `stats.fileCount`
   (`crates/mover/src/main.rs`). In kopia v0.23.1 that counter is incremented only
-  on the two paths that read a file *in full*; a file served from the local cache
+  on the two paths that read a file _in full_; a file served from the local cache
   because it is unchanged since the previous snapshot bumps `cachedFiles`
   instead (`snapshot/upload/upload.go`). A source that never changes is therefore
   100% cache hits, and `stats.fileCount` is **0** for a snapshot that covers the
@@ -1608,6 +1613,7 @@ GET is a 200 either way. Public exposure via `envoy-external`; see
   `fileCount` in a kopia manifest means "files read this run", not "files in the
   snapshot"; the two diverge exactly when a backup is healthy and unchanging,
   which is the case most likely to be dismissed as harmless.
+
 ### 2026-10-29 (later) — degoog enrolled in kopiur backups
 
 - Degoog was the only app **data** PVC in `apps/default` with no
@@ -1710,7 +1716,7 @@ removal — the reasoning below is the whole point of this entry.
   no probe process at all.
 - **Lesson:** a probe is a liability until it has a consumer. This one ran for
   weeks paging falsely about a healthy broker while silently failing the check it
-  existed for, because nobody had verified it had ever returned the *true* answer
+  existed for, because nobody had verified it had ever returned the _true_ answer
   — only that it returned. Before trusting a hand-rolled probe, make it prove its
   known-good state at least once: a healthy system that reads as broken is a
   louder failure than no probe, and it hides the real one behind it.
@@ -1721,7 +1727,7 @@ Driver: a full cluster review of `mouse`. Headline number — the node committed
 **27.17 GiB of its 30.97 GiB allocatable on memory requests (88%)** while
 running ~15.5 GiB, with **no OOM kill and no eviction in 30 days** and
 `MemAvailable` never below 4.5 GiB over 7 days. It was not short on memory; it
-was short on *paper*, and requests are what the scheduler counts.
+was short on _paper_, and requests are what the scheduler counts.
 
 Three changes came out of it.
 
@@ -1735,7 +1741,7 @@ Three changes came out of it.
   2026-10-04 with a 30d p99 × 1.25 rule), which had already spotted the
   accidental-Guaranteed pods but redistributed rather than reduced.
   **Deliberately unchanged:** jellyfin's 4 GiB request (load-bearing for DRA
-  transcoding) and the workloads whose request sits *below* their real peak —
+  transcoding) and the workloads whose request sits _below_ their real peak —
   unmanic, sabnzbd, wyoming-whisper, immich-server, rustfs, hermes. They borrow
   above their request and borrowing has never evicted anything here; raising
   them would spend the headroom this change just bought.
@@ -1755,7 +1761,7 @@ Three changes came out of it.
 - **Single-node HA**: the cert-manager and external-secrets webhooks drop from
   2 replicas to 1. Both replicas land on
   `mouse`, so there was no failure domain — only churn. Their PDBs go with them:
-  `minAvailable: 1` against 1 replica is *0 allowed disruptions*, which would
+  `minAvailable: 1` against 1 replica is _0 allowed disruptions_, which would
   block every future node drain. `coredns` and `cloudflare-tunnel` stay at 2.
 - **Logging decommissioned**: see the 2026-09-26 entry for the original design
   and `docs/logging.md` for what replaced it.
@@ -1770,13 +1776,13 @@ because someone decided so.
 **Also recorded: `kubectl top` does not work here.**
 `--disable-components=coredns,metrics-server` in `infra/k0s/mouse.yaml` turns
 metrics-server off; the GitOps `./metrics-server/ks.yaml` line in
-`apps/kube-system/kustomization.yaml` is commented out *and its directory does
-not exist*. Left as-is deliberately — Prometheus is the better source, and every
+`apps/kube-system/kustomization.yaml` is commented out _and its directory does
+not exist_. Left as-is deliberately — Prometheus is the better source, and every
 number in this entry came from `container_memory_working_set_bytes` via
 `kubectl -n o11y port-forward svc/kube-prometheus-stack-prometheus`.
 
 **Measurement gotcha worth keeping:** `quantile_over_time` over `[30d]` on a
-per-series query includes *dead* pods, so completed kopia/nightly Job pods
+per-series query includes _dead_ pods, so completed kopia/nightly Job pods
 inflate any naive "top memory" list. Filter to live pods (`pod=~"..."` from
 `kubectl get pods`) before believing it.
 
@@ -1791,7 +1797,7 @@ personal documents have no business being internet-reachable. Full notes in
 Decisions worth recording:
 
 - **Paperless does not require Postgres.** SQLite is upstream's default and
-  Postgres is only *recommended* for multi-user/high-throughput installs.
+  Postgres is only _recommended_ for multi-user/high-throughput installs.
   Chose SQLite for the same reason as FreshRSS (2026-10-08): no database
   service to keep, back up and reconcile.
 - **It is not a one-way door.** `document_exporter`/`document_importer` switch
@@ -1834,7 +1840,7 @@ Turned on Paperless' native AI (3.0+) and recorded the decisions:
   image ships torch/sentence-transformers, so no second backend, no key, and
   document text stays in the cluster for the RAG index. Cache on the tank, not
   the kopia-backed data PVC (weights are re-downloadable; ~90MB).
-- **Checked the friend's gateway before sending documents.** Content is *not*
+- **Checked the friend's gateway before sending documents.** Content is _not_
   retained (`store_prompts_in_spend_logs` unset → false; rows return
   `messages={}`), but metadata is retained forever
   (`maximum_spend_logs_retention_period` unset). Details in `docs/local-llm.md`.
@@ -1852,14 +1858,14 @@ Three decisions, and the seed that implements them:
   review pass. Search is the filing system.
 - **Paperless config lives in the DB, not Git.** Document types, tags, custom
   fields and workflows survive restarts but not a config wipe. `mise run
-  paperless:seed` (`scripts/paperless_seed.py`) re-applies them through the REST
+paperless:seed` (`scripts/paperless_seed.py`) re-applies them through the REST
   API, idempotently by name — the same lesson as Sonarr's release profiles, but
   handled instead of written down.
 - **Only invoice/receipt marking is automated**, because that is the one thing
   the Beancount bridge needs (issue #988): two `Document Added` workflows match
   the OCR text and assign the document type + `accounting/inbox` tag. Receipt
   runs after invoice so a receipt that also says "invoice" lands as `Receipt`.
-  Custom fields are *not* auto-filled — the AI-suggestion action does not cover
+  Custom fields are _not_ auto-filled — the AI-suggestion action does not cover
   them, so `Total`/`Invoice Number` come from the bridge or by hand.
 
 ### 2026-11-11 (later) — Paperless tags: a provenance trail, not decoration
@@ -1945,18 +1951,19 @@ measured the models before picking one.
 - **Measured on a real 49s walkthrough (49 frames @1fps, 720px) plus one native
   video call**, same prompt, `qwen3.8-omni-flash` vs `gpt-5.6-luna`:
 
-  |                              | qwen3.8-omni-flash | gpt-5.6-luna |
-  | ---------------------------- | ------------------ | ------------ |
-  | frames parsed (fair budget)  | 49/49              | 49/49        |
-  | book titles vs the covers    | 3/3 exact          | 2/3 + 0.95   |
-  | frame ISBN-13 check digits   | 3/4 valid          | 3/4 valid    |
-  | avg / worst frame            | 19.3s / 96.7s      | 9.0s / 18.1s |
-  | tokens over 49 frames        | 121,565            | 84,106       |
-  | native video (with audio)    | 20 items, 1 call   | HTTP 404     |
+  |                             | qwen3.8-omni-flash | gpt-5.6-luna |
+  | --------------------------- | ------------------ | ------------ |
+  | frames parsed (fair budget) | 49/49              | 49/49        |
+  | book titles vs the covers   | 3/3 exact          | 2/3 + 0.95   |
+  | frame ISBN-13 check digits  | 3/4 valid          | 3/4 valid    |
+  | avg / worst frame           | 19.3s / 96.7s      | 9.0s / 18.1s |
+  | tokens over 49 frames       | 121,565            | 84,106       |
+  | native video (with audio)   | 20 items, 1 call   | HTTP 404     |
 
   Chose qwen for companion (titles exact, cheaper output, and the only one that
   can take video/audio) despite the latency, and added both aliases to
   `litellm-config` so Settings can switch without a deploy.
+
 - **One native-video call beat 49 image calls**: 26,745 tokens (~$0.004) for the
   whole clip, 20 items, versus 121.5k/84.1k tokens for the frame passes. It also
   read the narration — prices and "tag removed" — which no frame contains. That
@@ -1967,7 +1974,7 @@ measured the models before picking one.
     49/49. Check the budget before concluding a model can't produce structured
     output.
   - **Low resolution makes anything hallucinate.** Reading a 240px contact
-    sheet, I called *Da Freebooterz Code* (Justin Woolley) "Da Freedom Code" by
+    sheet, I called _Da Freebooterz Code_ (Justin Woolley) "Da Freedom Code" by
     "Justin Kojima" — invented author, wrong title. At 720px both models read it
     correctly. Frame size is a correctness setting, not a bandwidth one.
   - **Model priors fill fields the image never showed.** qwen attributed the
@@ -2005,12 +2012,12 @@ streamer. Acquisition is unsolved on purpose. Runbook: `docs/books.md`.
   `/var/tank` mount in the agent pod, `pods/exec` not granted, pod creation not
   permitted. File counts/formats/layout of `books` are unknown; the host one-liner
   is in the doc.
-- **Readarr is retired, so a fork was the only *arr-shaped option — and the fork
+- **Readarr is retired, so a fork was the only \*arr-shaped option — and the fork
   went too.** Upstream Readarr was archived 2025-06 with its metadata servers
   gone, so Chaptarr (eBook + audiobook in one instance; its own README calls it
   beta) was the maintained revival. It was removed the same day, for a supply
-  reason rather than a capability one. Kavita is the *reader*; Audiobookshelf is
-  the audiobook *streamer* with native apps; both stay.
+  reason rather than a capability one. Kavita is the _reader_; Audiobookshelf is
+  the audiobook _streamer_ with native apps; both stay.
 - **Mount the dataset root, pick the root folder in the UI.** Committing
   `ebooks/` + `audiobooks/` subpaths would have baked in a guess about a layout
   nobody could read; one mount plus in-app root folders is layout-agnostic.
@@ -2031,14 +2038,14 @@ streamer. Acquisition is unsolved on purpose. Runbook: `docs/books.md`.
   container, not as a reconcile error.
 - **Then it was dropped for a connectivity reason, not a software one.** The site
   is CGNAT with no port forwards, so slskd's listening port has no inbound route:
-  outbound search/download works, but peers cannot connect *to* us, which is the
+  outbound search/download works, but peers cannot connect _to_ us, which is the
   whole upload half of a network that expects reciprocity. A permanently
   low-connectivity peer is worse than no client, so the entry goes back to
   commented out. It needs a tailnet path or a port forward first.
 - **Usenet was validated against real content and does not carry this class.**
   Prowlarr searches (run by rwaltr — the arr key is in 1Password item `arr` and
-  this agent holds no secrets) returned nothing for *Vagabond Squadron* and *Da
-  Freebooterz Code* (both Black Library / Games Workshop) and were slim for
+  this agent holds no secrets) returned nothing for _Vagabond Squadron_ and _Da
+  Freebooterz Code_ (both Black Library / Games Workshop) and were slim for
   Infected Mushroom. That is one indexer (NZBgeek) speaking, so read it as "usenet
   is the movies/TV engine, not the books engine" rather than a proof of absence.
   Prowlarr's book coverage is thin in general: of 584 indexer definitions only
@@ -2046,7 +2053,7 @@ streamer. Acquisition is unsolved on purpose. Runbook: `docs/books.md`.
   (RU) are book-related, and **MyAnonaMouse has no definition at all** — it would
   need Jackett or a hand-written one.
 - **Chaptarr was never limited to usenet; it was still the wrong tool here.** Its
-  source tree ships `Newznab` *and* `Torznab` indexers, plus `MyAnonaMouse`,
+  source tree ships `Newznab` _and_ `Torznab` indexers, plus `MyAnonaMouse`,
   `IPTorrents`, `FileList`, `Gazelle`, `Nyaa` and `Torrentleech` built in, and
   torrent download clients including `QBittorrent`, `Transmission`, `Deluge` and
   `Blackhole`. MAM in particular is something Prowlarr has no definition for. So
@@ -2096,7 +2103,7 @@ cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
 - **Fix**: delete the `tmp` persistence entry. Nothing about Kavita needs `/tmp`
   to be its own volume, and `readOnlyRootFilesystem: false` already leaves the
   container layer writable, so `/tmp` works with no mount at all.
-- **Generalise it**: an `emptyDir` over a path an image also *ships files in* is
+- **Generalise it**: an `emptyDir` over a path an image also _ships files in_ is
   a destructive mount, not a scratch volume. `/tmp` is the usual trap because
   images hide initialisation payloads there. Before copying the `/tmp: emptyDir`
   block into a new app, check the image's Dockerfile for a `COPY ... /tmp/...`.
@@ -2107,7 +2114,7 @@ cp: cannot stat '/tmp/config/appsettings.json': No such file or directory
 - **`helm template` would never have caught this**: the rendered pod spec matched
   what the manifest asked for. The failure needed the image's own filesystem.
   Same class as the unchecked port guesses in the entry above — nothing here can
-  run the image, so the first boot *is* the test.
+  run the image, so the first boot _is_ the test.
 
 ### 2026-11-14 (later still) — metrics-server: the metrics.k8s.io API, with kubelet TLS verified
 
@@ -2131,7 +2138,7 @@ debugging falls back to Prometheus — and the app directory was already sitting
   (`issuer=CN=kubernetes-ca`, `subject=O=system:nodes, CN=system:node:mouse`,
   SANs `DNS:mouse, IP:10.10.0.10, IP:FDAD:207A:F1AB:10:0:0:0:10`), and the
   in-cluster service-account bundle at
-  `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` *is* that CA
+  `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` _is_ that CA
   (`subject=CN=kubernetes-ca`). So the manifest passes
   `--kubelet-certificate-authority=` at that path and metrics-server verifies
   kubelets for real — the flag exists in v0.9.0 (confirmed by running the pinned
@@ -2167,7 +2174,7 @@ Second item of the bjw-s parity series. `corentinth/it-tools` behind nginx at
 `https://it-tools.waltr.tech`, attached to `envoy-internal` only — nothing about a
 developer-utilities page needs to leave the LAN, and exposure stays rwaltr's call.
 
-- **Pinned to the project's last release, by digest.** Upstream's newest *release*
+- **Pinned to the project's last release, by digest.** Upstream's newest _release_
   tag is `2024.10.22-7ca5933` (its `nightly` tracks main and was refreshed
   2026-02), so a floating tag would drift silently. Index digest
   `sha256:8b812874…a61f`.
@@ -2180,7 +2187,7 @@ developer-utilities page needs to leave the LAN, and exposure stays rwaltr's cal
 - **Dropping ALL capabilities crashloops this image** — caught on the first
   deploy, not in review:
   `chown("/var/cache/nginx/client_temp", 101) failed (1: Operation not
-  permitted)`, then `[emerg]` and a restart loop. nginx's master runs as root and
+permitted)`, then `[emerg]` and a restart loop. nginx's master runs as root and
   needs two things back: `CHOWN` for its own cache dirs and `SETUID`/`SETGID` to
   drop its workers to the `nginx` user. The manifest adds exactly those three —
   no `DAC_OVERRIDE`, and no `NET_BIND_SERVICE` because root may bind `:80`
@@ -2188,11 +2195,11 @@ developer-utilities page needs to leave the LAN, and exposure stays rwaltr's cal
   entrypoint is also non-root; for a root-running daemon, "drop ALL" and "runs
   at all" are in direct conflict.
 - **Probe port 80 and path `/` come from the image config** (`ExposedPorts
-  80/tcp`; `/` is the static root, a 200 with no redirect), not from intuition.
+80/tcp`; `/` is the static root, a 200 with no redirect), not from intuition.
   The render check caught the app-template probe shape: an `httpGet` written
   directly under `probes.<name>` is rejected by the chart schema
   (`additional properties 'httpGet' not allowed`) — the correct shape is
-  `custom: true` plus a `spec:` block. Worth knowing that this one *errors*
+  `custom: true` plus a `spec:` block. Worth knowing that this one _errors_
   rather than silently rendering a `tcpSocket` probe.
 - No PVC and therefore no kopiur policy: the app is stateless.
 
@@ -2248,7 +2255,7 @@ Fourth item of the bjw-s parity series. Giant Swarm's `silence-operator` 0.22.0 
   peer service, matching the reference; the ClusterIP service is the same single
   pod.
 - **The first Silence CR is dated and disposable** (`bjw-s-parity-deploys`,
-  ends 2026-11-16) — it covers expected churn for the rest of the series *and* is
+  ends 2026-11-16) — it covers expected churn for the rest of the series _and_ is
   the operator's end-to-end proof, since its comment is what the triage agent
   reads in `/api/v2/silences`. Delete the CR once the window passes instead of
   leaving an expired object in the tree. The equivalent API-created silence used
@@ -2260,7 +2267,7 @@ Operating section: `docs/alerting.md` → "Silences".
 
 Deploying MikroMCP turned up the case the `bootstrap` workspace exists for. The
 server needs an inbound bearer token that nothing upstream issues, and the first
-two attempts to get it were both "rwaltr adds a field to the item" — a *generated*
+two attempts to get it were both "rwaltr adds a field to the item" — a _generated_
 credential being requested as if it were a consumer credential. rwaltr's answer
 was to point at `infra/terraform/bootstrap/`, which is right: that workspace is
 the one thing in the repo that writes to 1Password, and a value invented in a
@@ -2270,7 +2277,7 @@ vendor console exists in exactly one place with no record of what it is for.
   client and the Cloudflare DNS tokens. `random_password` + `onepassword_item`,
   value in the login's `password` field.
 - **Top-level fields only.** The 1Password provider can only write custom fields
-  *inside* a section, and External Secrets resolves the two-level `item/field`
+  _inside_ a section, and External Secrets resolves the two-level `item/field`
   reference every other secret here uses — so `username`/`password` is the shape
   that works, and a field labelled `mcptoken` on a hand-made item cannot be added
   by Terraform anyway.
@@ -2282,7 +2289,7 @@ vendor console exists in exactly one place with no record of what it is for.
   nor Terraform Cloud credentials (`terraform plan` fails at backend init for want
   of an API token). The declaration is the agent's work; the trust credential is
   not. Documented non-interactive form: `MISE_YES=1
-  TF_CLI_ARGS_apply=-auto-approve mise run tf:apply bootstrap`.
+TF_CLI_ARGS_apply=-auto-approve mise run tf:apply bootstrap`.
 
 ### 2026-11-14 (later still) — agentgateway: a second front door
 
@@ -2377,7 +2384,7 @@ Eighth item of the series: `kubesearch-mcp` (perfectra1n/kubesearch-mcp 1.3.0) a
   both are one-line reversals and both are deliberate.
 - **Its auth is the URL path.** Standard mode has no bearer token; the path is the
   credential. That is tolerable only because nothing routes to it but the gateway.
-- Neither app needed a new 1Password *human* entry: one token is Terraform-minted
+- Neither app needed a new 1Password _human_ entry: one token is Terraform-minted
   (kubesearch), one was reused (HA).
 
 Operating docs: `docs/kubesearch-mcp.md`, `docs/home-assistant-mcp.md`.
@@ -2399,7 +2406,7 @@ session. Router-side specifics live in `infra/routeros/README.md`
   whole commissioning path is effectively unavailable there.** Symptom is not
   a clean error: BLE scan/provision may start and then fail, or Thread
   credential import/export silently does nothing. Controlling an
-  *already-commissioned* device from HA on GrapheneOS works fine — it's only
+  _already-commissioned_ device from HA on GrapheneOS works fine — it's only
   onboarding (and Thread credential handoff) that breaks.
 - **Compounding factor here**: mouse's BT is a MediaTek Wi-Fi/BT combo
   (0e8d:c616) and the OTBR is on a different VLAN than the controlling phone
@@ -2488,13 +2495,13 @@ dependent on it." Deleted whole: the app, `litellm-config`, `litellm-secret`, th
 `docs/local-llm.md`. Four apps and one CronJob pointed at port 4000 and now point at
 agentgateway's **8082**, the unauthenticated in-cluster listener:
 
-| Consumer            | Model               | Env                         |
-| ------------------- | ------------------- | --------------------------- |
-| `hermes`            | local aliases       | `providers.agentgateway`    |
-| `homebox-companion` | `qwen3.8-omni-flash`| `HBC_LLM_API_BASE`          |
-| `immich-paperless`  | `intel-vl`          | `AIGW_URL`                  |
-| `paperless`         | `intel-vl`          | `PAPERLESS_AI_LLM_ENDPOINT` |
-| `paperless-extract` | `intel-vl`          | `AIGW_BASE_URL`             |
+| Consumer            | Model                | Env                         |
+| ------------------- | -------------------- | --------------------------- |
+| `hermes`            | local aliases        | `providers.agentgateway`    |
+| `homebox-companion` | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`          |
+| `immich-paperless`  | `intel-vl`           | `AIGW_URL`                  |
+| `paperless`         | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT` |
+| `paperless-extract` | `intel-vl`           | `AIGW_BASE_URL`             |
 
 8082 is the right landing spot rather than a minted per-client key: all of them
 already shared litellm's single master key, so a key each would have been new
@@ -2506,7 +2513,7 @@ left is a literal `unused` where an OpenAI-shaped client insists on a bearer.
 was a second copy of what the `wyoming-*` pods already serve HA, and nothing in the
 cluster ever called litellm's port 8000. `parakeet` on 10301 is the OpenAI-compatible
 STT door if one is wanted again. `homebox-companion` still imports the litellm
-*Python library* — that is the app's own code, not our proxy, and it does not require
+_Python library_ — that is the app's own code, not our proxy, and it does not require
 the proxy to exist.
 
 **What git could not move.** Home Assistant's native LiteLLM integration is
@@ -2521,6 +2528,7 @@ unsupported parameter or a dead alias now surfaces instead of being stripped or
 retried, which is the behaviour we want from a proxy that is the only door.
 
 **Lessons.**
+
 - **A parallel front door is cheap to run and expensive to remove.** agentgateway ran
   beside litellm from 2026-11-14 with every upstream duplicated, and the cutover
   still touched nine manifests for URL and key plumbing. Front both doors at one
@@ -2533,19 +2541,20 @@ retried, which is the behaviour we want from a proxy that is the only door.
 - **Verified before cutting over, not after**: `/v1/models` and a real
   `deepseek-v4.1-flash` completion through 8082 from another pod. The vision aliases
   could not be verified because Dan's gateway was returning `503 upstream connection
-  failed` through *both* proxies at the time — a pre-existing outage, and the reason
+failed` through _both_ proxies at the time — a pre-existing outage, and the reason
   the cutover looks safe rather than proven for `intel-vl`.
 
 ## Open questions
 
-- [ ] Controlled reboot mechanism for OS updates: kured vs manual?
+- [x] ~~Controlled reboot mechanism for OS updates: kured vs manual?~~ → manual while single-node (`docs/adr/0017-manual-os-update-reboots.md`, 2026-11-19)
 - [ ] bjw-s parity series is paused after metrics-server/chaski/it-tools/silence-operator/agentgateway/cliproxyapi/MCP servers: **kanidm via kaniop, or CloudNativePG, next?** (2026-11-14)
 
-- [ ] SOPS+age (keep) vs 1Password Connect + ESO (adopt)?
-- [ ] Dedicated service CIDR for BGP pool: `192.168.x.0/24` — pick one
-- [ ] Router ASN / node ASN assignment
+- [x] ~~SOPS+age (keep) vs 1Password Connect + ESO (adopt)?~~ → 1Password Connect + ESO
+      ([ADR 0012](docs/adr/0012-1password-connect-and-eso-for-secrets.md))
+- [x] ~~Dedicated service CIDR for BGP pool~~ → `10.10.100.0/24` + `fdad:207a:f1ab:100::/64`
+      (`CiliumLoadBalancerIPPool` in `infra/k8s/kyz/apps/kube-system/cilium/app/networking.yaml`)
+- [x] ~~Router ASN / node ASN assignment~~ → router 64512, mouse 64513 (same file)
 - [x] ~~Which VLAN ID is the "served" VLAN?~~ → **30 (iot) + 40 (cameras), both reached
       via k8s (home-assistant/macvlan or BGP), NOT configured on the host** (2026-08-13)
 - [x] ~~`infra/k0s/kyz-0.yml` superseded by `mouse.yaml`~~ → deleted with uCore decom (2026-08-13)
 - [x] ~~Do other hosts stay on uCore, or does everything move to Flatcar?~~ → everything moves; uCore decommissioned 2026-08-13
-````

@@ -13,6 +13,9 @@ bot/human ──push/PR──▶ Forgejo (git.waltr.tech) ──review+lint─�
 
 ## Why this shape
 
+Decision record: [ADR 0011](adr/0011-flux-reads-github-mirror.md). Contract:
+`openspec/specs/gitops-reconciliation`.
+
 - **GitHub stays the Flux source.** Forgejo runs in the cluster it deploys, so if
   Flux read from Forgejo a dead cluster could not rebuild itself. GitHub holds every
   merged commit, so a cold start needs nothing from the cluster.

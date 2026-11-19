@@ -5,6 +5,9 @@ the cluster can actually get them.
 
 ## Flow
 
+Decision record: [ADR 0012](adr/0012-1password-connect-and-eso-for-secrets.md).
+Contract: `openspec/specs/secrets-delivery`.
+
 1Password vault **`home-ops`** → `ClusterSecretStore` **`onepassword-connect`** →
 one Secret per app → the app. The store maps exactly one vault
 (`vaults: home-ops: 1` in

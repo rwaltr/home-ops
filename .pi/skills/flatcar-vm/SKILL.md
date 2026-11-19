@@ -10,6 +10,8 @@ All commands run from the repo root. Every task takes a host argument
 
 ## Locations
 
+Contract this workflow protects: `openspec/specs/host-provisioning`.
+
 - Butane configs: `infra/flatcar/butane/base.bu` (shared: users, tailscale, mDNS,
   update-strategy), `butane/test.bu` (scratch), `butane/hosts/*.bu` (per-host, merge base.ign)
 - Compiled to Ignition: `infra/flatcar/ignition/*.ign` (JSON, gitignored) via `mise run flatcar:build`

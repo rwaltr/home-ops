@@ -14,6 +14,8 @@ email, PDF and images. Defined in `infra/k8s/kyz/apps/default/paperless/`.
 
 ## Why SQLite
 
+Decision record: [ADR 0015](adr/0015-sqlite-by-default.md).
+
 Paperless defaults to SQLite and only _recommends_ PostgreSQL for multi-user or
 high-throughput installs. This is a single-user archive, and SQLite keeps the
 app to one container plus a couple of mounts — no extra database service to

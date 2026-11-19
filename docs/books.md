@@ -169,6 +169,8 @@ below before re-enabling it.
 
 ## slskd (Soulseek) — left disabled (CGNAT)
 
+The constraint: [ADR 0016](adr/0016-cgnat-cloudflare-tunnel-only-inbound.md).
+
 `infra/k8s/kyz/apps/default/slskd/` is in the tree but **not registered** in the
 parent kustomization, and it was decided on 2026-11-14 to leave it that way. It
 briefly merged registered in #1005 and was taken back out in #1007 — the pod sat

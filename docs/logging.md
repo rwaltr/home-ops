@@ -8,6 +8,8 @@ only in `kubectl logs` and in the kubelet's journal (journald currently holds
 
 ## Why it was removed
 
+Decision record: [ADR 0013](adr/0013-no-cluster-log-store.md).
+
 It had already been switched off, and what was left was drift:
 
 - Commit `6d0a60bf` ("oom oom oh pls no oom", 2026-09-28) commented

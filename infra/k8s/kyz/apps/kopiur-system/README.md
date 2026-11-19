@@ -10,6 +10,9 @@ Kopia-native PVC backups for the mouse cluster. Three apps, one namespace:
 
 ## Data flow
 
+Contract: `openspec/specs/pvc-backups`. Decision record:
+[ADR 0005](../../../../../docs/adr/0005-kopiur-to-in-cluster-rustfs.md).
+
 ```
 SnapshotPolicy (ns, per-PVC) ──▶ Snapshot CR ──▶ mover Job (in the app ns)
    reads PVC (copyMethod: Direct) ──▶ kopia encrypts client-side (KOPIA_PASSWORD)

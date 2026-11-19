@@ -24,6 +24,8 @@ plus `/stats`, `/metrics`, `/safety`.
 
 ## The boundary
 
+Contract shared by every MCP server: `openspec/specs/agent-tool-boundary`.
+
 Three layers, deliberately redundant:
 
 1. `--read-only` / `MCP_SAFETY_MODE=read-only` — write tools are hidden from

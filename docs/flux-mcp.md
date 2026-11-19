@@ -41,6 +41,8 @@ serve --transport=http --port=8000 --read-only
 
 ## The boundary
 
+Contract shared by every MCP server: `openspec/specs/agent-tool-boundary`.
+
 `flux-mcp-read` grants `get`/`list`/`watch` on the Flux API groups, the workload kinds
 Flux reconciles, `pods/log`, `events`, and discovery non-resource URLs. No write verbs.
 

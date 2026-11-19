@@ -1,28 +1,35 @@
 # Hermes Agent — remote operations from a phone
 
-**Status:** draft plan (2026-09-25). Not yet implemented.
+**Status:** deployed as Teletran. The plan below (2026-09-25) is kept as the
+record of how it was built; "Current state" is what runs today.
 **Goal:** let the in-cluster Hermes Agent do the work we normally do in a pi
 session (GitOps edits, cluster debugging, docs, PRs) and let rwaltr drive it
 from a phone, instead of having to be at the computer.
 
 ## Current state (as deployed)
 
-`apps/default/hermes` — `nousresearch/hermes-agent` v2026.9.21, 10Gi PVC on
-`openebs-hostpath` mounted at `/opt/data`.
+`apps/default/hermes` — `nousresearch/hermes-agent` (version pinned by digest in
+`app/helmrelease.yaml`), 10Gi PVC on `openebs-hostpath` mounted at `/opt/data`.
 
 - Gateway + dashboard (`hermes.waltr.tech`, **envoy-internal only**) + OpenAI
   API on `8642`. Dashboard requires basic auth (`hermes-secret`).
-- Toolsets: `terminal, file, web` for `cli` and `api_server` **only**.
-- `tools` init container installs `mise`, `uv`, `gh`, `go`, `homebrew` into
-  `/opt/data/.local` (persisted, guarded).
+- Phone channel: **Discord** (home channel `Teletran`), outbound websocket only.
+- Toolsets are listed per platform in `platform_toolsets` (`api_server`, `cli`,
+  `discord`); an unlisted platform falls back to the full preset.
+- `tools` init container installs `mise`, `uv`, `gh`, `go`, `homebrew`, `kubectl`
+  into `/opt/data/.local` (persisted, guarded).
+- `rwaltr/home-ops` is checked out at `/opt/data/workspace/home-ops`; the
+  `gitcreds` sidecar keeps a `teletraan-x` GitHub App token fresh.
+- Cluster access through the `hermes` ServiceAccount: read-only ClusterRoles plus
+  `delete` on pods and jobs only (`app/rbac.yaml`).
 - Config is seeded from the `hermes-config` ConfigMap on every pod start, and
   is _also_ mounted read-only at `/etc/hermes-policy` as Hermes' **managed
   scope** (2026-10-08) — see below. `stakater/reloader` rolls the pod when the
   ConfigMap or `hermes-secret` changes.
-- No messaging platform is configured; the gateway currently serves only the
-  dashboard/API.
 
-### What pi does here that Hermes cannot (yet)
+### What pi does here that Hermes could not (2026-09-25 baseline)
+
+The table is the starting point the phases below worked from, not today's state.
 
 Repo edits → Flux GitOps (`ks.yaml`, HelmRelease, ExternalSecret), `kubectl`
 debugging, `mise run` tasks, docs, conventional commits and
