@@ -41,6 +41,13 @@ spec:
       metadata:
         name: mouse
       spec:
+        workerProfiles:
+          # The single controller+worker node uses k0s's default profile. The
+          # kubelet default of 110 blocked scheduling at 126 non-terminated
+          # pods (2026-11-21); Cilium's node CIDR allows ~250 pod IPs.
+          - name: default
+            values:
+              maxPods: 200
         api:
           sans:
             - 10.10.0.10

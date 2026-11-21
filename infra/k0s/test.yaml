@@ -21,6 +21,11 @@ spec:
       metadata:
         name: test
       spec:
+        # Exercise the same single-node kubelet pod cap as production.
+        workerProfiles:
+          - name: default
+            values:
+              maxPods: 200
         network:
           provider: custom # Cilium installed out-of-band (flatcar:k0s task)
           kubeProxy:

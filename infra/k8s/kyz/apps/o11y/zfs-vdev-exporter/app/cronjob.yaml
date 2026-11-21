@@ -23,6 +23,9 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      # Retain run logs for a day, then reclaim the finished pod's slot even
+      # if the failed-job history limit keeps it.
+      ttlSecondsAfterFinished: 86400
       backoffLimit: 1
       template:
         metadata:
