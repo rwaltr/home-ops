@@ -28,13 +28,12 @@ Everything that used to point at `litellm.default.svc.cluster.local:4000` now po
 at **8082, the unauthenticated in-cluster listener** — same trust boundary as before,
 since every one of them shared litellm's master key:
 
-| Consumer            | Model                | Env                         |
-| ------------------- | -------------------- | --------------------------- |
-| `hermes`            | local aliases        | `providers.agentgateway`    |
-| `homebox-companion` | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`          |
-| `immich-paperless`  | `intel-vl`           | `AIGW_URL`                  |
-| `paperless`         | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT` |
-| `paperless-extract` | `intel-vl`           | `AIGW_BASE_URL`             |
+| Consumer             | Model                | Env                         |
+| -------------------- | -------------------- | --------------------------- |
+| `hermes`             | local aliases        | `providers.agentgateway`    |
+| `homebox-companion`  | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`          |
+| `paperless`          | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT` |
+| `paperless-windmill` | `intel-vl`           | `f/paperless/*` scripts     |
 
 8082 wants no key, so each of those app configs carries a placeholder (`unused`)
 rather than a Secret — the OpenAI-shaped clients refuse to run without one.

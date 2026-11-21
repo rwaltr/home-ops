@@ -1,0 +1,4 @@
+version: v2
+locks:
+  f/paperless/extract: b2867ccc03b095b7f08e997854fb820f2e7eb6162629533497ff182bee4614fa
+  f/paperless/immich_bridge: eb244fddd09abe8e0eb79b738ea9d2929f486fa012ca229085c6bee8413465e7

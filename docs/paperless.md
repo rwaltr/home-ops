@@ -193,9 +193,9 @@ Limits worth knowing:
 
 ## Receipt metadata (extractor)
 
-Paperless' AI suggestion action cannot write custom fields, so a CronJob fills
-the financial ones. `paperless-extract` (`paperless_extract.py`, every 5
-minutes) scans documents typed `Invoice` or `Receipt`, asks `intel-vl` through
+Paperless' AI suggestion action cannot write custom fields, so the Windmill
+`f/paperless/extract` script fills the financial ones. Its five-minute schedule
+scans documents typed `Invoice` or `Receipt`, asks `intel-vl` through
 agentgateway for the values, and PATCHes the document:
 
 | Field            | Example     |
@@ -261,15 +261,16 @@ Recreate`); never run two pods against `data/`.
 
 ## Immich bridge (photo → archive)
 
-Receipts photographed on a phone land in Immich. `immich-paperless`
-(`infra/k8s/kyz/apps/default/immich-paperless/`) runs one script (`bridge.py`,
-held in a ConfigMap) from two entry points: a CronJob that sweeps hourly
-(`0 * * * *`, `concurrencyPolicy: Forbid`) and a Deployment that holds Immich's
-websocket, so a fresh upload is examined within seconds instead of in an hour.
+Receipts photographed on a phone land in Immich. Windmill's
+`f/paperless/immich_bridge` script polls every five minutes over the last 15
+minutes; an hourly backstop scans the last 24 hours. The former Immich WebSocket
+listener is retired, so a new photo may take up to five minutes to be examined.
+State remains in Immich tags, so the poller is idempotent and recovers work after
+a Windmill outage.
 
-There is a clickable diagram of this flow — every box, its verdicts and eight
-real failure scenarios — in `docs/immich-paperless-flow.html`. It is a plain file
-in the repo, not served anywhere: open it in a browser.
+`docs/immich-paperless-flow.html` is the historical diagram of the retired
+WebSocket/consume-directory design; it no longer describes the deployed trigger
+or send path.
 
 **The vision model decides everything.** One call to `intel-vl` answers with a
 JSON verdict — `description`, `tags`, `document`, `useful`, `confidence`,
@@ -302,16 +303,16 @@ plus `document`, `useless` and `paperless-sent`. A tag an operator adds by hand
 counts as their answer too. There is no `paperless-skip` or `paperless-maybe`
 any more; both were retired with the CLIP/OCR cascade.
 
-**send** — assets tagged `document` are copied into the consume dropbox:
+**send** — assets tagged `document` are uploaded directly through Paperless'
+`/api/documents/post_document/` endpoint:
 
-1. skips any asset already carrying `paperless-sent`, and any video (a video
-   would otherwise be archived as a single JPEG frame);
+1. skips any asset already carrying `paperless-sent`, and any video;
 2. downloads the original — or, for formats Paperless cannot read (HEIC straight
-   off an iPhone), Immich's `fullsize` JPEG. The bridge never hands Paperless a
-   HEIC, because its consumer would fail the file rather than convert it;
-3. writes it into the consume dropbox as `<date> <description>.<ext>`, mode 0644
-   so the consumer (uid 1000) can read it;
-4. tags the asset `paperless-sent`.
+   off an iPhone), Immich's `fullsize` JPEG;
+3. uploads it as `<date> <description>.<ext>` with the matching Paperless title;
+4. tags the asset `paperless-sent` only after Paperless accepts the upload.
+
+The Windmill worker no longer mounts or writes to Paperless' consume directory.
 
 The **tag** is the queue, not the album. Immich's album API reports no assets for
 an album the key's user does not own, so an album-driven send reads back empty and
@@ -358,59 +359,23 @@ To undo a decision, remove the `document` tag (or replace it with `useless`)
 before the next run: the bridge never re-tags an asset carrying any of its own
 tags.
 
-### Setting it up
+### Credentials and deployment
 
-1. Create an Immich API key (Account Settings → API Keys) with **all**
-   permissions. The bridge reads assets and tags, writes descriptions, adds
-   assets to an album and writes tags; a narrower key fails the writes with a zod
-   body naming the field that was refused.
-2. Add it to 1Password as an **API Credential** item named `paperless-bridge` in
-   the `home-ops` vault, with the key in the **credential** field. The
-   ExternalSecret reads `paperless-bridge/credential`, and the vault matters: the
-   ClusterSecretStore is pinned to `home-ops`, so an item in any other vault is
-   invisible to the sync.
-3. `mise run secrets:verify` should then report it as resolving.
+The Windmill project is versioned under `f/paperless/`. It reads the existing
+1Password items `paperless/api_token` and `paperless-bridge/credential`.
+`mise run paperless:windmill` refreshes them into Windmill **secret variables**
+and syncs resource types, resource references, scripts and schedules. Resource
+values store `$var:` references rather than historical copies of the tokens;
+job tokens are scoped to the specific resources and variables they need.
 
-It also holds a Paperless token (`paperless/api_token`) for the enrich step, so a
-Paperless outage shows up in its logs instead of being silent.
+A failed API or model call leaves the document/asset unmodified for the next
+schedule to retry; the failure appears in Windmill's execution logs.
 
-### Editing the script, and backfilling
+### Editing and backfilling
 
-`bridge.py` lives in a ConfigMap, and **a ConfigMap change does not restart the
-Deployment** — the running process keeps whatever it loaded at start. After any
-script change:
-
-```sh
-kubectl rollout restart deploy/immich-paperless-realtime -n default
-```
-
-The CronJob is immune, because each run mounts the script fresh. Verify the
-deployed artifact, not the diff:
-
-```sh
-kubectl exec -n default deploy/immich-paperless-realtime -- \
-  grep -c '^def find_named' /scripts/bridge.py
-```
-
-To walk the whole library instead of the window, run the CronJob's own spec once
-with a wider window:
-
-```sh
-kubectl create job -n default vlbackfill --from=cronjob/immich-paperless-bridge \
-  --dry-run=client -o yaml > /tmp/bf.yaml
-# edit: WINDOW_HOURS=8760, MAX_PAGES=60, MAX_VISION_CALLS=8000 (quote the values,
-# Job env entries are strings), then add the annotation below
-kubectl apply -f /tmp/bf.yaml
-```
-
-It is resumable — everything already decided is skipped — so it can be stopped
-and restarted at will. Two things to know:
-
-- **Flux will delete it.** The Kustomization has `prune: true`, so a Job that is
-  not in Git is removed at the next reconcile, taking its logs with it. Add
-  `kustomize.toolkit.fluxcd.io/prune: disabled` under the Job's
-  `metadata.annotations`.
-- `MAX_VISION_CALLS` is a real request budget, not a limit to be set to infinity:
-  every call is a request against a shared GPU, and the model is the bottleneck.
-  The hourly sweep only does `MAX_VISION_CALLS` per run, so a large backfill is
-  better run as its own job.
+Edit `f/paperless/extract.py` or `f/paperless/immich_bridge.py`, run the local
+tests, then deploy with `mise run paperless:windmill`. The backstop schedule is
+resumable because Immich tags are the idempotency state. For a larger backfill,
+increase `window_hours` and `max_pages` in
+`f/paperless/immich_backstop.schedule.yaml`; keep `max_vision_calls` bounded
+because the model is a shared GPU.

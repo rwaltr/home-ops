@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#requirements:
+# wmill
 """Fill Paperless custom fields from receipt/invoice OCR text via the LLM.
 
 Paperless' built-in "Apply AI suggestions" action can only write title, tags,
@@ -151,9 +153,21 @@ def custom_field_values(document: dict, ids: dict[str, int], values: dict) -> li
     return [{"field": field, "value": value} for field, value in merged.items()]
 
 
-def main() -> None:
+def main(max_docs: int = 25, dry_run: bool = False) -> dict:
+    global AIGW, AIGW_KEY, MAX_DOCS, MODEL, PAPERLESS, TOKEN
+    if os.environ.get("WM_JOB_ID"):
+        import wmill
+
+        paperless = wmill.get_resource("f/paperless/paperless_api")
+        ai = wmill.get_resource("f/ai/agentgateway")
+        PAPERLESS = paperless["base_url"].rstrip("/")
+        TOKEN = paperless["api_token"]
+        AIGW = ai["base_url"].rstrip("/")
+        AIGW_KEY = ai["api_key"]
+        MODEL = "intel-vl"
     if not TOKEN:
         sys.exit("PAPERLESS_API_TOKEN is required")
+    MAX_DOCS = max_docs
 
     fields = {f["name"]: f["id"] for f in list_all("/api/custom_fields/")}
     types = {t["name"]: t["id"] for t in list_all("/api/document_types/")}
@@ -186,11 +200,14 @@ def main() -> None:
         if not values:
             idle += 1
             continue
-        pp("PATCH", f"/api/documents/{document['id']}/", {"custom_fields": custom_field_values(document, fields, values)})
-        print(f"  + doc {document['id']}: {values}")
+        if not dry_run:
+            pp("PATCH", f"/api/documents/{document['id']}/", {"custom_fields": custom_field_values(document, fields, values)})
+        print(f"  {'would update' if dry_run else 'updated'} doc {document['id']}: field_names={','.join(values)}")
         done += 1
 
-    print(f"documents={len(documents)} updated={done} skipped={idle} errors={errors}")
+    result = {"documents": len(documents), "updated": done, "skipped": idle, "errors": errors, "dry_run": dry_run}
+    print("documents={documents} updated={updated} skipped={skipped} errors={errors}".format(**result))
+    return result
 
 
 if __name__ == "__main__":

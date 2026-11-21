@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>immich-paperless — event-driven flow</title>
+<title>Immich → Paperless — legacy event-driven flow</title>
 <style>
   :root {
     --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
@@ -83,11 +83,11 @@
 </head>
 <body>
 <header>
-  <h1>immich-paperless <small>receipt photo → Paperless → ledger, event-driven</small>
-    <span class="plan">built · running · not the plan any more</span></h1>
-  <p class="lat">upload → classified: <b>seconds</b> (the socket) · classified → in Paperless: <b>up to an hour</b> (the sweep) ·
-     one vision verdict decides, and the <b>tag</b> is the queue, not the album ·
-     verified against Immich <b>v3.2.4</b> and <b>paperless-ngx 3.4.2</b>, gateway <code>/api/socket.io</code>, websocket-only, <code>x-api-key</code> auth</p>
+  <h1>Immich → Paperless <small>legacy event-driven design</small>
+    <span class="plan">historical · superseded by Windmill polling</span></h1>
+  <p class="lat">This diagram records the retired Kubernetes WebSocket + consume-directory implementation.
+     The current Windmill pipelines poll every five minutes and upload through Paperless' API; see <code>docs/paperless.md</code> ·
+     the historical design's tag-based idempotency and verdict rules still apply.</p>
   <div class="bar">
     <span class="lbl">Flows</span>
     <div class="chips" id="chips" role="group" aria-label="Filter by flow"></div>

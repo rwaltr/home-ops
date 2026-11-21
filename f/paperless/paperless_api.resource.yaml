@@ -1,0 +1,5 @@
+description: Paperless-ngx in-cluster API; token comes from a Windmill secret variable.
+resource_type: paperless_api
+value:
+  base_url: http://paperless-app.default.svc.cluster.local:8000
+  api_token: $var:f/paperless/paperless_api_token

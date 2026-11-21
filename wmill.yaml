@@ -1,0 +1,12 @@
+defaultTs: bun
+includes:
+  - f/paperless/**
+skipSecrets: true
+skipVariables: true
+skipResourceTypes: true
+includeSchedules: true
+nonDottedPaths: true
+workspaces:
+  admins:
+    baseUrl: https://windmill.waltr.tech
+    workspaceId: admins

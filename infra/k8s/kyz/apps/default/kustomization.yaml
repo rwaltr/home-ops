@@ -45,7 +45,6 @@ resources:
   - ./homebox-companion/ks.yaml
   - ./homepage/ks.yaml
   - ./beancount-stack/ks.yaml
-  - ./immich-paperless/ks.yaml
   - ./it-tools/ks.yaml
   - ./chaski/ks.yaml
   - ./mikrotik-mcp/ks.yaml

@@ -94,7 +94,7 @@ spec:
               # it the login POST fails CSRF verification behind the gateway.
               PAPERLESS_URL: https://paperless.waltr.tech
               # 3.5 enforces ALLOWED_HOSTS; these add to PAPERLESS_URL's host so
-              # in-cluster callers (paperless-extract, immich-paperless-bridge)
+              # in-cluster callers (the Windmill Paperless scripts)
               # that use the Service name don't get 400.
               PAPERLESS_ALLOWED_HOSTS: paperless-app.default.svc.cluster.local,paperless-app
               PAPERLESS_USE_X_FORWARD_HOST: "true"

@@ -1,0 +1,16 @@
+description: Immich API endpoint and key used by the Paperless receipt bridge.
+schema:
+  type: object
+  order:
+    - base_url
+    - api_key
+  required:
+    - base_url
+    - api_key
+  properties:
+    base_url:
+      type: string
+      default: http://immich-server.default.svc.cluster.local:2283
+    api_key:
+      type: string
+      password: true
