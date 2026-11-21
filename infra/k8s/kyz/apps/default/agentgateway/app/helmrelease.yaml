@@ -190,6 +190,13 @@ spec:
                   - claude-sonnet-5-5
                   - claude-opus-5-5
                   - claude-haiku-5-5
+                  # The failover chains: same backends as the aliases above, with
+                  # the OpenRouter twin behind each. pi asks for the tier its own
+                  # router picked and lets this gateway do the failing over.
+                  - auto-quick
+                  - auto-work
+                  - auto-deep
+                  - auto-max
         mcp-public:
           port: 8081
           apiKey:
@@ -332,6 +339,129 @@ spec:
               apiKey: ${OPENCODE_GO_API_KEY}
               baseUrl: https://opencode.ai/inference/go/openai/v1
               model: deepseek-v4.1-flash
+          # --- Failover chains for the Go tier ---
+          # Each of these is an internal target only: clients ask for the `auto-*`
+          # virtual models below, never for these. `visibility: internal` keeps them
+          # out of /v1/models and out of every allow-list.
+          #
+          # health.unhealthyExpression is what makes quota exhaustion fail over. The
+          # default unhealthy classifier covers 5xx and connection failures only, and
+          # a subscription running out arrives as 429 (or 402/403 from a proxy that
+          # wants a top-up) — so without this the chain never moves, which is the same
+          # trap pi's own router hits. Setting health replaces the default eviction,
+          # so the eviction block has to be spelled out to keep it.
+          - name: go/glm-5.3
+            provider: openAI
+            visibility: internal
+            requestHeaders:
+              set:
+                x-opencode-session: teletran-agentgateway
+            params:
+              apiKey: ${OPENCODE_GO_API_KEY}
+              baseUrl: https://opencode.ai/inference/go/openai/v1
+              model: glm-5.3
+            health:
+              unhealthyExpression: "response.code >= 500 || response.code == 429 || response.code == 402 || response.code == 403"
+              eviction:
+                consecutiveFailures: 1
+                duration: 60s
+          - name: go/gpt-6-luna
+            provider: openAI
+            visibility: internal
+            requestHeaders:
+              set:
+                x-opencode-session: teletran-agentgateway
+            params:
+              apiKey: ${OPENCODE_GO_API_KEY}
+              baseUrl: https://opencode.ai/inference/go/openai/v1
+              model: gpt-6-luna
+            health:
+              unhealthyExpression: "response.code >= 500 || response.code == 429 || response.code == 402 || response.code == 403"
+              eviction:
+                consecutiveFailures: 1
+                duration: 60s
+          # The OpenRouter side of each chain. Same vendor model, so a failover
+          # changes who serves it and not what answered.
+          - name: glm-5.3
+            provider: openAI
+            visibility: internal
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: z-ai/glm-5.3
+            health:
+              unhealthyExpression: "response.code >= 500 || response.code == 429 || response.code == 402 || response.code == 403"
+              eviction:
+                consecutiveFailures: 1
+                duration: 60s
+          - name: gpt-6-luna
+            provider: openAI
+            visibility: internal
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: openai/gpt-6-luna
+            health:
+              unhealthyExpression: "response.code >= 500 || response.code == 429 || response.code == 402 || response.code == 403"
+              eviction:
+                consecutiveFailures: 1
+                duration: 60s
+          - name: claude-opus-5.5
+            provider: openAI
+            visibility: internal
+            params:
+              apiKey: ${OPENROUTER_API_KEY}
+              baseUrl: https://openrouter.ai/api/v1
+              model: anthropic/claude-opus-5.5
+            health:
+              unhealthyExpression: "response.code >= 500 || response.code == 429 || response.code == 402 || response.code == 403"
+              eviction:
+                consecutiveFailures: 1
+                duration: 60s
+        # Virtual models: one client-facing name over a priority chain.
+        #
+        # agentgateway cannot classify a prompt, so the tier is the caller's choice
+        # rather than the gateway's guess. `pi` does the classifying (kind + hardness)
+        # and asks for the matching alias; every other client picks one and gets the
+        # subscription-first, OpenRouter-second chain without knowing it.
+        #
+        # Failover is driven by eviction, not by rewriting an in-flight request: the
+        # request that trips eviction still fails, and the next one lands on the next
+        # priority group. Retries are deliberately not configured here — a replayed
+        # completion is worse than a visible error, and every caller already retries.
+        virtualModels:
+          - name: auto-quick
+            routing:
+              failover:
+                targets:
+                  - model: go/deepseek-v4.1-flash
+                    priority: 0
+                  - model: deepseek-v4.1-flash
+                    priority: 1
+          - name: auto-work
+            routing:
+              failover:
+                targets:
+                  - model: go/glm-5.3
+                    priority: 0
+                  - model: glm-5.3
+                    priority: 1
+          - name: auto-deep
+            routing:
+              failover:
+                targets:
+                  - model: go/gpt-6-luna
+                    priority: 0
+                  - model: gpt-6-luna
+                    priority: 1
+          - name: auto-max
+            routing:
+              failover:
+                targets:
+                  - model: claude-opus-5-5
+                    priority: 0
+                  - model: claude-opus-5.5
+                    priority: 1
       # MCP servers multiplexed behind one endpoint, so a client needs one URL and
       # one credential instead of five of each. Served on 8081, same idiom as the
       # llm block above.

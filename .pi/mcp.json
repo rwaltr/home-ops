@@ -7,8 +7,8 @@
       "description": "Terraform Registry + HCP Terraform (auto-reads TFE_TOKEN from ~/.terraform.d/credentials.tfrc.json)"
     },
     "arr": {
-      "command": "npx",
-      "args": ["-y", "mcp-arr-server"],
+      "command": "mcp-arr",
+      "args": [],
       "env": {
         "RADARR_URL": "http://127.0.0.1:7878",
         "RADARR_API_KEY": "!fnox get RADARR_API_KEY",
@@ -34,8 +34,8 @@
       "description": "Grafana dashboards, datasources, metrics, and Loki queries"
     },
     "homebox": {
-      "command": "uvx",
-      "args": ["homebox-mcp"],
+      "command": "homebox-mcp",
+      "args": [],
       "env": {
         "HOMEBOX_URL": "https://homebox.waltr.tech",
         "HOMEBOX_TOKEN": "!fnox get HOMEBOX_TOKEN"

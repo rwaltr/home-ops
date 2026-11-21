@@ -69,6 +69,10 @@ and three subscription aliases that resolve through cliproxyapi to the account l
 in there — `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`. Each alias is
 the upstream id verbatim, so a response always names the model that answered.
 
+The four `auto-*` virtual models sit on top of those — see
+[Failover chains](#failover-chains). Their name is not an upstream id: the response
+names the target that served the request, not the alias that was asked for.
+
 Where each one really runs matters more than the alias, because it decides whether a
 request leaves the house and whether it is billed:
 
@@ -114,6 +118,60 @@ pointing at `*.aiml.svc.cluster.local` or a LAN IP is self-hosted; an empty `api
 with an `openrouter/...` or vendor `/...` model is cloud. Names can lie — his
 `media-analysis`, `decision` and `embed-text` are cloud (Google, OpenAI, OpenRouter),
 not local.
+
+## Failover chains
+
+Four virtual models give one name per capability tier, each a priority chain:
+subscription first, OpenRouter second. They exist because every paid-for door — the
+Go tier and the Claude subscription — has a monthly or rolling limit, and a client
+that asks for one model by name has no way to survive reaching it.
+
+| Alias        | priority 0               | priority 1                         |
+| ------------ | ------------------------ | ---------------------------------- |
+| `auto-quick` | `go/deepseek-v4.1-flash` | `deepseek-v4.1-flash` (OpenRouter) |
+| `auto-work`  | `go/glm-5.3`             | `glm-5.3` (OpenRouter)             |
+| `auto-deep`  | `go/gpt-6-luna`          | `gpt-6-luna` (OpenRouter)          |
+| `auto-max`   | `claude-opus-5-5`        | `claude-opus-5.5` (OpenRouter)     |
+
+The targets are `visibility: internal`, so they do not appear in `/v1/models` and
+cannot be requested directly. The alias is the only name a client sees.
+
+**The tier is the caller's choice, not the gateway's guess.** agentgateway routes on
+health and priority; it cannot read a prompt. `pi` classifies (task kind, hardness)
+and asks for the matching alias, so the judgement stays where the conversation is and
+the gateway only owns the part it can do well: knowing which door is currently broken.
+Any other client picks a tier and gets the subscription behind it without learning
+about OpenRouter.
+
+Three details are load-bearing:
+
+- **`health.unhealthyExpression` is what makes quota fail over.** The default
+  unhealthy classifier covers `5xx`, server-side gRPC failures and connection
+  failures only. A subscription running out arrives as `429`, or `402`/`403` from a
+  proxy that wants a top-up, so without this expression the chain never moves — the
+  identical trap a retry-based router hits, because Pi treats those as non-retryable
+  too. Setting `health` _replaces_ default eviction rather than adding to it, which
+  is why `eviction` is spelled out beside the expression.
+- **Failover is eviction, not a rewrite.** The request that trips eviction still
+  fails; the next one lands on the next priority group. No retry policy is set here
+  on purpose: a silently replayed completion is worse than a visible error, and every
+  caller already retries.
+- **Being visible is not enough for a client to reach it.** A client's `allowedModels`
+  filters `/v1/models` and refuses the request before any provider is contacted, so a
+  new alias also needs adding to the keys that should see it.
+
+Adding another chain is one `llm.models` entry per target plus one `virtualModels`
+entry. Validate before committing — the chart renders a ConfigMap the binary reads,
+and the binary can check it without starting:
+
+```sh
+yq '.spec.values' infra/k8s/kyz/apps/default/agentgateway/app/helmrelease.yaml > /tmp/values.yaml
+helm template agentgateway oci://cr.agentgateway.dev/charts/agentgateway-standalone \
+  --version v1.7.0 -f /tmp/values.yaml | yq 'select(.kind=="ConfigMap") | .data["config.yaml"]' > /tmp/rendered.yaml
+podman run --rm --security-opt label=disable -v /tmp/rendered.yaml:/config.yaml:ro \
+  -e OPENROUTER_API_KEY=dummy -e OPENCODE_GO_API_KEY=dummy -e CLIPROXYAPI_API_KEY=dummy \
+  cr.agentgateway.dev/agentgateway:v1.7.0 -f /config.yaml --validate-only
+```
 
 ## Adding a model
 
@@ -183,11 +241,11 @@ to any client that can read its own session id.
 
 ### Clients
 
-| Client         | 1Password item | Models                                      | MCP targets                                |
-| -------------- | -------------- | ------------------------------------------- | ------------------------------------------ |
-| `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash` | `home-assistant` (read-only)               |
-| `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                       | `home-assistant`, `home-assistant-control` |
-| `pi`           | `pi`           | the three `claude-*-5-5` aliases            | all four targets                           |
+| Client         | 1Password item | Models                                                     | MCP targets                                |
+| -------------- | -------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash`                | `home-assistant` (read-only)               |
+| `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                                      | `home-assistant`, `home-assistant-control` |
+| `pi`           | `pi`           | the three `claude-*-5-5` aliases, the four `auto-*` chains | all four targets                           |
 
 Claude is deliberately absent from the phone clients' allow-lists: it is the paid
 subscription, and a leaked client key should not be able to spend it. `pi` is the
