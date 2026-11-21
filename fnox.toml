@@ -63,3 +63,8 @@ description = "Paperless-ngx API token (paperless:seed)"
 provider = "op"
 value = "homebox-mcp/API_KEY"
 description = "HomeBox API key (hb_…) for the agent MCP server"
+
+[secrets.WINDMILL_TOKEN]
+provider = "op"
+value = "windmill/credential"
+description = "Windmill API token for workflow configuration"
