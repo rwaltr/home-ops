@@ -7,6 +7,8 @@ metadata:
 spec:
   hosts:
     - role: controller+worker
+      installFlags:
+        - --profile=default
       ssh:
         address: 127.0.0.1
         port: 2223
