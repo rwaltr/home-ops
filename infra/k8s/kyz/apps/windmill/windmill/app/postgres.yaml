@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/postgresql.cnpg.io/cluster_v1.json
+# Windmill's database: one instance — one-node cluster, a standby would share
+# the node and its disk and protect against nothing. No backups yet (see
+# ../ks.yaml). The app uses the bootstrap owner directly; promotion to a
+# kritika-style app role happens when untrusted code ever runs here.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: windmill-postgres
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-standard-bookworm@sha256:30d0a38b6df3da24e89a2cfbe800e422c3ef13fa427aa5523f2a7d3fecb53b34
+  enableSuperuserAccess: false
+  storage:
+    storageClass: openebs-hostpath
+    size: 5Gi
+  bootstrap:
+    initdb:
+      database: windmill
+      owner: windmill
+      secret:
+        name: windmill-postgres-credentials

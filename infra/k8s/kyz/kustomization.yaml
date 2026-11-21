@@ -18,3 +18,4 @@ resources:
   - ./apps/o11y
   - ./apps/openebs
   - ./apps/renovate
+  - ./apps/windmill
