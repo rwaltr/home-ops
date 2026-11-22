@@ -8,3 +8,4 @@ resources:
   - ./group-kritika-admins.yaml
   - ./group-renovate-admins.yaml
   - ./person-rwaltr.yaml
+  - ./person-sam.yaml

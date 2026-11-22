@@ -1,0 +1,25 @@
+---
+# Samantha's own account. No groups: this is a daily-use login, not an admin one.
+#
+# `kanidmName` is omitted: it defaults to the resource name, giving sam@waltr.tech.
+#
+# Delivery is `event`, the default — see person-rwaltr.yaml for why there is no
+# mail path to send the credential link.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmPersonAccount
+metadata:
+  name: sam
+spec:
+  kanidmRef:
+    name: kanidm
+  personAttributes:
+    displayname: Samantha
+    # Required, not cosmetic: Kanidm only emits the `email` claim when the account
+    # has a primary mail address, and apps key their users on it. The first
+    # address listed is the primary one. Nothing sends mail to it.
+    mail:
+      - sam@waltr.tech
+  # A day, rather than Kanidm's short default: this is a link a human has to
+  # notice in an event stream, not a machine that acts within the hour.
+  credentialsTokenTtl: 86400
+  credentialBootstrapDelivery: event
