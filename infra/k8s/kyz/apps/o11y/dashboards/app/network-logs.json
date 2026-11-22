@@ -559,8 +559,8 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "Wi-Fi events and signal strength",
-      "description": "Association, connection and roam events (bars) with average client signal in dBm.",
+      "title": "Wi-Fi events",
+      "description": "CAPsMAN association, connection and roam events per 5-minute bucket.",
       "datasource": {
         "type": "victoriametrics-logs-datasource",
         "uid": "victoria-logs"
@@ -574,7 +574,54 @@
           },
           "expr": "source:ap1-132l | extract_regexp \"(?P<mac>[0-9A-F:]{17})@(?P<radio>[a-z0-9-]+)\\\\((?P<ssid>[^)]*)\\\\) (?P<event>[a-z ]+?)(,| roamed)\" | stats by (event) count() c",
           "queryType": "statsRange"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "displayName": "${__field.labels.event}"
         },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Wi-Fi client signal",
+      "description": "Average signal strength in dBm for AP association and roam events.",
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victoria-logs"
+      },
+      "targets": [
         {
           "refId": "B",
           "datasource": {
@@ -587,18 +634,18 @@
       ],
       "gridPos": {
         "x": 12,
-        "y": 14,
+        "y": 18,
         "w": 12,
-        "h": 8
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "dBm",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 1,
+            "lineWidth": 2,
             "fillOpacity": 10,
-            "showPoints": "never",
+            "showPoints": "always",
             "spanNulls": true,
             "stacking": {
               "mode": "none",
