@@ -1,21 +1,19 @@
 # Comms-channel demo: Matrix
 
-> **Retired 2026-11-09.** The `matrix` Kustomization is commented out of
-> `apps/default/kustomization.yaml`, which pruned `tuwunel`, `element-web` and the
-> 5Gi `tuwunel-data` PVC. Nothing is served at either hostname any more and the
-> hand-made accounts are gone. The manifests are still in git, so re-enabling is
-> one uncomment plus a fresh PVC and first-run accounts — but treat the notes
-> below as a record of what was tried, not as a live runbook.
+> **Restored in GitOps.** The previous demo was retired on 2026-11-09, which
+> pruned `tuwunel`, `element-web` and the 5Gi `tuwunel-data` PVC. Enabling the
+> `matrix` Kustomization again creates a fresh homeserver: old accounts and
+> messages are gone, and first-run accounts must be created by hand.
 
-A self-hosted communication stack stood up **internal-only** on 2026-11-01 to
-evaluate it as a channel for the self-hosted agent (Hermes / whatever
-pi-durable-based agent replaces it). It is demo-grade: single namespace, no
-federation, low resource limits, and first-run accounts created by hand rather
-than declared in git.
+A self-hosted communication stack first stood up **internal-only** on 2026-11-01
+to evaluate it as a channel for the self-hosted agent (Hermes / whatever
+pi-durable-based agent replaces it). It remains demo-grade: single namespace,
+no federation, low resource limits, and first-run accounts created by hand
+rather than declared in git.
 
 |                | Matrix                                    |
 | -------------- | ----------------------------------------- |
-| Web UI         | <https://element.waltr.tech> (retired)    |
+| Web UI         | <https://element.waltr.tech>              |
 | API host       | <https://matrix.waltr.tech>               |
 | Server         | Tuwunel v1.9.4 (Rust)                     |
 | Storage        | `tuwunel-data` (5Gi, RocksDB)             |
@@ -24,10 +22,10 @@ than declared in git.
 
 ## How it is deployed
 
-`infra/k8s/kyz/apps/default/matrix/` holds Tuwunel + Element Web, reconciled by
-the Flux `matrix` Kustomization. It was applied out-of-band on 2026-11-01
-(`kubectl apply -k`), which is why its objects predate the manifests being in
-git; Flux owns them now.
+`infra/k8s/kyz/apps/default/matrix/` holds Tuwunel + Element Web. The default
+apps Kustomization includes `matrix/ks.yaml`, so Flux reconciles both services
+and the Tuwunel data PVC from Git. The initial account setup remains a manual,
+one-time step below.
 
 ## Why Matrix
 
