@@ -20,6 +20,14 @@ agentgateway's default spans include model and token-use metadata. This config
 does not add prompt or response content. Do not add `llm.prompt` or
 `llm.completion` attributes without reviewing the privacy impact first.
 
+## Failure behavior
+
+The trace store is not a prerequisite for either gateway. Envoy Gateway and
+agentgateway start and serve traffic while VictoriaTraces is down or absent, and
+trace export fails on its own. Neither Flux Kustomization declares a
+`dependsOn` on `victoria-traces` on purpose: a trace store outage must not gate
+ingress or LLM traffic. Losing traces during that window is the accepted cost.
+
 ## Using traces
 
 Open **Explore** in Grafana and choose `VictoriaTraces`. The Jaeger query editor

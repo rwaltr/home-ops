@@ -13,9 +13,9 @@ spec:
     name: flux-system
     namespace: flux-system
   targetNamespace: default
+  # No dependsOn on victoria-traces: trace export is best-effort, so the trace
+  # store must not gate LLM traffic. See docs/tracing.md.
   dependsOn:
-    - name: victoria-traces
-      namespace: o11y
     # cliproxyapi must exist first: it is a model upstream.
     - name: cliproxyapi
       namespace: default
