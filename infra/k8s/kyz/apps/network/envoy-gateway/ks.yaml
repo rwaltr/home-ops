@@ -5,7 +5,7 @@ kind: Kustomization
 metadata:
   name: envoy-gateway
 spec:
-  # No dependsOn on victoria-traces on purpose. Envoy can start and serve ingress
+  # No dependsOn on tempo on purpose. Envoy can start and serve ingress
   # while trace export is unreachable; the exporter is best-effort and a trace
   # store outage must never gate the ingress path. Ordering it first would also
   # buy nothing in steady state, because o11y is reconciled anyway.

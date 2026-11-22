@@ -1,6 +1,7 @@
 ---
 # yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
-# Fluent Bit tails container stdout from the node and forwards it to VictoriaLogs.
+# Fluent Bit collects container stdout, host journald, and Kubernetes events.
+# RouterOS/AP syslog goes directly to VictoriaLogs' native syslog receiver.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -16,27 +17,32 @@ spec:
     resources:
       requests:
         cpu: 10m
-        memory: 32Mi
+        memory: 64Mi
       limits:
-        memory: 96Mi
-    # Cluster-wide metadata lookup needs pods and namespaces only. Do not grant
-    # node, event, or secret access.
+        memory: 192Mi
+    # Container metadata needs pods and namespaces. Event collection adds read-only
+    # events access. Do not grant node or secret access.
     rbac:
       create: true
       nodeAccess: false
-      eventsAccess: false
+      eventsAccess: true
     tolerations:
       - operator: Exists
+    # Runs as root on purpose. Pod log files under /var/log/pods are root:root
+    # 0640, so a non-root UID reads none of them (tested: 0 of 229 readable).
+    # Root owns both those files and the journal, so dropping all capabilities
+    # still leaves it able to read them.
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
         drop:
           - ALL
-    # k0s uses containerd, so omit the chart's Docker-specific hostPath.
+    # k0s uses containerd. The varlog mount contains CRI symlinks and journald.
     daemonSetVolumes:
       - name: varlog
         hostPath:
           path: /var/log
+          type: Directory
       - name: etcmachineid
         hostPath:
           path: /etc/machine-id
@@ -44,13 +50,12 @@ spec:
     daemonSetVolumeMounts:
       - name: varlog
         mountPath: /var/log
+        readOnly: true
       - name: etcmachineid
         mountPath: /etc/machine-id
         readOnly: true
     testFramework:
       enabled: false
-    # The buffer is memory-only. A collector restart can lose the small in-flight
-    # queue, but filesystem buffering would need another hostPath on the OS disk.
     config:
       # Flush and Log_Level stay literal. The chart's values for them are only
       # consumed by its default service string, which this override replaces.
@@ -73,15 +78,18 @@ spec:
             Tag kube.*
             Mem_Buf_Limit 2MB
             Skip_Long_Lines On
-            # Poll with stat instead of inotify. The live node reports
-            # fs.inotify.max_user_instances=128 although infra/flatcar/butane/
-            # base.bu declares 1024, so the shared quota is exhausted and tail
-            # fails at init with `Too many open files`. shortcut: polling is
-            # slower to notice new files, remove this once the host sysctl is
-            # confirmed live.
+            # The live node's inotify limit is lower than base.bu declares.
             Inotify_Watcher false
-      # Keep_Log On preserves the original `log` field after Merge_Log parses
-      # JSON. VictoriaLogs uses that field as the message body.
+        [INPUT]
+            Name systemd
+            Tag host.systemd
+            Path /var/log/journal
+            Read_From_Tail On
+            Strip_Underscores On
+        [INPUT]
+            Name kubernetes_events
+            Tag k8s_events
+            Kube_Retention_Time 30m
       filters: |
         [FILTER]
             Name kubernetes
@@ -90,6 +98,16 @@ spec:
             Keep_Log On
             K8S-Logging.Parser On
             K8S-Logging.Exclude On
+        [FILTER]
+            Name modify
+            Match host.*
+            Add log_type host-journal
+            Add source mouse
+        [FILTER]
+            Name modify
+            Match k8s_events
+            Add log_type kubernetes-event
+            Add source kubernetes
       outputs: |
         [OUTPUT]
             Name http
@@ -97,6 +115,26 @@ spec:
             Host victoria-logs.o11y.svc.cluster.local
             Port 9428
             URI /insert/jsonline?_stream_fields=kubernetes.namespace_name,kubernetes.pod_name,kubernetes.container_name,stream&_msg_field=log&_time_field=date&ignore_fields=log.offset
+            Format json_lines
+            Json_date_Format iso8601
+            Compress gzip
+            Retry_Limit 5
+        [OUTPUT]
+            Name http
+            Match host.*
+            Host victoria-logs.o11y.svc.cluster.local
+            Port 9428
+            URI /insert/jsonline?_stream_fields=source,log_type,HOSTNAME,SYSTEMD_UNIT,SYSLOG_IDENTIFIER,PRIORITY,stream&_msg_field=MESSAGE&_time_field=date
+            Format json_lines
+            Json_date_Format iso8601
+            Compress gzip
+            Retry_Limit 5
+        [OUTPUT]
+            Name http
+            Match k8s_events
+            Host victoria-logs.o11y.svc.cluster.local
+            Port 9428
+            URI /insert/jsonline?_stream_fields=source,log_type,type,reason,involvedObject.kind,involvedObject.namespace&_msg_field=message&_time_field=date
             Format json_lines
             Json_date_Format iso8601
             Compress gzip

@@ -5,6 +5,11 @@ kind: GrafanaDatasource
 metadata:
   name: prometheus
 spec:
+  # Pinned so other datasources reference a readable UID instead of the operator's
+  # generated one (Tempo's service map needs it). spec.uid is immutable, so this
+  # value can only be added by deleting and re-creating this resource once —
+  # `kubectl delete grafanadatasource -n o11y prometheus` and let Flux recreate it.
+  uid: prometheus
   instanceSelector:
     matchLabels:
       dashboards: grafana
@@ -32,8 +37,7 @@ spec:
       implementation: prometheus
     url: http://alertmanager-operated.o11y.svc.cluster.local:9093
 ---
-# VictoriaLogs needs its datasource plugin. The preset links log entries with a
-# trace_id field to the Jaeger-compatible VictoriaTraces datasource.
+# VictoriaLogs links its structured trace/span fields to the Tempo datasource.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:
@@ -49,24 +53,57 @@ spec:
     access: proxy
     url: http://victoria-logs.o11y.svc.cluster.local:9428
     jsonData:
-      otelPreset:
-        enabled: true
-        tracesDatasourceUid: jaeger
-        detection:
-          traceIdField: trace_id
+      derivedFields:
+        - name: trace.id
+          matcherType: label
+          matcherRegex: trace.id
+          url: "${__value.raw}"
+          urlDisplayLabel: View trace
+          datasourceUid: tempo
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          url: "${__value.raw}"
+          urlDisplayLabel: View trace
+          datasourceUid: tempo
+        # agentgateway writes `trace.id=<hex>` into plain-text access logs, so
+        # there is no structured field to match. Extract it from the message.
+        - name: agentgateway trace.id
+          matcherType: regex
+          matcherRegex: 'trace\.id=([a-f0-9]{32})'
+          url: "${__value.raw}"
+          urlDisplayLabel: View trace
+          datasourceUid: tempo
 ---
-# VictoriaTraces implements the Jaeger query API, which Grafana ships built in.
+# Tempo's HTTP API provides TraceQL, service graphs and Traces Drilldown.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:
-  name: victoria-traces
+  name: tempo
 spec:
-  uid: jaeger
+  uid: tempo
   instanceSelector:
     matchLabels:
       dashboards: grafana
   datasource:
-    type: jaeger
-    name: VictoriaTraces
+    type: tempo
+    name: Tempo
     access: proxy
-    url: http://victoria-traces.o11y.svc.cluster.local:10428/select/jaeger
+    url: http://tempo.o11y.svc.cluster.local:3200
+    jsonData:
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      serviceMap:
+        datasourceUid: prometheus
+      tracesToLogsV2:
+        datasourceUid: victoria-logs
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        # agentgateway writes `trace.id=<hex>` into the message text, not as a
+        # field, so a field filter would match nothing. Search the text.
+        customQuery: true
+        query: '"${__trace.traceId}"'
+        filterByTraceID: false
+        filterBySpanID: false

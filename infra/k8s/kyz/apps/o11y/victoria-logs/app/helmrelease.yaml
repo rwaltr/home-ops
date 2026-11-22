@@ -21,6 +21,18 @@ spec:
       retentionPeriod: 14d
       # VictoriaMetrics size flags require GiB, not the Kubernetes Gi suffix.
       retentionDiskSpaceUsage: 8GiB
+      # Separate UDP listeners let the Grafana Logs datasource identify the
+      # RouterOS controller and its CAPsMAN AP events without parsing messages.
+      extraArgs:
+        syslog.listenAddr.udp:
+          - ":5140"
+          - ":5141"
+        syslog.streamFields.udp:
+          - [source, hostname]
+          - [source, hostname]
+        syslog.extraFields.udp:
+          - { source: routeros }
+          - { source: ap1-132l }
       resources:
         requests:
           cpu: 20m

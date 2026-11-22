@@ -18,7 +18,7 @@ spec:
       provider:
         type: OpenTelemetry
         backendRefs:
-          - name: victoria-traces
+          - name: tempo
             namespace: o11y
             port: 4317
   provider:

@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoria-logs-syslog
+  namespace: o11y
+  annotations:
+    lbipam.cilium.io/ips: 10.10.100.13,fdad:207a:f1ab:100::13
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ipFamilies:
+    - IPv4
+    - IPv6
+  ipFamilyPolicy: PreferDualStack
+  # UDP syslog has no transport authentication. Limit it to management devices.
+  loadBalancerSourceRanges:
+    - 10.10.0.0/24
+    - fdad:207a:f1ab:10::/64
+  selector:
+    app: server
+    app.kubernetes.io/instance: victoria-logs
+    app.kubernetes.io/name: victoria-logs-single
+  ports:
+    - name: routeros
+      port: 514
+      targetPort: 5140
+      protocol: UDP
+    - name: ap-capsman
+      port: 5141
+      targetPort: 5141
+      protocol: UDP

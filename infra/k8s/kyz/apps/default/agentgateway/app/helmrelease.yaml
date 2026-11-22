@@ -146,7 +146,7 @@ spec:
         connectionTerminationDeadline: 295s
       frontendPolicies:
         tracing:
-          host: victoria-traces.o11y.svc.cluster.local:4317
+          host: tempo.o11y.svc.cluster.local:4317
           protocol: grpc
           randomSampling: 0.1
       # Three listeners, two of them authenticated.
