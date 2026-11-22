@@ -232,7 +232,8 @@ Recreate`); never run two pods against `data/`.
 ## Automation pipelines (removed)
 
 Two Windmill-driven pipelines used to run beside Paperless. Windmill was removed,
-and nothing replaces them yet:
+and nothing replaces them yet. Node-RED was tried as a replacement and removed
+too, before its flows were finished:
 
 - **Receipt extractor** filled the `Total`, `Payment method` and `Reference`
   custom fields from OCR text through `intel-vl`.
@@ -240,5 +241,6 @@ and nothing replaces them yet:
   `/api/documents/post_document/`, and enriched them from the image.
 
 Both are not running. Documents still arrive through manual upload, mail rules
-and the consume directory, and Paperless' own AI still runs. The code is in git
-history. Recover it with `git log --diff-filter=D --name-only -- f/paperless`.
+and the consume directory, and Paperless' own AI still runs. The Windmill code is
+in git history. Recover it with `git log --diff-filter=D --name-only -- f/paperless`.
+The Node-RED flows only ever lived in the instance, so they are gone with it.

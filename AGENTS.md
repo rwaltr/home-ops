@@ -91,8 +91,6 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/calendar.md` — Radicale + CalDAV / Remind feed
 - `docs/freshrss.md` — FreshRSS
 - `docs/navidrome.md` — Navidrome (Subsonic/OpenSubsonic)
-- `docs/node-red.md` — Node-RED flow automation: flows in a Forgejo Project (not this
-  repo), the generated credential secret, and the Kanidm editor login
 - `docs/books.md` — Kavita + Audiobookshelf over the tank `books` dataset, why acquisition is still unsolved, and the disabled slskd (Soulseek)
 - `docs/homebox.md` — HomeBox home inventory
 - `docs/homepage.md` — Homepage service dashboard
