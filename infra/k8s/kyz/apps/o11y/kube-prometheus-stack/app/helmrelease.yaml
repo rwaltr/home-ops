@@ -83,7 +83,8 @@ spec:
           clientType: grpc
           endpoint: tempo.o11y.svc.cluster.local:4317
           insecure: true
-          samplingFraction: 0.1
+          # The CRD types this as integer-or-string; a bare float is rejected.
+          samplingFraction: "0.1"
         retention: 30d
         retentionSize: 40GiB
         resources:
