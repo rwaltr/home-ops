@@ -12,8 +12,11 @@ Fluent Bit. The pipeline runs in `o11y` and is managed by Flux under
 - VictoriaLogs retains data for 14 days, with an 8 GiB data cap on a 10 Gi PVC.
 - Grafana uses the pinned `victoriametrics-logs-datasource` plugin.
 
-The store has a 64Mi memory request and 256Mi limit. Fluent Bit has a 32Mi
-request and 96Mi limit. Review actual working sets before changing those budgets.
+The store has a 192Mi memory request and 512Mi limit, sized from its own
+working set (p95 188Mi, peak 250Mi over 12h). It sizes its caches from the
+container limit, so a limit below the peak it reaches during merges makes it
+OOM. Fluent Bit has a 32Mi request and 96Mi limit. Review actual working sets
+before changing those budgets.
 VictoriaLogs also stores trace IDs and supports links to traces when an
 application includes a `trace_id` field in its logs. Fluent Bit does not create
 trace IDs or inject them into log messages.

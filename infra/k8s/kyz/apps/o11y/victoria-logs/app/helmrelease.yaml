@@ -24,9 +24,16 @@ spec:
       resources:
         requests:
           cpu: 20m
-          memory: 64Mi
+          # p95 working set 188Mi and p99 198Mi over 12h of real ingestion (~230
+          # container streams, ~1M rows). The old 64Mi was a guess made before
+          # the pipeline carried traffic.
+          memory: 192Mi
         limits:
-          memory: 256Mi
+          # The old 256Mi ceiling sat 6Mi above the measured peak (250Mi) and the
+          # pod was OOMKilled four times on 2026-11-22. VictoriaLogs sizes its
+          # caches from the container limit (-memory.allowedPercent=60), so this
+          # limit also decides how much it may cache and merge.
+          memory: 512Mi
       serviceMonitor:
         enabled: true
     # The chart's default Vector agent would duplicate Fluent Bit collection.
