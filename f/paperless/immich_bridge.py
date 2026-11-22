@@ -770,7 +770,7 @@ def send(tags):
     return sent
 
 
-def main(window_hours: float = 24, max_pages: int = 5, max_vision_calls: int = 20, dry_run: bool = False) -> dict:
+def main(stage: str = "all", window_hours: float = 24, max_pages: int = 5, max_vision_calls: int = 20, dry_run: bool = False) -> dict:
     global AIGW_URL, DRY_RUN, IMMICH, KEY, MAX_PAGES, MAX_VISION_CALLS, PAPERLESS_KEY, PAPERLESS_URL, VISION_KEY, WINDOW_HOURS
     if os.environ.get("WM_JOB_ID"):
         import wmill
@@ -794,11 +794,22 @@ def main(window_hours: float = 24, max_pages: int = 5, max_vision_calls: int = 2
     MAX_VISION_CALLS = max_vision_calls
     DRY_RUN = dry_run
     tags = tags_by_name()
-    documents = classify(tags, window_hours=window_hours)
-    sent = send(tags)
-    enriched = enrich_all(tags)
-    result = {"documents": documents, "sent": sent, "enriched": enriched, "dry_run": dry_run}
-    print("done: {sent} sent, {documents} classified, {enriched} enriched".format(**result), flush=True)
+    if stage == "classify":
+        result = {"documents": classify(tags, window_hours=window_hours), "dry_run": dry_run}
+    elif stage == "send":
+        result = {"sent": send(tags), "dry_run": dry_run}
+    elif stage == "enrich":
+        result = {"enriched": enrich_all(tags), "dry_run": dry_run}
+    elif stage == "all":
+        result = {
+            "documents": classify(tags, window_hours=window_hours),
+            "sent": send(tags),
+            "enriched": enrich_all(tags),
+            "dry_run": dry_run,
+        }
+    else:
+        raise ValueError(f"unknown stage {stage!r}; expected classify, send, enrich, or all")
+    print(f"{stage}: {result}", flush=True)
     return result
 
 

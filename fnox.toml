@@ -69,6 +69,18 @@ provider = "op"
 value = "windmill/credential"
 description = "Windmill API token for workflow configuration"
 
+# `mise run routeros:dns-apply` uses this dedicated RouterOS REST/SCP identity;
+# do not reuse the read-only MCP account and never put its values in Git.
+[secrets.MIKROTIK_DNS_USER]
+provider = "op"
+value = "mikrotik-dns/username"
+description = "Dedicated RouterOS user for Blocky DNS deployment"
+
+[secrets.MIKROTIK_DNS_PASSWORD]
+provider = "op"
+value = "mikrotik-dns/password"
+description = "Password for the dedicated RouterOS Blocky deployment user"
+
 [secrets.IMMICH_PAPERLESS_API_KEY]
 provider = "op"
 value = "paperless-bridge/credential"

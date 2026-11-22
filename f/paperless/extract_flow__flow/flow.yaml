@@ -1,0 +1,53 @@
+summary: Extract OCR metadata from Paperless invoices and receipts.
+description: Find documents missing Total, then extract and fill their financial
+  fields one document at a time.
+value:
+  modules:
+    - id: list_candidates
+      summary: Find invoices and receipts with OCR text and no Total.
+      value:
+        type: script
+        input_transforms:
+          action:
+            type: static
+            value: list
+          max_docs:
+            type: javascript
+            expr: flow_input.max_docs
+        path: f/paperless/extract
+    - id: process_each_document
+      summary: Extract fields and update each matching document.
+      value:
+        type: forloopflow
+        modules:
+          - id: extract_document
+            summary: Ask intel-vl to read OCR text and fill missing fields.
+            value:
+              type: script
+              input_transforms:
+                action:
+                  type: static
+                  value: process
+                document_id:
+                  type: javascript
+                  expr: flow_input.iter.value
+                dry_run:
+                  type: javascript
+                  expr: flow_input.dry_run
+              path: f/paperless/extract
+        iterator:
+          type: javascript
+          expr: results.list_candidates.document_ids
+        parallel: false
+        skip_failures: true
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    dry_run:
+      type: boolean
+      default: false
+    max_docs:
+      type: integer
+      default: 25
+  required: []

@@ -153,7 +153,53 @@ def custom_field_values(document: dict, ids: dict[str, int], values: dict) -> li
     return [{"field": field, "value": value} for field, value in merged.items()]
 
 
-def main(max_docs: int = 25, dry_run: bool = False) -> dict:
+def candidate_ids(max_docs: int) -> list[int]:
+    fields = {f["name"]: f["id"] for f in list_all("/api/custom_fields/")}
+    types = {t["name"]: t["id"] for t in list_all("/api/document_types/")}
+    type_ids = [types[name] for name in FINANCIAL_TYPES if name in types]
+    if not type_ids:
+        return []
+    total_id = fields.get("Total")
+    docs = list_all(
+        f"/api/documents/?document_type__id__in={','.join(map(str, type_ids))}"
+        "&page_size=100&ordering=-added",
+    )
+    candidates = []
+    for doc in docs:
+        values = {entry["field"]: entry["value"] for entry in doc.get("custom_fields", [])}
+        if total_id and values.get(total_id):
+            continue
+        if len((doc.get("content") or "").strip()) < 40:
+            continue
+        candidates.append(doc["id"])
+        if len(candidates) >= max_docs:
+            break
+    return candidates
+
+
+def process_document(document_id: int, dry_run: bool = False) -> dict:
+    fields = {f["name"]: f["id"] for f in list_all("/api/custom_fields/")}
+    types = {t["name"]: t["id"] for t in list_all("/api/document_types/")}
+    type_ids = {types[name] for name in FINANCIAL_TYPES if name in types}
+    total_id = fields.get("Total")
+    document = pp("GET", f"/api/documents/{document_id}/")
+    if document.get("document_type") not in type_ids:
+        return {"document_id": document_id, "status": "not_invoice_or_receipt"}
+    existing = {entry["field"]: entry["value"] for entry in document.get("custom_fields", [])}
+    if total_id and existing.get(total_id):
+        return {"document_id": document_id, "status": "already_filled"}
+    content = (document.get("content") or "").strip()
+    if len(content) < 40:
+        return {"document_id": document_id, "status": "no_ocr_text"}
+    values = clean(extract(content))
+    if not values:
+        return {"document_id": document_id, "status": "no_values"}
+    if not dry_run:
+        pp("PATCH", f"/api/documents/{document_id}/", {"custom_fields": custom_field_values(document, fields, values)})
+    return {"document_id": document_id, "status": "would_update" if dry_run else "updated", "field_names": list(values)}
+
+
+def main(action: str = "run", document_id: int | None = None, max_docs: int = 25, dry_run: bool = False) -> dict | list[int]:
     global AIGW, AIGW_KEY, MAX_DOCS, MODEL, PAPERLESS, TOKEN
     if os.environ.get("WM_JOB_ID"):
         import wmill
@@ -168,6 +214,16 @@ def main(max_docs: int = 25, dry_run: bool = False) -> dict:
     if not TOKEN:
         sys.exit("PAPERLESS_API_TOKEN is required")
     MAX_DOCS = max_docs
+    if action == "list":
+        return {"document_ids": candidate_ids(max_docs)}
+    if action == "process":
+        if document_id is None:
+            raise ValueError("document_id is required for action=process")
+        result = process_document(document_id, dry_run)
+        print(result)
+        return result
+    if action != "run":
+        raise ValueError(f"unknown action {action!r}; expected list, process, or run")
 
     fields = {f["name"]: f["id"] for f in list_all("/api/custom_fields/")}
     types = {t["name"]: t["id"] for t in list_all("/api/document_types/")}

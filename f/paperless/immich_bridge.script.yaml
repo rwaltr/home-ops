@@ -23,6 +23,10 @@ schema:
     max_vision_calls:
       type: integer
       default: 20
+    stage:
+      type: string
+      default: all
+      originalType: string
     window_hours:
       type: number
       default: 24

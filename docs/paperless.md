@@ -194,9 +194,9 @@ Limits worth knowing:
 ## Receipt metadata (extractor)
 
 Paperless' AI suggestion action cannot write custom fields, so the Windmill
-`f/paperless/extract` script fills the financial ones. Its five-minute schedule
-scans documents typed `Invoice` or `Receipt`, asks `intel-vl` through
-agentgateway for the values, and PATCHes the document:
+`f/paperless/extract_flow` visual flow fills the financial ones. Its five-minute
+schedule lists eligible documents, then loops over them with an extraction
+script step that asks `intel-vl` through agentgateway and PATCHes the document:
 
 | Field            | Example     |
 | ---------------- | ----------- |
@@ -262,11 +262,11 @@ Recreate`); never run two pods against `data/`.
 ## Immich bridge (photo → archive)
 
 Receipts photographed on a phone land in Immich. Windmill's
-`f/paperless/immich_bridge` script polls every five minutes over the last 15
-minutes; an hourly backstop scans the last 24 hours. The former Immich WebSocket
-listener is retired, so a new photo may take up to five minutes to be examined.
-State remains in Immich tags, so the poller is idempotent and recovers work after
-a Windmill outage.
+`f/paperless/immich_pipeline` visual flow runs every five minutes over the last
+15 minutes; an hourly backstop scans the last 24 hours. Its canvas has classify,
+upload, and enrich script steps. The former Immich WebSocket listener is retired,
+so a new photo may take up to five minutes to be examined. State remains in
+Immich tags, so the poller is idempotent and recovers work after a Windmill outage.
 
 `docs/immich-paperless-flow.html` is the historical diagram of the retired
 WebSocket/consume-directory design; it no longer describes the deployed trigger
@@ -373,8 +373,9 @@ schedule to retry; the failure appears in Windmill's execution logs.
 
 ### Editing and backfilling
 
-Edit `f/paperless/extract.py` or `f/paperless/immich_bridge.py`, run the local
-tests, then deploy with `mise run paperless:windmill`. The backstop schedule is
+Edit a flow in `f/paperless/*__flow/flow.yaml` or its scripts
+`f/paperless/extract.py` / `f/paperless/immich_bridge.py`, run the local tests,
+then deploy with `mise run paperless:windmill`. The backstop schedule is
 resumable because Immich tags are the idempotency state. For a larger backfill,
 increase `window_hours` and `max_pages` in
 `f/paperless/immich_backstop.schedule.yaml`; keep `max_vision_calls` bounded
