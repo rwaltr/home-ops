@@ -67,6 +67,10 @@ spec:
               TUWUNEL_PORT: "8008"
               TUWUNEL_ALLOW_REGISTRATION: "false"
               TUWUNEL_LOGIN_WITH_PASSWORD: "false"
+              # Element Classic on iOS uses /r0/.../redirect/<idp>, which Tuwunel
+              # does not implement. With our single Kanidm IdP, omit provider IDs
+              # so clients use the supported bare SSO redirect endpoint.
+              TUWUNEL_SINGLE_SSO: "true"
               TUWUNEL_REGISTRATION_SHARED_SECRET_FILE: /run/secrets/registration_shared_secret
               TUWUNEL_ALLOW_FEDERATION: "true"
               # Allow-list: non-empty means everything else is denied. Own server

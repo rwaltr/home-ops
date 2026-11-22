@@ -89,6 +89,13 @@ is granted admin privileges by Tuwunel. Matrix localparts are derived from
 Kanidm's `preferred_username` (or its email address if needed). The Element
 server picker should use `matrix.waltr.tech`, not `idm.waltr.tech`.
 
+`TUWUNEL_SINGLE_SSO=true` is enabled because Element Classic on iOS appends the
+IdP ID to the legacy `/_matrix/client/r0/login/sso/redirect` endpoint. Tuwunel
+1.9.4 returns `M_UNRECOGNIZED` for that path. With a single IdP, this setting
+omits the provider list, so the client uses the bare redirect endpoint instead.
+The trade-off is that clients show a generic SSO button rather than a
+provider-specific Kanidm button.
+
 ## Bot accounts (one-time per bot)
 
 Hermes' native adapter needs a normal Matrix user ID and access token; it is not
