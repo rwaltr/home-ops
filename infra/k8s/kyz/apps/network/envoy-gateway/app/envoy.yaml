@@ -11,6 +11,16 @@ spec:
   logging:
     level:
       default: info
+  telemetry:
+    tracing:
+      # Keep the initial sample modest while measuring trace volume and cost.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: victoria-traces
+            namespace: o11y
+            port: 4317
   provider:
     type: Kubernetes
     kubernetes:

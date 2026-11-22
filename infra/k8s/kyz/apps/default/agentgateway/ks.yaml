@@ -14,6 +14,8 @@ spec:
     namespace: flux-system
   targetNamespace: default
   dependsOn:
+    - name: victoria-traces
+      namespace: o11y
     # cliproxyapi must exist first: it is a model upstream.
     - name: cliproxyapi
       namespace: default

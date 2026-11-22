@@ -31,3 +31,42 @@ spec:
     jsonData:
       implementation: prometheus
     url: http://alertmanager-operated.o11y.svc.cluster.local:9093
+---
+# VictoriaLogs needs its datasource plugin. The preset links log entries with a
+# trace_id field to the Jaeger-compatible VictoriaTraces datasource.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: victoria-logs
+spec:
+  uid: victoria-logs
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: victoriametrics-logs-datasource
+    name: victoria-logs
+    access: proxy
+    url: http://victoria-logs.o11y.svc.cluster.local:9428
+    jsonData:
+      otelPreset:
+        enabled: true
+        tracesDatasourceUid: jaeger
+        detection:
+          traceIdField: trace_id
+---
+# VictoriaTraces implements the Jaeger query API, which Grafana ships built in.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: victoria-traces
+spec:
+  uid: jaeger
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: jaeger
+    name: VictoriaTraces
+    access: proxy
+    url: http://victoria-traces.o11y.svc.cluster.local:10428/select/jaeger
