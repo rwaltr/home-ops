@@ -1,0 +1,34 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/grafana.integreatly.org/grafanadashboard_v1beta1.json
+# Showcase dashboards for the log and trace pipelines. The JSON is in this
+# directory and reaches the operator through the configMapGenerator in
+# kustomization.yaml. Datasources are referenced by UID (prometheus, tempo,
+# victoria-logs), which the GrafanaDatasource resources pin.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: network-logs
+spec:
+  allowCrossNamespaceImport: true
+  folder: o11y
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  configMapRef:
+    name: o11y-dashboards
+    key: network-logs.json
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/grafana.integreatly.org/grafanadashboard_v1beta1.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: traces
+spec:
+  allowCrossNamespaceImport: true
+  folder: o11y
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  configMapRef:
+    name: o11y-dashboards
+    key: traces.json

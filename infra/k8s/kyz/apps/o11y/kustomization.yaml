@@ -16,4 +16,5 @@ resources:
   - ./victoria-logs/ks.yaml
   - ./fluent-bit/ks.yaml
   - ./tempo/ks.yaml
+  - ./dashboards/ks.yaml
   - ./grafana-operator/instance/ks.yaml
