@@ -73,6 +73,13 @@ spec:
             Tag kube.*
             Mem_Buf_Limit 2MB
             Skip_Long_Lines On
+            # Poll with stat instead of inotify. The live node reports
+            # fs.inotify.max_user_instances=128 although infra/flatcar/butane/
+            # base.bu declares 1024, so the shared quota is exhausted and tail
+            # fails at init with `Too many open files`. shortcut: polling is
+            # slower to notice new files, remove this once the host sysctl is
+            # confirmed live.
+            Inotify_Watcher false
       # Keep_Log On preserves the original `log` field after Merge_Log parses
       # JSON. VictoriaLogs uses that field as the message body.
       filters: |
