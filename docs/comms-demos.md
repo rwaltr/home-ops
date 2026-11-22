@@ -9,8 +9,9 @@
 A self-hosted communication stack first stood up **internal-only** on 2026-11-01
 to evaluate it as a channel for the self-hosted agent (Hermes / whatever
 pi-durable-based agent replaces it). It remains demo-grade: single namespace,
-no federation, low resource limits, Kanidm SSO for people, and manually
-provisioned bot accounts.
+low resource limits, Kanidm SSO for people, and manually provisioned bot
+accounts. Federation is on but allow-listed to `beeper.com` only, so Beeper can
+reach the server (MVP; see the federation section below).
 
 |                | Matrix                                    |
 | -------------- | ----------------------------------------- |
@@ -20,6 +21,7 @@ provisioned bot accounts.
 | Storage        | `tuwunel-data` (5Gi, RocksDB)             |
 | Memory limit   | 512Mi                                     |
 | Human login    | Kanidm SSO via Tuwunel OIDC               |
+| Federation     | allow-listed to `beeper.com` only         |
 | Hermes adapter | native (rooms, threads, E2EE) — not wired |
 
 ## How it is deployed
@@ -185,12 +187,45 @@ the executor or the model's reach.
 This stays documented rather than wired: making the agent answer in Matrix is a
 promotion to a live channel and should be a deliberate, separate change.
 
+## Federation (beeper.com only, MVP)
+
+Federation is on so Beeper can reach this homeserver: Beeper Desktop can DM a
+Matrix user by ID, and the agent's own user ID becomes reachable from Beeper.
+The MVP is deliberately narrow — one allow-list entry, nothing else.
+
+- `allow_federation = true`.
+- `allowed_remote_server_names_experimental = ["(^|\\.)beeper\\.com$"]`. A
+  non-empty allow-list means **every other remote server is denied**; the
+  server's own name is always permitted. The regex is anchored so
+  `evilbeeper.com` does not match.
+- The route now also attaches to `envoy-external`, so external-dns publishes
+  `matrix.waltr.tech` as a CNAME to the Cloudflare tunnel and the existing
+  `*.waltr.tech` certificate covers it. Tuwunel's well-known already points at
+  `matrix.waltr.tech:443`, so no `:8448` listener is needed — which matters,
+  because CGNAT blocks inbound ports.
+
+Why the allow-list rather than opening federation: without it the server accepts
+signed events from any server that can find it. With it, only Beeper's server can
+complete a federation handshake.
+
+Cloudflare caveat: Bot Fight Mode is off on this zone (checked via the API), so
+federation traffic is not challenged. If it is ever turned on, it cannot be
+bypassed by WAF skip rules on the free plan — federation would start failing
+with 403s.
+
+Not done in the MVP: presence/typing federation stays at defaults, and no
+appservice bridges are registered. Encryption is the real follow-on cost: Beeper
+requires per-device verification, so a bot reading encrypted rooms needs a
+recovery key and device handling.
+
 ## Operational notes
 
-- **Internal only.** Every route attaches to `envoy-internal`; k8s-gateway
-  publishes the `*.waltr.tech` names from the HTTPRoutes. Nothing is reachable
-  off-LAN.
-- **No federation.** Tuwunel has `allow_federation = false`.
+- **Internal routes, one public exception.** Every app route attaches to
+  `envoy-internal`; k8s-gateway publishes the `*.waltr.tech` names from the
+  HTTPRoutes. Tuwunel is the exception: it also attaches to `envoy-external` so
+  Beeper can federate, gated by the allow-list above.
+- **Federation is allow-listed.** `allow_federation = true` with only
+  `beeper.com` permitted; see the section above.
 - **Secrets.** No secret enters git. The registration HMAC is generated in the
   cluster into `matrix-secret` and is powerful enough to create server
   administrators; only read it to provision a bot.

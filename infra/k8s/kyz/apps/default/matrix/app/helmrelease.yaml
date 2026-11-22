@@ -7,8 +7,10 @@
 # are disabled. The separate shared-secret registration API is only for bot
 # accounts and must never be given to bots. See docs/comms-demos.md.
 #
-# Internal-only: the route attaches to envoy-internal and federation is off, so
-# user IDs are @user:matrix.waltr.tech and nothing leaves the cluster.
+# Federation is on but allow-listed to beeper.com only (MVP): the server is
+# published through the Cloudflare tunnel so Beeper's server can reach us, and
+# the allow-list denies every other remote server. User IDs stay
+# @user:matrix.waltr.tech. See docs/comms-demos.md.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -66,7 +68,10 @@ spec:
               TUWUNEL_ALLOW_REGISTRATION: "false"
               TUWUNEL_LOGIN_WITH_PASSWORD: "false"
               TUWUNEL_REGISTRATION_SHARED_SECRET_FILE: /run/secrets/registration_shared_secret
-              TUWUNEL_ALLOW_FEDERATION: "false"
+              TUWUNEL_ALLOW_FEDERATION: "true"
+              # Allow-list: non-empty means everything else is denied. Own server
+              # is always permitted. Anchored so "evilbeeper.com" does not match.
+              TUWUNEL_ALLOWED_REMOTE_SERVER_NAMES_EXPERIMENTAL: '["(^|\\.)beeper\\.com$"]'
               TUWUNEL_WELL_KNOWN__CLIENT: https://matrix.waltr.tech
               TUWUNEL_WELL_KNOWN__SERVER: matrix.waltr.tech:443
               TUWUNEL_IDENTITY_PROVIDER__0__BRAND: Kanidm
@@ -137,6 +142,10 @@ spec:
           - matrix.waltr.tech
         parentRefs:
           - name: envoy-internal
+            namespace: network
+          # Federation needs a public name; external-dns publishes the CNAME and
+          # the Cloudflare tunnel carries it. Remove this to go internal-only.
+          - name: envoy-external
             namespace: network
     persistence:
       registration-secret:
