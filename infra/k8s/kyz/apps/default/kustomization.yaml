@@ -46,6 +46,7 @@ resources:
   - ./homepage/ks.yaml
   - ./beancount-stack/ks.yaml
   - ./it-tools/ks.yaml
+  - ./node-red/ks.yaml
   - ./chaski/ks.yaml
   - ./mikrotik-mcp/ks.yaml
   - ./flux-mcp/ks.yaml
