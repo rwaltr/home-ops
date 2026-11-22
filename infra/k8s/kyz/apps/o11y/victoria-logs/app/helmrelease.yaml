@@ -1,0 +1,36 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# VictoriaLogs single-node store. Keep a hard disk ceiling as well as age-based
+# retention so a log burst cannot fill the node's OS disk.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-logs
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-logs
+  interval: 1h
+  values:
+    server:
+      fullnameOverride: victoria-logs
+      persistentVolume:
+        enabled: true
+        size: 10Gi
+        storageClassName: openebs-hostpath
+      retentionPeriod: 14d
+      # VictoriaMetrics size flags require GiB, not the Kubernetes Gi suffix.
+      retentionDiskSpaceUsage: 8GiB
+      resources:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+      serviceMonitor:
+        enabled: true
+    # The chart's default Vector agent would duplicate Fluent Bit collection.
+    vector:
+      enabled: false
+    dashboards:
+      enabled: false

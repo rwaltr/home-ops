@@ -144,6 +144,11 @@ spec:
         # completion that takes more than five seconds.
         connectionMinTerminationDeadline: 10s
         connectionTerminationDeadline: 295s
+      frontendPolicies:
+        tracing:
+          host: victoria-traces.o11y.svc.cluster.local:4317
+          protocol: grpc
+          randomSampling: 0.1
       # Three listeners, two of them authenticated.
       #
       # apiKey sits at the GATEWAY level rather than on the llm/mcp blocks because

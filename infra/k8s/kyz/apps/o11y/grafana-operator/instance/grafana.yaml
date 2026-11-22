@@ -94,9 +94,8 @@ spec:
                     secretKeyRef:
                       name: grafana-kanidm-oauth2-credentials
                       key: CLIENT_SECRET
-                # GF_INSTALL_PLUGINS pinned victoriametrics-logs-datasource for
-                # the VictoriaLogs datasource. Removed with the logging
-                # decommission (2026-11-07) — see docs/logging.md.
+                - name: GF_INSTALL_PLUGINS
+                  value: victoriametrics-logs-datasource 0.34.0
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

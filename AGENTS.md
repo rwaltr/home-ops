@@ -84,7 +84,8 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/agentgateway.md` — the LLM door: OpenRouter chat, self-hosted aliases, subscription models, MCP multiplex (replaced litellm 2026-11-18)
 - `docs/tailscale.md` — Tailnet: Terraform-owned policy/DNS/settings, the Kubernetes operator credential, and the manual bootstrap step
 - `docs/secrets.md` — 1Password → External Secrets: who writes what, `mise run secrets:verify`, and the staged Cloudflare DNS token switch
-- `docs/logging.md` — decommissioned 2026-11-07 (VictoriaLogs + Fluent Bit removed)
+- `docs/logging.md` — VictoriaLogs + Fluent Bit container-log pipeline, retention, and troubleshooting
+- `docs/tracing.md` — VictoriaTraces, Grafana Jaeger datasource, sampling, and TraceQL/Drilldown trade-offs
 - `docs/alerting.md` — Alertmanager routing (pushover, blackholes, silences)
 - `docs/mosquitto.md` — MQTT broker + HA discovery
 - `docs/calendar.md` — Radicale + CalDAV / Remind feed

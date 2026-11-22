@@ -1,50 +1,43 @@
-# Cluster logging — DECOMMISSIONED 2026-11-07
+# Cluster logging
 
-There is no cluster log store. VictoriaLogs and Fluent Bit were switched off on
-2026-09-28 and formally decommissioned on 2026-11-07; the manifests, the Grafana
-datasource, the Grafana plugin and the PVC are all gone. Container logs live
-only in `kubectl logs` and in the kubelet's journal (journald currently holds
-4 GiB on the node).
+Grafana's **VictoriaLogs** datasource contains container stdout collected by
+Fluent Bit. The pipeline runs in `o11y` and is managed by Flux under
+`infra/k8s/kyz/apps/o11y/`.
 
-## Why it was removed
+## Pipeline
 
-It had already been switched off, and what was left was drift:
+- Fluent Bit runs as a DaemonSet and tails `/var/log/containers/*.log`.
+- Its Kubernetes filter adds namespace, pod, and container metadata.
+- Fluent Bit sends records to VictoriaLogs over the cluster network.
+- VictoriaLogs retains data for 14 days, with an 8 GiB data cap on a 10 Gi PVC.
+- Grafana uses the pinned `victoriametrics-logs-datasource` plugin.
 
-- Commit `6d0a60bf` ("oom oom oh pls no oom", 2026-09-28) commented
-  `victoria-logs/ks.yaml` and `fluent-bit/ks.yaml` out of
-  `infra/k8s/kyz/apps/o11y/kustomization.yaml` to relieve memory pressure on
-  `mouse`. The workload never ran again.
-- The store stopped writing on that date, so everything in it was already more
-  than five weeks past its own 14-day retention. Nothing of value was deleted.
-- What remained was a Bound 10 Gi PVC (`o11y/server-volume-victoria-logs-0`)
-  with no consumer, a Grafana datasource pointing at a Service that no longer
-  existed, an installed Grafana plugin nothing used, and this document
-  describing the pipeline as live.
+The store has a 64Mi memory request and 256Mi limit. Fluent Bit has a 32Mi
+request and 96Mi limit. Review actual working sets before changing those budgets.
+VictoriaLogs also stores trace IDs and supports links to traces when an
+application includes a `trace_id` field in its logs. Fluent Bit does not create
+trace IDs or inject them into log messages.
 
-The alternative was re-enabling it now that memory requests are being
-right-sized. It was retired instead: a pipeline that had to be killed during a
-memory incident is not the first workload to bring back.
+## Scope and limits
 
-## What was deleted
+This pipeline collects container stdout only. It does not collect host or
+kubelet journald, Home Assistant's log file, or application PVC data. A
+Fluent Bit restart can lose its small in-memory buffer. It retries failed
+writes five times, then drops the buffered records.
 
-| Removed                                                                   |
-| ------------------------------------------------------------------------- |
-| `infra/k8s/kyz/apps/o11y/victoria-logs/` (HelmRelease, OCIRepository, ks) |
-| `infra/k8s/kyz/apps/o11y/fluent-bit/` (HelmRelease, OCIRepository, ks)    |
-| the `victoria-logs` GrafanaDatasource                                     |
-| `GF_INSTALL_PLUGINS=victoriametrics-logs-datasource` on the Grafana CR    |
-| PVC `o11y/server-volume-victoria-logs-0`                                  |
+VictoriaLogs is not Loki-compatible. The Grafana plugin is required. Keep the
+VictoriaLogs and Fluent Bit chart versions pinned in their OCIRepository files.
+The VictoriaLogs disk-size flag expects `GiB`, not the Kubernetes `Gi` suffix.
 
-## Bringing it back
+## Troubleshooting
 
-The design reasoning is preserved in `REFACTOR_PLANS.md` under **2026-09-26
-(later) — log system: VictoriaLogs + Fluent Bit**. That entry is the spec: why
-VictoriaLogs single rather than Loki, why Fluent Bit rather than the chart's
-default Vector, the `Keep_Log On` and stream-field constraints, and the
-`8GiB`-vs-`8Gi` flag bug that crashlooped the first deploy — K8s quantities and
-VictoriaMetrics byte-size flags look interchangeable and are not.
+- Check the `victoria-logs` and `fluent-bit` Flux Kustomizations in namespace
+  `o11y`.
+- Check the VictoriaLogs StatefulSet, PVC, and Service in namespace `o11y`.
+- Check Fluent Bit DaemonSet pods and their logs in namespace `o11y`.
+- In Grafana Explore, select the `victoria-logs` datasource.
+- For recent logs without a working pipeline, use `kubectl logs` directly.
 
-Budget it before rebuilding: the original ask was 64Mi request / 256Mi limit for
-the store and 32Mi / 96Mi for the collector, plus a 10 Gi PVC on
-`openebs-hostpath`, and a new workload fits only because the request budget has
-room now.
+See `REFACTOR_PLANS.md` under **2026-09-26 (later) — log system:
+VictoriaLogs + Fluent Bit** for the original design decisions and
+**2026-11-07 — efficiency review** for the decommission history.
