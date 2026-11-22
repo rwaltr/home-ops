@@ -1,11 +1,8 @@
 ---
-# yaml-language-server: $schema=https://json.schemastore.org/kustomization
-# Node-RED's settings.js, mounted over /data/settings.js.
-#
-# Editor login is deliberately not configured here yet. The route is on
-# envoy-internal only, and the Kanidm OIDC strategy needs a Passport module
-# installed into /data first. docs/node-red.md has the two steps and the exact
-# settings.js block for it.
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/core/configmap_v1.json
+# Node-RED's settings.js, mounted over /data/settings.js. Envoy's route-level
+# SecurityPolicy handles Kanidm login, and the NetworkPolicy prevents direct
+# access to the ClusterIP around that gate.
 apiVersion: v1
 kind: ConfigMap
 metadata:

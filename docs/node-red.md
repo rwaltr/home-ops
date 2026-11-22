@@ -59,100 +59,38 @@ mints a new one and orphans them, so re-enter them in the editor if that happens
 A restore needs both the PVC and this Secret. With only the PVC, the flows open
 but their credentials read as invalid.
 
-## Editor login (not configured yet)
+## Kanidm access control
 
-The route is on `envoy-internal` only, so the editor is reachable from the LAN
-with no login. Anyone on that network can edit flows. Add login before the
-instance holds anything you would not hand out.
+Envoy Gateway enforces OIDC on `HTTPRoute/node-red` with the route-scoped
+`SecurityPolicy/node-red-oidc`. The Kanidm client and the policy live next to the
+app manifests. The callback is
+`https://nodered.waltr.tech/oauth2/callback`, and the policy uses the issuer
+`https://idm.waltr.tech/oauth2/openid/node-red`.
 
-The login is a Passport strategy, and Node-RED resolves modules from
-`/data/node_modules`, so it installs without a custom image:
+Kanidm mints the client ID and secret into the `default` namespace Secret
+`node-red-kanidm-oauth2-credentials`. Envoy reads the `client-id` and
+`client-secret` keys directly. It sends PKCE, which meets kaniop's default
+requirement. Users must belong to `idm_all_persons` and have a primary mail
+attribute for the requested email scope.
 
-```sh
-kubectl -n default exec deploy/node-red -c app -- \
-  npm install --prefix /data passport-openidconnect
-```
+The `NetworkPolicy/node-red-ingress` allows port 1880 only from Envoy pods in the
+`network` namespace. This matters because direct Service access would bypass the
+Gateway's OIDC policy. Node-RED does not duplicate authentication with `adminAuth`.
 
-Then add the strategy to `settings.js` in
-`infra/k8s/kyz/apps/default/node-red/app/settings-configmap.yaml`:
+Gatus accepts either 302 from the OIDC redirect or 200 if its client follows the
+redirect. The pod probes use TCP and do not pass through Envoy.
 
-```js
-adminAuth: {
-  type: "strategy",
-  strategy: {
-    name: "kanidm",
-    label: "Sign in with Kanidm",
-    icon: "fa-lock",
-    strategy: require("passport-openidconnect").Strategy,
-    options: {
-      issuer: "https://idm.waltr.tech/oauth2/openid/node-red",
-      authorizationURL: "https://idm.waltr.tech/ui/oauth2",
-      tokenURL: "https://idm.waltr.tech/oauth2/token",
-      userInfoURL: "https://idm.waltr.tech/oauth2/openid/node-red/userinfo",
-      clientID: process.env.NODERED_OIDC_CLIENT_ID,
-      clientSecret: process.env.NODERED_OIDC_CLIENT_SECRET,
-      callbackURL: "https://nodered.waltr.tech/auth/strategy/callback",
-      scope: "openid profile email",
-    },
-  },
-},
-```
-
-The callback path `/auth/strategy/callback` is fixed by Node-RED. The three URLs
-above come from Kanidm's discovery document, per client:
+Verify the route gate after Flux applies the changes:
 
 ```sh
-curl -s https://idm.waltr.tech/oauth2/openid/node-red/.well-known/openid-configuration
+curl -sSI https://nodered.waltr.tech/ | head -10
+kubectl -n default get securitypolicy node-red-oidc
+kubectl -n default get networkpolicy node-red-ingress
+kubectl -n default get kanidmoauth2client node-red
 ```
 
-The `KanidmOAuth2Client` for it, next to this app's manifests:
-
-```yaml
-apiVersion: kaniop.rs/v1beta1
-kind: KanidmOAuth2Client
-metadata:
-  name: node-red
-spec:
-  kanidmRef:
-    name: kanidm
-    namespace: identity
-  displayname: Node-RED
-  origin: https://nodered.waltr.tech
-  redirectUrl:
-    - https://nodered.waltr.tech/auth/strategy/callback
-  # passport-openidconnect does not send a PKCE challenge, and kaniop enforces
-  # PKCE by default. Without this the login fails with
-  # `No PKCE code challenge was provided with client in enforced PKCE mode`.
-  # The client is confidential with an exact-match redirect, so the risk this
-  # setting accepts is the interception of an unused authorization code.
-  allowInsecureClientDisablePkce: true
-  scopeMap:
-    - group: idm_all_persons
-      scopes:
-        - openid
-        - profile
-        - email
-  disableConsentPrompt: true
-  preferShortUsername: true
-  secretKeyAliases:
-    clientId:
-      - NODERED_OIDC_CLIENT_ID
-    clientSecret:
-      - NODERED_OIDC_CLIENT_SECRET
-```
-
-Point the two `NODERED_OIDC_*` variables at that minted Secret in the
-HelmRelease, the same way the FreshRSS and Homebox clients are wired.
-
-Two things move together when login is enabled:
-
-- `gatus.home-operations.com/endpoint` in the HelmRelease must accept a 3xx,
-  because `/` then redirects to the identity provider instead of answering 200.
-- The probes are `tcpSocket` on purpose. They survive the change.
-
-`passport-openidconnect` against Kanidm is **not verified**. The probe here is
-the Kanidm log: an `invalid_request` with `No PKCE code challenge` means the
-setting above was missed.
+The browser should redirect to Kanidm. The OAuth client must become ready before
+the Gateway can complete the login flow.
 
 ## Rebuilding the pipelines
 

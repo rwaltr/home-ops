@@ -53,9 +53,8 @@ spec:
                     name: node-red-credential-secret
                     key: NODERED_CREDENTIAL_SECRET
             probes:
-              # tcpSocket, not an HTTP path: every editor route answers 401 once
-              # an adminAuth strategy is added, and an HTTP probe would then fail
-              # a healthy pod. The port check holds either way.
+              # The OIDC gate sits at Envoy, not in Node-RED. A TCP probe checks
+              # the pod directly without coupling health to editor login.
               liveness: &probes
                 enabled: true
                 custom: true
@@ -103,11 +102,10 @@ spec:
           gethomepage.dev/description: Flow automation
           gethomepage.dev/group: Automation
           gethomepage.dev/icon: node-red.png
-          # `/` is the editor. It answers 200 while no editor login is
-          # configured; adding one makes it a 302 to the identity provider, so
-          # widen this condition to accept 3xx at the same time.
+          # An unauthenticated check may see Envoy's OIDC 302, or a 200 if its
+          # client follows the redirect. Accept both, but not auth/config errors.
           gatus.home-operations.com/endpoint: |-
-            conditions: ["[STATUS] == 200"]
+            conditions: ["[STATUS] == 200 || [STATUS] == 302"]
         hostnames:
           - nodered.waltr.tech
         parentRefs:

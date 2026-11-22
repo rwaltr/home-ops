@@ -26,4 +26,8 @@ spec:
       namespace: openebs
     - name: external-secrets # the Password generator behind the credential secret
       namespace: external-secrets
+    - name: kanidm # the OAuth2Client CRD and OIDC provider
+      namespace: identity
+    - name: envoy-gateway # the SecurityPolicy CRD and controller
+      namespace: network
   wait: false
