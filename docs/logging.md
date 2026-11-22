@@ -18,6 +18,14 @@ pipeline runs in `o11y` under `infra/k8s/kyz/apps/o11y/`.
 - The syslog LoadBalancer only accepts the management VLAN ranges.
 - VictoriaLogs retains all sources for 14 days, capped at 8 GiB on a 10 Gi PVC.
 
+The store has a 192Mi memory request and 512Mi limit, sized from its own
+working set (p95 188Mi, peak 250Mi over 12h). It sizes its caches from the
+container limit, so a limit below the peak it reaches during merges makes it
+OOM. Fluent Bit has a 32Mi request and 192Mi limit. Review actual working sets
+before changing those budgets. VictoriaLogs also stores trace IDs and supports
+links to traces when an application includes a `trace_id` field in its logs.
+Fluent Bit does not create trace IDs or inject them into log messages.
+
 ## Router and access point
 
 The RB5009 (`gateway-132l`) is the CAPsMAN controller for `ap1-132l`. The AP

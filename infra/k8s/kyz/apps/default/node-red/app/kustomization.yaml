@@ -3,9 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./helmrepository.yaml
+  - ./oauth2client.yaml
+  - ./securitypolicy.yaml
+  - ./networkpolicy.yaml
   - ./generator.yaml
   - ./externalsecret.yaml
-  - ./postgres.yaml
+  - ./settings-configmap.yaml
+  - ./ocirepository.yaml
   - ./helmrelease.yaml
-  - ./httproute.yaml

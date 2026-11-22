@@ -5,6 +5,11 @@ kind: GrafanaDatasource
 metadata:
   name: prometheus
 spec:
+  # Pinned so other datasources reference a readable UID instead of the operator's
+  # generated one (Tempo's service map needs it). spec.uid is immutable, so this
+  # value can only be added by deleting and re-creating this resource once —
+  # `kubectl delete grafanadatasource -n o11y prometheus` and let Flux recreate it.
+  uid: prometheus
   instanceSelector:
     matchLabels:
       dashboards: grafana
@@ -91,7 +96,7 @@ spec:
       search:
         hide: false
       serviceMap:
-        datasourceUid: bfb70c0a-a5df-44d9-bfdc-22b4e5b9cf0a
+        datasourceUid: prometheus
       tracesToLogsV2:
         datasourceUid: victoria-logs
         spanStartTimeShift: -5m

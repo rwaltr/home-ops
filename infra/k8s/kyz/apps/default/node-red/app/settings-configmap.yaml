@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/core/configmap_v1.json
+# Node-RED's settings.js, mounted over /data/settings.js. Envoy's route-level
+# SecurityPolicy handles Kanidm login, and the NetworkPolicy prevents direct
+# access to the ClusterIP around that gate.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-red-settings
+data:
+  # Mounted with subPath over /data/settings.js. The entrypoint runs red.js with
+  # --userDir /data, and Node-RED prefers a settings.js found there over the one
+  # baked into the image, so this file is the whole configuration.
+  settings.js: |
+    // Encrypts the credentials a flow stores (API keys, tokens). Generated in
+    // the cluster and injected as an environment variable, never committed.
+    // Losing the value orphans every saved credential.
+    const credentialSecret = process.env.NODERED_CREDENTIAL_SECRET;
+
+    module.exports = {
+      credentialSecret,
+      // Git-backed flows. Each Project is a git repository (Forgejo), so
+      // workflow state lives there and never in this repo — see docs/node-red.md.
+      // The image ships git and OpenSSH, and /data is the persistent volume.
+      editorTheme: { projects: { enabled: true } },
+    };

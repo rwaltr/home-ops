@@ -55,7 +55,7 @@ description = "Grafana service account token (mcp-grafana)"
 [secrets.PAPERLESS_API_TOKEN]
 provider = "op"
 value = "paperless/api_token"
-description = "Paperless-ngx API token (paperless seed and Windmill pipelines)"
+description = "Paperless-ngx API token (paperless seed)"
 # Client credential, not server config: the `homebox` item holds the API key
 # pepper the server HMACs keys with, and adding this key there would invite
 # rotating the wrong field. Issued one-time in HomeBox Profile → API Keys.
@@ -63,11 +63,6 @@ description = "Paperless-ngx API token (paperless seed and Windmill pipelines)"
 provider = "op"
 value = "homebox-mcp/API_KEY"
 description = "HomeBox API key (hb_…) for the agent MCP server"
-
-[secrets.WINDMILL_TOKEN]
-provider = "op"
-value = "windmill/credential"
-description = "Windmill API token for workflow configuration"
 
 # `mise run routeros:dns-apply` uses this dedicated RouterOS REST/SCP identity;
 # do not reuse the read-only MCP account and never put its values in Git.
@@ -80,8 +75,3 @@ description = "Dedicated RouterOS user for Blocky DNS deployment"
 provider = "op"
 value = "mikrotik-dns/password"
 description = "Password for the dedicated RouterOS Blocky deployment user"
-
-[secrets.IMMICH_PAPERLESS_API_KEY]
-provider = "op"
-value = "paperless-bridge/credential"
-description = "Immich API key for Windmill Paperless bridge"

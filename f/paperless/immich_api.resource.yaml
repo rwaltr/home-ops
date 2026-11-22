@@ -1,5 +1,0 @@
-description: Immich in-cluster API; key comes from a Windmill secret variable.
-resource_type: immich_api
-value:
-  base_url: http://immich-server.default.svc.cluster.local:2283
-  api_key: $var:f/paperless/immich_api_key

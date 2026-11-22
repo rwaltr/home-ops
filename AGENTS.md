@@ -84,13 +84,15 @@ Ping a skill explicitly with `/skill:verify-change` if the model doesn't auto-lo
 - `docs/agentgateway.md` — the LLM door: OpenRouter chat, self-hosted aliases, subscription models, MCP multiplex (replaced litellm 2026-11-18)
 - `docs/tailscale.md` — Tailnet: Terraform-owned policy/DNS/settings, the Kubernetes operator credential, and the manual bootstrap step
 - `docs/secrets.md` — 1Password → External Secrets: who writes what, `mise run secrets:verify`, and the staged Cloudflare DNS token switch
-- `docs/logging.md` — VictoriaLogs + Fluent Bit container-log pipeline, retention, and troubleshooting
+- `docs/logging.md` — VictoriaLogs log pipeline: container stdout, host journald, Kubernetes events, router/AP syslog; retention and troubleshooting
 - `docs/tracing.md` — Grafana Tempo, OTLP trace sources, Explore/Drilldown, retention, and log correlation
 - `docs/alerting.md` — Alertmanager routing (pushover, blackholes, silences)
 - `docs/mosquitto.md` — MQTT broker + HA discovery
 - `docs/calendar.md` — Radicale + CalDAV / Remind feed
 - `docs/freshrss.md` — FreshRSS
 - `docs/navidrome.md` — Navidrome (Subsonic/OpenSubsonic)
+- `docs/node-red.md` — Node-RED flow automation: flows in a Forgejo Project (not this
+  repo), the generated credential secret, and the Kanidm editor login
 - `docs/books.md` — Kavita + Audiobookshelf over the tank `books` dataset, why acquisition is still unsolved, and the disabled slskd (Soulseek)
 - `docs/homebox.md` — HomeBox home inventory
 - `docs/homepage.md` — Homepage service dashboard
