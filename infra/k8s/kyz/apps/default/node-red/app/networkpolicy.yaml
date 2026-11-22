@@ -1,0 +1,24 @@
+---
+# Only Envoy may reach Node-RED. Direct requests to the ClusterIP bypass the
+# route's OIDC SecurityPolicy, so the app port is not open to other pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-red-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: node-red
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: network
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+      ports:
+        - protocol: TCP
+          port: 1880

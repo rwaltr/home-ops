@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/gateway.envoyproxy.io/securitypolicy_v1alpha1.json
+# OIDC is route-scoped and lives beside the HTTPRoute it protects.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: node-red-oidc
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: node-red
+  oidc:
+    provider:
+      issuer: https://idm.waltr.tech/oauth2/openid/node-red
+    clientIDRef:
+      name: node-red-kanidm-oauth2-credentials
+    clientSecret:
+      name: node-red-kanidm-oauth2-credentials
+    redirectURL: https://nodered.waltr.tech/oauth2/callback
+    scopes:
+      - openid
+      - profile
+      - email

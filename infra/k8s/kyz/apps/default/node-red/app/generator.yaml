@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/generators.external-secrets.io/password_v1alpha1.json
+# Node-RED's credential secret: the key it encrypts flow credentials (API keys,
+# tokens) with. Only the running pod reads it, so 1Password would add a step and
+# buy nothing (docs/secrets.md) — the same call as Windmill's Postgres password.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: node-red-credential
+spec:
+  length: 40
+  # Letters and digits only: the value is pasted into settings.js through the
+  # environment, and symbol quoting is one more way to break it.
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
