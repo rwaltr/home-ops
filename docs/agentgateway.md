@@ -70,22 +70,24 @@ the upstream id verbatim, so a response always names the model that answered.
 
 The four `auto-*` virtual models sit on top of those — see
 [Failover chains](#failover-chains). Their name is not an upstream id: the response
-names the target that served the request, not the alias that was asked for.
+names the target that served the request, not the alias that was asked for. The
+`pi` extension classifies individual turns and routes physical models directly;
+these gateway aliases provide the same tier choices to other clients.
 
 Where each one really runs matters more than the alias, because it decides whether a
 request leaves the house and whether it is billed:
 
-| Alias                 | Backend       | Notes                                                                   |
-| --------------------- | ------------- | ----------------------------------------------------------------------- |
-| `deepseek-v4.1-flash` | OpenRouter    | Cloud, billed. The default for hermes and the phone clients.            |
-| `qwen3.8-omni-flash`  | OpenRouter    | Cloud. **Vision + audio + video.** homebox-companion's default.         |
-| `gpt-5.6-luna`        | OpenRouter    | Cloud. **Vision**; 404s on a video part.                                |
-| `voyage-code-4`       | OpenRouter    | Cloud. Embeddings, 1024 dims. Not on any client's allow-list.           |
-| `nvidia-llama`        | Dan's gateway | Self-hosted **Qwen3-32B** (vLLM, nvfp4), 151k context. Best local pick. |
-| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware, 229k context. PARKED on his side.  |
-| `intel-vl`            | Dan's gateway | **Vision**: Qwen3-VL-8B on an Intel Arc. Paperless + Immich use it.     |
-| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`, 114k context.                            |
-| `claude-*-5-5`        | cliproxyapi   | The paid subscription. `pi` only — see the allow-lists below.           |
+| Alias                 | Backend       | Notes                                                                  |
+| --------------------- | ------------- | ---------------------------------------------------------------------- |
+| `deepseek-v4.1-flash` | OpenRouter    | Cloud, billed. The default for hermes and the phone clients.           |
+| `qwen3.8-omni-flash`  | OpenRouter    | Cloud. **Vision + audio + video.** homebox-companion's default.        |
+| `gpt-5.6-luna`        | OpenRouter    | Cloud. **Vision**; 404s on a video part.                               |
+| `voyage-code-4`       | OpenRouter    | Cloud. Embeddings, 1024 dims. Not on any client's allow-list.          |
+| `nvidia-llama`        | Dan's gateway | Self-hosted `inkling-2-mini` (vLLM), 151k context. Best local pick.    |
+| `intel-llama`         | Dan's gateway | Self-hosted Llama on Intel hardware, 229k context. PARKED on his side. |
+| `intel-vl`            | Dan's gateway | **Vision**: Qwen3-VL-8B on an Intel Arc. Paperless + Immich use it.    |
+| `gptoss-llama`        | Dan's gateway | Self-hosted `gpt-oss-20b-f16`, 114k context.                           |
+| `claude-*-5-5`        | cliproxyapi   | The paid subscription. `pi` only — see the allow-lists below.          |
 
 The two OpenRouter vision aliases exist for photo/video intake (homebox-companion and
 the walkthrough-to-CSV route). Both read image barcodes well enough to be useful but
@@ -120,27 +122,28 @@ not local.
 
 ## Failover chains
 
-Four virtual models give one name per capability tier, each a priority chain:
-subscription first, OpenRouter second. They exist because every paid-for door — the
-Go tier and the Claude subscription — has a monthly or rolling limit, and a client
-that asks for one model by name has no way to survive reaching it.
+Four virtual models give one name per capability tier. Work stays on the proven,
+low-cost Luna model; deep and max start on the Claude subscription, then drop to
+Luna when that subscription is exhausted rather than paying OpenRouter's Claude
+prices.
 
-| Alias        | priority 0               | priority 1                         |
-| ------------ | ------------------------ | ---------------------------------- |
-| `auto-quick` | `go/deepseek-v4.1-flash` | `deepseek-v4.1-flash` (OpenRouter) |
-| `auto-work`  | `go/glm-5.3`             | `glm-5.3` (OpenRouter)             |
-| `auto-deep`  | `go/gpt-6-luna`          | `gpt-6-luna` (OpenRouter)          |
-| `auto-max`   | `claude-opus-5-5`        | `claude-opus-5.5` (OpenRouter)     |
+| Alias        | priority 0               | priority 1                 | priority 2        | priority 3        |
+| ------------ | ------------------------ | -------------------------- | ----------------- | ----------------- |
+| `auto-quick` | `go/deepseek-v4.1-flash` | `deepseek-v4.1-flash` (OR) |                   |                   |
+| `auto-work`  | `go/gpt-6-luna`          | `gpt-6-luna` (OR)          |                   |                   |
+| `auto-deep`  | `claude-sonnet-5-5`      | `go/gpt-6-luna`            | `gpt-6-luna` (OR) |                   |
+| `auto-max`   | `claude-opus-5-5`        | `claude-sonnet-5-5`        | `go/gpt-6-luna`   | `gpt-6-luna` (OR) |
+
+(OR = OpenRouter.)
 
 The targets are `visibility: internal`, so they do not appear in `/v1/models` and
 cannot be requested directly. The alias is the only name a client sees.
 
 **The tier is the caller's choice, not the gateway's guess.** agentgateway routes on
-health and priority; it cannot read a prompt. `pi` classifies (task kind, hardness)
-and asks for the matching alias, so the judgement stays where the conversation is and
-the gateway only owns the part it can do well: knowing which door is currently broken.
-Any other client picks a tier and gets the subscription behind it without learning
-about OpenRouter.
+health and priority; it cannot read a prompt. Pi uses heuristics plus a classifier to
+choose each turn's tier and directly routes to the equivalent physical-model chain.
+Other clients choose a tier alias and get subscription-first routing without learning
+about OpenRouter or needing to implement their own fallback.
 
 Three details are load-bearing:
 
