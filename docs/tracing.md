@@ -1,57 +1,83 @@
 # Distributed tracing
 
-VictoriaTraces stores OpenTelemetry traces in namespace `o11y`. Grafana queries
-it through the built-in Jaeger datasource. No collector or Grafana traces plugin
-is required.
+Grafana queries OpenTelemetry traces from **Grafana Tempo** in namespace `o11y`.
+Tempo runs as one StatefulSet with local storage. It accepts OTLP/gRPC on `4317`
+and OTLP/HTTP on `4318`. Both ports stay cluster-internal.
 
-## Pipeline
+Tempo replaced VictoriaTraces. VictoriaTraces only offered the Jaeger API, which
+has no TraceQL and no Traces Drilldown. Traces stored there were dropped.
 
-- VictoriaTraces accepts OTLP/gRPC on the cluster-internal service port `4317`.
-- Envoy Gateway sends traces for ingress traffic. It samples 10% of requests.
-- agentgateway sends traces for its HTTP, MCP, and LLM traffic. It samples 10%
-  of requests that do not inherit a sampling decision.
-- VictoriaTraces retains data for 14 days, with an 8 GiB data cap on a 10 Gi PVC.
-- Grafana exposes the datasource as `VictoriaTraces` with UID `jaeger`.
+## Trace sources
 
-The trace store requests 128Mi and has a 512Mi memory limit. Treat this as an
-initial budget. Check measured use after the pipeline has collected traffic.
+- Envoy Gateway exports 10% of ingress traces.
+- agentgateway exports 10% of HTTP, MCP, and LLM traces.
+- Grafana exports 10% of its own server traces.
+- Prometheus exports 10% of its own traces. The Prometheus Operator marks this
+  field experimental.
+- Tempo's metrics generator writes span metrics and service-graph metrics to
+  Prometheus. Tempo 3 removed the `local-blocks` processor, so it is not used.
 
-agentgateway's default spans include model and token-use metadata. This config
+agentgateway's default spans include model and token-use metadata. This setup
 does not add prompt or response content. Do not add `llm.prompt` or
 `llm.completion` attributes without reviewing the privacy impact first.
 
-## Failure behavior
+## What does not emit traces yet
 
-The trace store is not a prerequisite for either gateway. Envoy Gateway and
-agentgateway start and serve traffic while VictoriaTraces is down or absent, and
-trace export fails on its own. Neither Flux Kustomization declares a
-`dependsOn` on `victoria-traces` on purpose: a trace store outage must not gate
-ingress or LLM traffic. Losing traces during that window is the accepted cost.
+Everything else logs to VictoriaLogs but produces no spans. I checked these:
 
-## Using traces
+- **Kanidm 1.11.2** has a native exporter. The binary reads
+  `KANIDM_OTEL_GRPC_ENDPOINT`. I did not enable it. It needs a Kanidm restart,
+  and I could not confirm the operator passes the variable through. Try it in a
+  separate change so a bad value cannot take sign-in down with it.
+- **Immich** has an OpenTelemetry SDK, but the project documents only metrics.
+  Traces need a modified build or auto-instrumentation.
+- **Jellyfin** has a third-party OpenTelemetry plugin for 10.11. Built-in support
+  is an open pull request.
+- **Home Assistant** has third-party HACS integrations only.
+- **Forgejo** and **CloudNativePG** did not return a documented trace exporter.
+  I did not verify either.
+- **Cilium Hubble** exports network flows, not traces. It is not enabled.
 
-Open **Explore** in Grafana and choose `VictoriaTraces`. The Jaeger query editor
-can search by service, operation, tags, and duration. Trace IDs open a span
-waterfall, and the dependency graph summarizes service relationships.
+## Storage and failure behavior
 
-The VictoriaLogs datasource adds a trace link when a log has a `trace_id` field.
-The collector does not generate IDs or add them to application logs, so this
-link requires the application to log its trace ID. Trace-to-logs is not wired
-because Grafana's Jaeger datasource documents that feature for Loki and Splunk.
+Tempo retains trace blocks for seven days on a 10 Gi `openebs-hostpath` PVC.
+Its 256Mi memory request and 1Gi limit are initial budgets. Tempo's local
+backend has age-based retention but no hard disk cap. Check disk growth and
+working set after traffic accumulates.
 
-## TraceQL and Traces Drilldown
+Neither gateway depends on Tempo being ready. Envoy and agentgateway keep
+serving traffic during a Tempo outage, and traces may be lost until export
+recovers.
 
-TraceQL is a query language for selecting spans by attributes and relationships
-between spans. Its metrics functions can aggregate trace data into rates,
-counts, and latency summaries.
+## Where to go
 
-Traces Drilldown is a visual workflow for exploring those metrics without
-writing TraceQL. It shows RED views (rate, errors, and duration) and helps find
-which service or operation changed.
+Open [Grafana Explore](https://grafana.waltr.tech/explore) and choose `Tempo`.
+Search for service `agentgateway`, `envoy-internal.network`, or
+`envoy-external.network`. Click a result to view its span waterfall.
 
-VictoriaTraces implements Grafana's Tempo API, which enables the Tempo
-datasource, TraceQL, and Drilldown. VictoriaMetrics documents that API as
-experimental. This setup uses the Jaeger API instead. It provides basic search,
-trace details, and dependency graphs without depending on the experimental API.
-Revisit Tempo API support if TraceQL or Drilldown becomes useful enough to
-accept that compatibility risk.
+In **Drilldown → Traces**, the RED views compare request rate, errors, and
+duration without writing TraceQL. In Explore, try:
+
+```text
+{ resource.service.name = "agentgateway" }
+```
+
+### If Explore is missing
+
+Explore needs the Grafana Editor or Admin role. The Kanidm mapping gives Admin to
+members of `grafana_admins` or `idm_admins`, and Viewer to everyone else. Viewer
+cannot open Explore.
+
+`grafana_admins` is declared in
+`infra/k8s/kyz/apps/identity/resources/app/group-grafana-admins.yaml`. After the
+group reconciles, sign out of Grafana and sign in again. The role is set at login.
+
+## Linking traces and logs
+
+From a trace, the Tempo datasource searches VictoriaLogs for the trace ID as text.
+That matches agentgateway access logs, which write `trace.id=<hex>` into the
+message. Envoy access logs and other containers do not include a trace ID, so
+those spans have no log link.
+
+From a log line, a derived field opens the trace in Tempo. It matches a
+`trace.id` or `trace_id` field, or the `trace.id=<hex>` text in agentgateway logs.

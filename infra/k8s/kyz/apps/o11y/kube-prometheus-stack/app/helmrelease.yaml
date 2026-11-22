@@ -77,6 +77,13 @@ spec:
         ruleSelectorNilUsesHelmValues: false
         scrapeConfigSelectorNilUsesHelmValues: false
         serviceMonitorSelectorNilUsesHelmValues: false
+        enableRemoteWriteReceiver: true
+        # Tempo's metrics generator writes low-volume span/service-graph metrics here.
+        tracingConfig:
+          clientType: grpc
+          endpoint: tempo.o11y.svc.cluster.local:4317
+          insecure: true
+          samplingFraction: 0.1
         retention: 30d
         retentionSize: 40GiB
         resources:

@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/helm.toolkit.fluxcd.io/helmrelease_v2.json
+# Tempo 3.x monolithic mode. It keeps trace storage local and provides native
+# TraceQL and Traces Drilldown without Kafka or object storage.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tempo
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: tempo
+  interval: 1h
+  values:
+    fullnameOverride: tempo
+    tempo:
+      registry: mirror.gcr.io
+      retention: 168h
+      reportingEnabled: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+      metricsGenerator:
+        enabled: true
+        remoteWriteUrl: http://prometheus-operated.o11y.svc.cluster.local:9090/api/v1/write
+        storage:
+          path: /var/tempo/generator
+        processor:
+          span_metrics: {}
+          service_graphs: {}
+      overrides:
+        defaults:
+          metrics_generator:
+            processors:
+              - span-metrics
+              - service-graphs
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClassName: openebs-hostpath
+    serviceMonitor:
+      enabled: true

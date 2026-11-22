@@ -4,6 +4,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ./group-forgejo-admins.yaml
+  - ./group-grafana-admins.yaml
   - ./group-kritika-admins.yaml
   - ./group-renovate-admins.yaml
   - ./person-rwaltr.yaml

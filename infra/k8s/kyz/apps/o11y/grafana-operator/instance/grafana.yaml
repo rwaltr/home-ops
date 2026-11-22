@@ -48,7 +48,7 @@ spec:
       # its SPN, so the SPN form is matched. Both spellings are checked because the
       # built-in groups are the ones that matter here and their SPN form has varied
       # across versions. Everything unmatched is a Viewer rather than an error.
-      role_attribute_path: contains(groups[*], 'idm_admins@waltr.tech') && 'Admin' || contains(groups[*], 'idm_admins') && 'Admin' || 'Viewer'
+      role_attribute_path: contains(groups[*], 'grafana_admins@waltr.tech') && 'Admin' || contains(groups[*], 'idm_admins@waltr.tech') && 'Admin' || contains(groups[*], 'idm_admins') && 'Admin' || 'Viewer'
       allow_sign_up: "true"
     auth.anonymous:
       enabled: "true"
@@ -56,6 +56,12 @@ spec:
       mode: console
     metrics:
       enabled: "true"
+    tracing.opentelemetry:
+      sampler_type: probabilistic
+      sampler_param: "0.1"
+    tracing.opentelemetry.otlp:
+      address: tempo.o11y.svc.cluster.local:4317
+      insecure: "true"
     news:
       news_feed_enabled: "false"
     plugins:
@@ -94,8 +100,8 @@ spec:
                     secretKeyRef:
                       name: grafana-kanidm-oauth2-credentials
                       key: CLIENT_SECRET
-                - name: GF_INSTALL_PLUGINS
-                  value: victoriametrics-logs-datasource 0.34.0
+                - name: GF_PLUGINS_PREINSTALL_SYNC
+                  value: victoriametrics-logs-datasource@0.34.0
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

@@ -1,0 +1,15 @@
+---
+# Members get the Grafana Admin role, which is what shows Explore and
+# Drilldown. The role mapping in o11y/grafana-operator/instance/grafana.yaml
+# matches this group's SPN. Not a built-in group, so declaring `members` is safe
+# here — see docs/kanidm.md for why that is not true of idm_admins.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmGroup
+metadata:
+  name: grafana-admins
+spec:
+  kanidmRef:
+    name: kanidm
+  kanidmName: grafana_admins
+  members:
+    - rwaltr
