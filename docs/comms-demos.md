@@ -3,13 +3,14 @@
 > **Restored in GitOps.** The previous demo was retired on 2026-11-09, which
 > pruned `tuwunel`, `element-web` and the 5Gi `tuwunel-data` PVC. Enabling the
 > `matrix` Kustomization again creates a fresh homeserver: old accounts and
-> messages are gone, and first-run accounts must be created by hand.
+> messages are gone; people create accounts through Kanidm, bots through the
+> operator-only provisioning endpoint below.
 
 A self-hosted communication stack first stood up **internal-only** on 2026-11-01
 to evaluate it as a channel for the self-hosted agent (Hermes / whatever
 pi-durable-based agent replaces it). It remains demo-grade: single namespace,
-no federation, low resource limits, and first-run accounts created by hand
-rather than declared in git.
+no federation, low resource limits, Kanidm SSO for people, and manually
+provisioned bot accounts.
 
 |                | Matrix                                    |
 | -------------- | ----------------------------------------- |
@@ -18,14 +19,15 @@ rather than declared in git.
 | Server         | Tuwunel v1.9.4 (Rust)                     |
 | Storage        | `tuwunel-data` (5Gi, RocksDB)             |
 | Memory limit   | 512Mi                                     |
+| Human login    | Kanidm SSO via Tuwunel OIDC               |
 | Hermes adapter | native (rooms, threads, E2EE) — not wired |
 
 ## How it is deployed
 
 `infra/k8s/kyz/apps/default/matrix/` holds Tuwunel + Element Web. The default
 apps Kustomization includes `matrix/ks.yaml`, so Flux reconciles both services
-and the Tuwunel data PVC from Git. The initial account setup remains a manual,
-one-time step below.
+and the Tuwunel data PVC from Git. Human accounts are created at first Kanidm
+login; bot accounts use Tuwunel's shared-secret registration API below.
 
 ## Why Matrix
 
@@ -71,32 +73,95 @@ state. If a custom agent frontend is built later, AG-UI is the protocol to embed
 agent state/streaming into it; Open WebUI is the ready-made option. Neither is
 deployed here.
 
-## First run (one-time, in a browser)
+## Human sign-in (Kanidm)
 
-The registration token is generated on first start and printed by the init
-container. Open Element at <https://element.waltr.tech>, choose
-`matrix.waltr.tech` under "Host account on", click **Create account**, and paste
-the token when asked.
+Element talks to Tuwunel's built-in Matrix OIDC server, which delegates the
+interactive login to Kanidm. Tuwunel's upstream-provider client is declared as a
+`KanidmOAuth2Client` named `matrix`; kaniop writes its credentials to
+`matrix-kanidm-oauth2-credentials` in `default`. The callback is
+`https://matrix.waltr.tech/_matrix/client/unstable/login/sso/callback/matrix`.
+
+Local password login and password/token registration are disabled. Kanidm SSO
+can create Matrix users on first login; on this empty server, the first SSO user
+is granted admin privileges by Tuwunel. Matrix localparts are derived from
+Kanidm's `preferred_username` (or its email address if needed). The Element
+server picker should use `matrix.waltr.tech`, not `idm.waltr.tech`.
+
+## Bot accounts (one-time per bot)
+
+Hermes' native adapter needs a normal Matrix user ID and access token; it is not
+an appservice. Tuwunel's Synapse-compatible shared-secret registration endpoint
+creates that account and returns an access token even though password login is
+disabled. The password it requires is random and never used.
+
+The signing credential is generated in the cluster by External Secrets (the
+`matrix` Password generator, `refreshInterval: "0"`) and lands in the
+`matrix-secret` Secret. It can also create admin accounts, so **never put it in
+a bot's environment**; read it from the cluster only when provisioning:
 
 ```bash
-kubectl -n default logs deploy/tuwunel -c registration-token | grep token
-# later, to read it from the PVC:
-kubectl -n default exec deploy/tuwunel -- cat /var/lib/tuwunel/.registration_token
+kubectl -n default get secret matrix-secret \
+  -o jsonpath='{.data.registration_shared_secret}' | base64 -d
 ```
 
-Once accounts exist, set `TUWUNEL_ALLOW_REGISTRATION: "false"` in the HelmRelease.
-The first account to register becomes the server admin, which is exactly why
-open registration is not enabled.
+Forget the value afterwards. Re-minting the Secret (delete it and let Flux
+reconcile) changes only the key future provisioning calls sign with; existing
+accounts and tokens keep working.
+
+Beeper's apps and Bridge Manager are not generic clients for this homeserver:
+Bridge Manager expects Beeper's own Matrix server and account. For bridges on
+this homeserver, use a standard Matrix appservice bridge (for example a mautrix
+bridge); Tuwunel lets an admin register its YAML in the admin room. Appservices
+are separate from user login and do not need password login enabled. No Matrix
+client adapter or extension is currently installed for pi; a future surface
+would use a normal user token like Hermes.
+
+After the Secret exists, create a non-admin bot account and store the returned
+access token in the appropriate 1Password item (for Hermes, add
+`matrix_access_token` to `hermes`; wiring the adapter is a separate change):
+
+```bash
+REGISTRATION_SHARED_SECRET=$(kubectl -n default get secret matrix-secret \
+  -o jsonpath='{.data.registration_shared_secret}' | base64 -d) \
+  python3 - <<'PY'
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import urllib.request
+
+base = "https://matrix.waltr.tech/_synapse/admin/v1/register"
+username = input("Bot localpart (for example, hermes): ").strip()
+if not username:
+    raise SystemExit("username is required")
+password = secrets.token_urlsafe(32)
+with urllib.request.urlopen(base) as response:
+    nonce = json.load(response)["nonce"]
+mac_data = b"\0".join((nonce.encode(), username.encode(), password.encode(), b"notadmin"))
+mac = hmac.new(os.environ["REGISTRATION_SHARED_SECRET"].encode(), mac_data, hashlib.sha1).hexdigest()
+body = json.dumps({"nonce": nonce, "username": username, "password": password, "admin": False, "mac": mac}).encode()
+request = urllib.request.Request(base, data=body, headers={"Content-Type": "application/json"})
+with urllib.request.urlopen(request) as response:
+    result = json.load(response)
+print(f"User: {result['user_id']}")
+print(f"Access token (store in 1Password): {result['access_token']}")
+PY
+```
+
+Treat the printed token as a password. It grants full access to that bot account;
+revoke it by logging out that account's sessions. The registration HMAC itself
+can create administrator accounts and must remain with the operator.
 
 ## Wiring an agent in (later)
 
 Nothing is wired. There are two paths, and they are not the same amount of work.
 
-**Hermes** already has a native Matrix adapter, so this is configuration only. The
-shape mirrors how its Discord adapter works in `apps/default/hermes/`: `DISCORD_*`
-env inline on the HelmRelease, secrets from the `hermes` ExternalSecret projected
-into `hermes-secret`, which the container consumes with `envFrom`, and the
-1Password items in vault `home-ops`.
+**Hermes** already has a native Matrix adapter, so wiring it is a separate
+configuration change. Give it the bot's access token from `hermes-secret` and set
+`MATRIX_ALLOWED_USERS` and `MATRIX_ALLOWED_ROOMS`; both allowlists are
+non-negotiable. Without them, any sender in any room the agent has joined can
+trigger turns, making every joined room a prompt-injection surface.
 
 **A `pi-durable` agent** (TeleVect) has no Matrix adapter, because `pi-durable` is
 a conversation runtime and not a chat client: it commits turns, tools and
@@ -110,20 +175,15 @@ documents `chat.mention` entries and treats a mid-run message as a follow-up or 
 steer). The access token belongs to the surface, in the host process, never to
 the executor or the model's reach.
 
-1. Register a dedicated `@hermes:matrix.waltr.tech` account. Registration is
-   token-gated, so this is a manual step.
-2. Put its access token in a 1Password item (vault `home-ops`) and add it to the
-   `hermes` ExternalSecret; the container already consumes `hermes-secret`.
-3. Set the adapter env on the hermes container: `MATRIX_HOMESERVER_URL`, the
-   token, and — non-negotiable — `MATRIX_ALLOWED_USERS` and
-   `MATRIX_ALLOWED_ROOMS`.
-4. Invite `@hermes` to the rooms it should answer in.
+1. Use the shared-secret registration endpoint above to create `@hermes` and
+   save its access token in 1Password.
+2. Add the token to the `hermes` ExternalSecret and set the adapter env on the
+   Hermes container.
+3. Set `MATRIX_ALLOWED_USERS` and `MATRIX_ALLOWED_ROOMS`, then invite the bot to
+   the rooms it should answer in.
 
-Both allowlists are the whole point: without them, any sender in any room the
-agent has joined can trigger agent turns, which turns every joined room into a
-prompt-injection surface. This stays written down rather than wired because
-Matrix is a demo channel, and making the agent answer in it is a promotion to a
-live channel — deliberate, and separate from this.
+This stays documented rather than wired: making the agent answer in Matrix is a
+promotion to a live channel and should be a deliberate, separate change.
 
 ## Operational notes
 
@@ -131,8 +191,9 @@ live channel — deliberate, and separate from this.
   publishes the `*.waltr.tech` names from the HTTPRoutes. Nothing is reachable
   off-LAN.
 - **No federation.** Tuwunel has `allow_federation = false`.
-- **Secrets.** No secret enters git. The registration token lives on the PVC and
-  is generated at runtime.
+- **Secrets.** No secret enters git. The registration HMAC is generated in the
+  cluster into `matrix-secret` and is powerful enough to create server
+  administrators; only read it to provision a bot.
 - **openebs-hostpath ignores `fsGroup`.** The data volume is chowned to its
   unprivileged uid by an init container, because hostPath-backed PVCs are not
   group-owned by kubelet.

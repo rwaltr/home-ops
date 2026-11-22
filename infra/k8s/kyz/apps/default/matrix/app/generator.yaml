@@ -1,0 +1,14 @@
+---
+# yaml-language-server: $schema=https://k8s-schemas.home-operations.com/generators.external-secrets.io/password_v1alpha1.json
+# Tuwunel's shared-secret registration credential, generated in the cluster:
+# only Tuwunel and the operator provisioning a bot read it, and re-minting it
+# leaves existing accounts and tokens alone (docs/secrets.md).
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: matrix
+spec:
+  length: 48
+  digits: 12
+  symbols: 0
+  allowRepeat: true

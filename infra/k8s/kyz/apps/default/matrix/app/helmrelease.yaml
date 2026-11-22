@@ -3,11 +3,9 @@
 # Tuwunel homeserver (successor to conduwuit). Single Rust binary on RocksDB —
 # no PostgreSQL, which is what makes Matrix viable on a single-node cluster.
 #
-# Registration is gated by a token stored on the PVC and generated once by the
-# init container (its value is printed to the init logs on first start). Open
-# registration is deliberately NOT enabled: the first account to register
-# becomes the server admin, so on a LAN-reachable service that would let any
-# device take over the homeserver. See docs/comms-demos.md.
+# Humans authenticate through Kanidm; local password login and registration
+# are disabled. The separate shared-secret registration API is only for bot
+# accounts and must never be given to bots. See docs/comms-demos.md.
 #
 # Internal-only: the route attaches to envoy-internal and federation is off, so
 # user IDs are @user:matrix.waltr.tech and nothing leaves the cluster.
@@ -34,27 +32,15 @@ spec:
       tuwunel:
         strategy: Recreate
         initContainers:
-          # Generate the registration token into the data PVC on first start.
-          # Both token and database live on the same volume, so no Secret is
-          # created and nothing secret enters git.
-          registration-token:
+          # openebs-hostpath ignores fsGroup; chown the data dir for Tuwunel.
+          data-permissions:
             image:
               repository: docker.io/library/alpine
               tag: 3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
             command:
               - /bin/sh
               - -c
-              - |
-                set -e
-                f=/var/lib/tuwunel/.registration_token
-                if [ ! -s "$f" ]; then
-                  head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$f"
-                  echo "[matrix] generated registration token: $(cat "$f")"
-                  echo "[matrix] use it on the Element 'Create account' screen"
-                fi
-                # openebs-hostpath ignores fsGroup, so hand the whole data dir
-                # to the unprivileged Tuwunel user or it cannot write RocksDB.
-                chown -R 1000:1000 /var/lib/tuwunel
+              - chown -R 1000:1000 /var/lib/tuwunel
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -77,11 +63,27 @@ spec:
               TUWUNEL_DATABASE_PATH: /var/lib/tuwunel
               TUWUNEL_ADDRESS: 0.0.0.0
               TUWUNEL_PORT: "8008"
-              TUWUNEL_ALLOW_REGISTRATION: "true"
-              TUWUNEL_REGISTRATION_TOKEN_FILE: /var/lib/tuwunel/.registration_token
+              TUWUNEL_ALLOW_REGISTRATION: "false"
+              TUWUNEL_LOGIN_WITH_PASSWORD: "false"
+              TUWUNEL_REGISTRATION_SHARED_SECRET_FILE: /run/secrets/registration_shared_secret
               TUWUNEL_ALLOW_FEDERATION: "false"
               TUWUNEL_WELL_KNOWN__CLIENT: https://matrix.waltr.tech
               TUWUNEL_WELL_KNOWN__SERVER: matrix.waltr.tech:443
+              TUWUNEL_IDENTITY_PROVIDER__0__BRAND: Kanidm
+              TUWUNEL_IDENTITY_PROVIDER__0__NAME: Kanidm
+              TUWUNEL_IDENTITY_PROVIDER__0__REGISTRATION: "true"
+              TUWUNEL_IDENTITY_PROVIDER__0__ISSUER_URL: https://idm.waltr.tech/oauth2/openid/matrix
+              TUWUNEL_IDENTITY_PROVIDER__0__CALLBACK_URL: https://matrix.waltr.tech/_matrix/client/unstable/login/sso/callback/matrix
+              TUWUNEL_IDENTITY_PROVIDER__0__CLIENT_ID:
+                valueFrom:
+                  secretKeyRef:
+                    name: matrix-kanidm-oauth2-credentials
+                    key: CLIENT_ID
+              TUWUNEL_IDENTITY_PROVIDER__0__CLIENT_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: matrix-kanidm-oauth2-credentials
+                    key: CLIENT_SECRET
             probes:
               liveness:
                 enabled: true
@@ -137,6 +139,14 @@ spec:
           - name: envoy-internal
             namespace: network
     persistence:
+      registration-secret:
+        type: secret
+        name: matrix-secret
+        advancedMounts:
+          tuwunel:
+            app:
+              - path: /run/secrets
+                readOnly: true
       data:
         type: persistentVolumeClaim
         accessMode: ReadWriteOnce

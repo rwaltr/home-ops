@@ -1,0 +1,23 @@
+---
+# Tuwunel's upstream OIDC provider client in Kanidm, managed by kaniop.
+# The generated Secret is consumed by the Tuwunel HelmRelease.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: matrix
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Matrix
+  origin: https://matrix.waltr.tech
+  redirectUrl:
+    - https://matrix.waltr.tech/_matrix/client/unstable/login/sso/callback/matrix
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+  disableConsentPrompt: true
+  preferShortUsername: true
