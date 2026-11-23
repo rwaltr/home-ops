@@ -71,6 +71,10 @@ spec:
                   - CHOWN
                   - DAC_OVERRIDE
                   - FOWNER
+                  # `hermes profile create` drops root to the Hermes uid through
+                  # s6-applyuidgid, which needs both of these.
+                  - SETGID
+                  - SETUID
         containers:
           app:
             image:
