@@ -69,6 +69,23 @@ resource "onepassword_item" "pi" {
   password = random_password.pi_key.result
 }
 
+# Separate key for the personal Hermes pod. Its allow-list contains only the
+# auto-* virtual chains, not direct upstreams or MCP routes.
+resource "random_password" "hermes_personal_key" {
+  length  = 48
+  special = false
+}
+
+resource "onepassword_item" "hermes_personal" {
+  vault    = data.onepassword_vault.secrets.uuid
+  title    = "hermes-personal-agentgateway"
+  category = "login"
+  url      = "https://llm.waltr.tech"
+
+  username = "agentgateway"
+  password = random_password.hermes_personal_key.result
+}
+
 # Not a client credential: the key that encrypts MCP session IDs.
 #
 # Without it the gateway logs "no session key configured; MCP session IDs are not

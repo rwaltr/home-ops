@@ -28,14 +28,17 @@ Everything that used to point at `litellm.default.svc.cluster.local:4000` now po
 at **8082, the unauthenticated in-cluster listener** — same trust boundary as before,
 since every one of them shared litellm's master key:
 
-| Consumer            | Model                | Env                         |
-| ------------------- | -------------------- | --------------------------- |
-| `hermes`            | local aliases        | `providers.agentgateway`    |
-| `homebox-companion` | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`          |
-| `paperless`         | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT` |
+| Consumer            | Model                | Env                                           |
+| ------------------- | -------------------- | --------------------------------------------- |
+| `hermes`            | local aliases        | `providers.agentgateway`                      |
+| `hermes-personal`   | `auto-work`          | authenticated 8080 / `providers.agentgateway` |
+| `homebox-companion` | `qwen3.8-omni-flash` | `HBC_LLM_API_BASE`                            |
+| `paperless`         | `intel-vl`           | `PAPERLESS_AI_LLM_ENDPOINT`                   |
 
-8082 wants no key, so each of those app configs carries a placeholder (`unused`)
-rather than a Secret — the OpenAI-shaped clients refuse to run without one.
+8082 wants no key, so the in-cluster callers on that listener carry a placeholder
+(`unused`) rather than a Secret — the OpenAI-shaped clients refuse to run without one.
+`hermes-personal` instead calls the authenticated 8080 listener with its dedicated,
+model-restricted key.
 
 **One consumer cannot move in git.** Home Assistant's native LiteLLM integration
 (Settings → Devices & services) is config-flow only and lives in `.storage` on the HA
@@ -52,11 +55,12 @@ stripped — which is the better default for a proxy whose failures should be vi
 `${VAR}` in the config is interpolated at runtime from the container environment, so
 no key ever appears in the ConfigMap or in git. Three keys are wired this way:
 
-| Env                      | Source                                             |
-| ------------------------ | -------------------------------------------------- |
-| `OPENROUTER_API_KEY`     | `hermes-secret` — the same item hermes reads       |
-| `DANMANNERS_LLM_API_KEY` | 1P `llm.cloud.danmanners.com` / `credential`       |
-| `CLIPROXYAPI_API_KEY`    | 1P `cliproxyapi` / `password`, minted by Terraform |
+| Env                       | Source                                                              |
+| ------------------------- | ------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`      | `hermes-secret` — the sysadmin agent's key                          |
+| `DANMANNERS_LLM_API_KEY`  | 1P `llm.cloud.danmanners.com` / `credential`                        |
+| `CLIPROXYAPI_API_KEY`     | 1P `cliproxyapi` / `password`, minted by Terraform                  |
+| `HERMES_PERSONAL_API_KEY` | 1P `hermes-personal-agentgateway` / `password`, minted by Terraform |
 
 ## Models
 
@@ -78,7 +82,7 @@ request leaves the house and whether it is billed:
 
 | Alias                 | Backend       | Notes                                                                  |
 | --------------------- | ------------- | ---------------------------------------------------------------------- |
-| `deepseek-v4.1-flash` | OpenRouter    | Cloud, billed. The default for hermes and the phone clients.           |
+| `deepseek-v4.1-flash` | OpenRouter    | Cloud, billed. The sysadmin Hermes fallback and phone-client default.  |
 | `qwen3.8-omni-flash`  | OpenRouter    | Cloud. **Vision + audio + video.** homebox-companion's default.        |
 | `gpt-5.6-luna`        | OpenRouter    | Cloud. **Vision**; 404s on a video part.                               |
 | `voyage-code-4`       | OpenRouter    | Cloud. Embeddings, 1024 dims. Not on any client's allow-list.          |
@@ -242,21 +246,20 @@ to any client that can read its own session id.
 
 ### Clients
 
-| Client         | 1Password item | Models                                                     | MCP targets                                |
-| -------------- | -------------- | ---------------------------------------------------------- | ------------------------------------------ |
-| `grok`         | `grok`         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash`                | `home-assistant` (read-only)               |
-| `pebble-index` | `pebble-index` | `deepseek-v4.1-flash`                                      | `home-assistant`, `home-assistant-control` |
-| `pi`           | `pi`           | the three `claude-*-5-5` aliases, the four `auto-*` chains | all four targets                           |
+| Client            | 1Password item                 | Models                                                     | MCP targets                                |
+| ----------------- | ------------------------------ | ---------------------------------------------------------- | ------------------------------------------ |
+| `grok`            | `grok`                         | `deepseek-v4.1-flash`, `qwen3.8-omni-flash`                | `home-assistant` (read-only)               |
+| `pebble-index`    | `pebble-index`                 | `deepseek-v4.1-flash`                                      | `home-assistant`, `home-assistant-control` |
+| `pi`              | `pi`                           | the three `claude-*-5-5` aliases, the four `auto-*` chains | all four targets                           |
+| `hermes-personal` | `hermes-personal-agentgateway` | the four `auto-*` chains                                   | none                                       |
 
-Claude is deliberately absent from the phone clients' allow-lists: it is the paid
-subscription, and a leaked client key should not be able to spend it. `pi` is the
-exception — it is the operator's own agent client, and the subscription is the one
-credential it cannot hold itself. It reaches every other model directly, so its
-allow-list is the three subscription aliases and nothing else, and a request for any
-other model through this door is refused rather than silently served. `allowedModels`
-also
-filters `/v1/models`, and a disallowed model is refused before any provider is
-contacted.
+Direct Claude model aliases are absent from phone-client allow-lists because they
+consume the paid subscription. `pi` is the operator's client and can request those
+aliases directly. `hermes-personal` can request only the four `auto-*` aliases. Its
+`auto-deep` and `auto-max` chains can consume Claude subscription quota, so use those
+tiers deliberately. The personal key cannot request direct Claude aliases, physical
+provider models, or MCP tools. `allowedModels` also filters `/v1/models`, and a
+disallowed model is refused before any provider is contacted.
 
 ### Verified live
 

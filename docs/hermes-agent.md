@@ -109,14 +109,21 @@ with two profiles:
 - The dashboard manages both profiles.
 - Each profile has its own Matrix token, sender allowlist, room allowlist, SOUL,
   working directory, memory, and sessions.
+- Both profiles use `agentgateway` model `auto-work` by default. They can switch
+  to `auto-quick`, `auto-deep`, or `auto-max` manually. These are fixed failover
+  chains, not Pi's per-turn classifier.
+- The gateway key permits only the four `auto-*` models. Deep and max may consume
+  Claude subscription quota.
 - Neither profile receives a Kubernetes ServiceAccount token, the GitHub App, or
-  the Home Assistant token.
+  the Home Assistant token. The personal pod no longer receives an OpenRouter key.
 
 The image's s6 supervisor runs the gateway and dashboard. Hermes multiplexes the
 profiles through one gateway. A config init container seeds the profile files
 from ConfigMaps on first initialization. Profile config files are not
 re-seeded on pod restarts, so Hermes retains mutable state. SOUL files are
-re-seeded. ESO Secrets supply each profile's `.env` through read-only volumes.
+re-seeded. Both profiles reach the authenticated `llm-public` gateway on port
+8080 with a dedicated Terraform-generated key. The gateway restricts that key to
+its four `auto-*` chains.
 
 ### Sysadmin agent
 
@@ -142,7 +149,9 @@ No secret values belong in Git. Add the Matrix bot tokens and allowlists to the
 1Password items above. Existing ExternalSecrets supply the other sysadmin
 credentials:
 
-- `OpenRouter API Key` supplies the model API key.
+- `OpenRouter API Key` supplies the sysadmin agent's model key.
+- `hermes-personal-agentgateway` supplies the personal gateway client key. Terraform
+  generates it in the `home-ops` vault. It can request only `auto-*` aliases.
 - `home-assistant-secret` supplies the Home Assistant token.
 - `teletraan-x github app` supplies the GitHub App client ID and private key.
 - The `hermes` and `hermes-personal` KanidmOAuth2Client resources create their

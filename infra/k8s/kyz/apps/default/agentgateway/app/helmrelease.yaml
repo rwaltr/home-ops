@@ -84,6 +84,11 @@ spec:
           secretKeyRef:
             name: agentgateway-secret
             key: PI_API_KEY
+      - name: HERMES_PERSONAL_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: agentgateway-secret
+            key: HERMES_PERSONAL_API_KEY
     # Encrypts MCP session IDs. The chart injects SESSION_KEY from this Secret's `key`
     # entry; without it session IDs are base64 only, which discloses the multiplexed
     # target names to any client that can read its own session id.
@@ -198,6 +203,17 @@ spec:
                   # The failover chains: same backends as the aliases above, with
                   # the OpenRouter twin behind each. pi asks for the tier its own
                   # router picked and lets this gateway do the failing over.
+                  - auto-quick
+                  - auto-work
+                  - auto-deep
+                  - auto-max
+              - key: ${HERMES_PERSONAL_API_KEY}
+                metadata:
+                  name: hermes-personal
+                  client: hermes-personal
+                # Hermes chooses a tier alias. It cannot use this key to bypass
+                # the automatic chains and call a provider target directly.
+                allowedModels:
                   - auto-quick
                   - auto-work
                   - auto-deep

@@ -94,11 +94,11 @@ spec:
               HERMES_DASHBOARD_OIDC_ISSUER: https://idm.waltr.tech/oauth2/openid/hermes-personal
               HERMES_DASHBOARD_OIDC_SCOPES: openid profile email
               SEARXNG_URL: http://degoog.default.svc.cluster.local:8080
-              OPENROUTER_API_KEY:
+              HERMES_AGENTGATEWAY_API_KEY:
                 valueFrom:
                   secretKeyRef:
-                    name: hermes-personal-model
-                    key: OPENROUTER_API_KEY
+                    name: agentgateway-secret
+                    key: HERMES_PERSONAL_API_KEY
             envFrom:
               - secretRef:
                   name: hermes-personal-kanidm-oauth2-credentials
@@ -217,8 +217,22 @@ spec:
           config.yaml: |
             ---
             model:
-              provider: openrouter
-              default: deepseek/deepseek-v4.1-flash
+              provider: agentgateway
+              default: auto-work
+            providers:
+              agentgateway:
+                name: agentgateway
+                base_url: http://agentgateway.default.svc.cluster.local:8080/v1
+                key_env: HERMES_AGENTGATEWAY_API_KEY
+                models:
+                  auto-quick:
+                    context_length: 1000000
+                  auto-work:
+                    context_length: 1000000
+                  auto-deep:
+                    context_length: 1000000
+                  auto-max:
+                    context_length: 1000000
             gateway:
               multiplex_profiles: true
             platform_toolsets:
