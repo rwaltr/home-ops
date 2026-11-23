@@ -1,0 +1,30 @@
+---
+# The personal dashboard serves all profiles in this Hermes instance. Everyone
+# who can sign in can switch profiles, so scope it to the household's Kanidm
+# accounts rather than treating profile selection as authorization.
+apiVersion: kaniop.rs/v1beta1
+kind: KanidmOAuth2Client
+metadata:
+  name: hermes-personal
+spec:
+  kanidmRef:
+    name: kanidm
+    namespace: identity
+  displayname: Hermes Personal
+  origin: https://hermes-personal.waltr.tech
+  redirectUrl:
+    - https://hermes-personal.waltr.tech/auth/callback
+  public: false
+  scopeMap:
+    - group: idm_all_persons
+      scopes:
+        - openid
+        - profile
+        - email
+  disableConsentPrompt: true
+  preferShortUsername: true
+  secretKeyAliases:
+    clientId:
+      - HERMES_DASHBOARD_OIDC_CLIENT_ID
+    clientSecret:
+      - HERMES_DASHBOARD_OIDC_CLIENT_SECRET

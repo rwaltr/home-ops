@@ -35,6 +35,7 @@ resources:
   - ./unmanic/ks.yaml
   - ./degoog/ks.yaml
   - ./hermes/ks.yaml
+  - ./hermes-personal/ks.yaml
   - ./radicale/ks.yaml
   - ./freshrss/ks.yaml
   - ./forgejo/ks.yaml

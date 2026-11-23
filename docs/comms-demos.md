@@ -7,22 +7,22 @@
 > operator-only provisioning endpoint below.
 
 A self-hosted communication stack first stood up **internal-only** on 2026-11-01
-to evaluate it as a channel for the self-hosted agent (Hermes / whatever
-pi-durable-based agent replaces it). It remains demo-grade: single namespace,
+to serve Hermes. Matrix is the selected primary communication channel for
+Hermes. It remains demo-grade: single namespace,
 low resource limits, Kanidm SSO for people, and manually provisioned bot
 accounts. Federation is on but allow-listed to `beeper.com` only, so Beeper can
 reach the server (MVP; see the federation section below).
 
-|                | Matrix                                    |
-| -------------- | ----------------------------------------- |
-| Web UI         | <https://element.waltr.tech>              |
-| API host       | <https://matrix.waltr.tech>               |
-| Server         | Tuwunel v1.9.4 (Rust)                     |
-| Storage        | `tuwunel-data` (5Gi, RocksDB)             |
-| Memory limit   | 512Mi                                     |
-| Human login    | Kanidm SSO via Tuwunel OIDC               |
-| Federation     | allow-listed to `beeper.com` only         |
-| Hermes adapter | native (rooms, threads, E2EE) — not wired |
+|                | Matrix                                               |
+| -------------- | ---------------------------------------------------- |
+| Web UI         | <https://element.waltr.tech>                         |
+| API host       | <https://matrix.waltr.tech>                          |
+| Server         | Tuwunel v1.9.4 (Rust)                                |
+| Storage        | `tuwunel-data` (5Gi, RocksDB)                        |
+| Memory limit   | 512Mi                                                |
+| Human login    | Kanidm SSO via Tuwunel OIDC                          |
+| Federation     | allow-listed to `beeper.com` only                    |
+| Hermes adapter | native Matrix adapter, dashboard plus per-agent bots |
 
 ## How it is deployed
 
@@ -99,23 +99,28 @@ provider-specific Kanidm button.
 ## Bot accounts (one-time per bot)
 
 Hermes' native adapter needs a normal Matrix user ID and access token; it is not
-an appservice. Tuwunel's Synapse-compatible shared-secret registration endpoint
-creates that account and returns an access token even though password login is
-disabled. The password it requires is random and never used.
+an appservice. Password login is disabled, so Hermes cannot use a user-password
+pair on this server.
 
-The signing credential is generated in the cluster by External Secrets (the
-`matrix` Password generator, `refreshInterval: "0"`) and lands in the
-`matrix-secret` Secret. It can also create admin accounts, so **never put it in
-a bot's environment**; read it from the cluster only when provisioning:
+Tuwunel's Synapse-compatible shared-secret registration endpoint creates a
+non-admin account and returns its access token. The helper script reads the
+signing secret directly from Kubernetes. It never prints that secret or the
+throwaway password:
 
 ```bash
-kubectl -n default get secret matrix-secret \
-  -o jsonpath='{.data.registration_shared_secret}' | base64 -d
+./scripts/provision-matrix-bot.py teletran
+./scripts/provision-matrix-bot.py rwaltr-agent
+./scripts/provision-matrix-bot.py wife-agent
 ```
 
-Forget the value afterwards. Re-minting the Secret (delete it and let Flux
-reconcile) changes only the key future provisioning calls sign with; existing
-accounts and tokens keep working.
+Run each command once per bot. Store the printed access token in that bot's
+1Password item, as listed in [`docs/hermes-agent.md`](hermes-agent.md). The
+registration secret lives in the `matrix-secret` Secret and can create admin
+accounts. Never put it in a bot's environment or paste it into chat. The script
+needs a `kubectl` context that can read that Secret.
+
+Re-minting the Secret (delete it and let Flux reconcile) changes only the key
+future provisioning calls sign with; existing accounts and tokens keep working.
 
 Beeper's apps and Bridge Manager are not generic clients for this homeserver:
 Bridge Manager expects Beeper's own Matrix server and account. For bridges on
@@ -162,37 +167,27 @@ Treat the printed token as a password. It grants full access to that bot account
 revoke it by logging out that account's sessions. The registration HMAC itself
 can create administrator accounts and must remain with the operator.
 
-## Wiring an agent in (later)
+## Hermes integration
 
-Nothing is wired. There are two paths, and they are not the same amount of work.
+Hermes uses Matrix as its primary chat platform. GitOps deploys two independent
+workloads:
 
-**Hermes** already has a native Matrix adapter, so wiring it is a separate
-configuration change. Give it the bot's access token from `hermes-secret` and set
-`MATRIX_ALLOWED_USERS` and `MATRIX_ALLOWED_ROOMS`; both allowlists are
-non-negotiable. Without them, any sender in any room the agent has joined can
-trigger turns, making every joined room a prompt-injection surface.
+- `hermes` runs the Teletran sysadmin agent with its own bot identity.
+- `hermes-personal` runs the rwaltr and wife profiles in one multi-profile
+  container. Their profile data and secrets are not isolated from each other.
 
-**A `pi-durable` agent** (TeleVect) has no Matrix adapter, because `pi-durable` is
-a conversation runtime and not a chat client: it commits turns, tools and
-documents and offers `submit()` in and `viewState()`/`watch()` out, but nothing
-that speaks Matrix. Matrix would be a _surface_ to build, beside the web, hook,
-email and notification surfaces its spec already defines — its open item O13 is
-exactly "whether a chat channel (Matrix/Signal) replaces email as the phone
-surface". Two properties make that smaller than it sounds: one room maps to one
-conversation, and a chat message is an anticipated input shape (the runtime
-documents `chat.mention` entries and treats a mid-run message as a follow-up or a
-steer). The access token belongs to the surface, in the host process, never to
-the executor or the model's reach.
+Each bot needs its own access token plus `MATRIX_ALLOWED_USERS` and
+`MATRIX_ALLOWED_ROOMS`. Keep the room list narrow. Hermes treats direct messages
+separately from the room allowlist. See [`docs/hermes-agent.md`](hermes-agent.md)
+for item names, OIDC setup, and the profile security boundary.
 
-1. Use the shared-secret registration endpoint above to create `@hermes` and
-   save its access token in 1Password.
-2. Add the token to the `hermes` ExternalSecret and set the adapter env on the
-   Hermes container.
-3. Set `MATRIX_ALLOWED_USERS` and `MATRIX_ALLOWED_ROOMS`, then invite the bot to
-   the rooms it should answer in.
+A Beeper identity works as a second sender: `MATRIX_ALLOWED_USERS` is a
+comma-separated set, and the federation allow-list above covers `beeper.com`.
+Do not allowlist bridge ghost users; add them to `MATRIX_IGNORE_USER_PATTERNS`
+instead.
 
-This stays documented rather than wired: making the agent answer in Matrix is a
-promotion to a live channel and should be a deliberate, separate change.
+Invite each bot only to the intended private rooms. Keep `MATRIX_E2EE_MODE` set
+to `required`.
 
 ## Federation (beeper.com only, MVP)
 
@@ -245,8 +240,8 @@ recovery key and device handling.
 
 ## Verification
 
-````bash
+```bash
 kubectl -n default get helmrelease,pod,pvc,httproute | grep -E 'tuwunel|element'
 curl -sS -o /dev/null -w 'element %{http_code}\n' https://element.waltr.tech/
-curl -sS https://matrix.waltr.tech/_matrix/client/versions```
-````
+curl -fsS https://matrix.waltr.tech/_matrix/client/versions
+```

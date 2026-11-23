@@ -35,7 +35,7 @@ spec:
           config:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+              tag: v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
             command:
               - /bin/bash
               - -c
@@ -94,7 +94,7 @@ spec:
           repo:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+              tag: v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
             command:
               - /bin/bash
               - -c
@@ -108,12 +108,12 @@ spec:
               GITHUB_APP_CLIENT_ID:
                 valueFrom:
                   secretKeyRef:
-                    name: hermes-secret
+                    name: hermes-gitcreds-secret
                     key: GITHUB_APP_CLIENT_ID
               GITHUB_APP_PRIVATE_KEY:
                 valueFrom:
                   secretKeyRef:
-                    name: hermes-secret
+                    name: hermes-gitcreds-secret
                     key: GITHUB_APP_PRIVATE_KEY
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
             securityContext:
@@ -126,7 +126,7 @@ spec:
           tools:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+              tag: v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
             command:
               - /bin/bash
               - -c
@@ -206,7 +206,7 @@ spec:
           app:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+              tag: v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
             args:
               - gateway
               - run
@@ -249,16 +249,15 @@ spec:
               HOMEBREW_REPOSITORY: /opt/data/.local/homebrew
               HOMEBREW_NO_AUTO_UPDATE: "1"
               HOMEBREW_NO_ANALYTICS: "1"
-              # Expose the OpenAI-compatible API server on the pod network.
-              API_SERVER_ENABLED: "true"
-              API_SERVER_HOST: 0.0.0.0
-              API_SERVER_PORT: &apiPort 8642
-              # Dashboard is supervised by the gateway; it fails closed without
-              # an auth provider, so basic auth (from hermes-secret) is required.
+              # Hermes fails closed on this non-loopback dashboard unless its
+              # self-hosted OIDC provider is configured. Credentials come from
+              # the KanidmOAuth2Client Secret.
               HERMES_DASHBOARD: "true"
               HERMES_DASHBOARD_HOST: 0.0.0.0
               HERMES_DASHBOARD_PORT: &dashboardPort 9119
               HERMES_DASHBOARD_PUBLIC_URL: https://hermes.waltr.tech
+              HERMES_DASHBOARD_OIDC_ISSUER: https://idm.waltr.tech/oauth2/openid/hermes
+              HERMES_DASHBOARD_OIDC_SCOPES: openid profile email
               # Self-hosted Degoog via the nginx compat shim: the `searxng`
               # provider hardcodes `/search?format=json`, which the compat port
               # rewrites to Degoog's `/api/search`. Harmless while the `web`
@@ -272,12 +271,12 @@ spec:
               GITHUB_REPO: rwaltr/home-ops
               REPO_DIR: /opt/data/workspace/home-ops
               KUBECONFIG: /opt/data/.kube/config
-              # No 👀/✅/❌ processing reactions on user messages.
-              DISCORD_REACTIONS: "false"
-              # Default delivery target for cron / notifications (the bot's DM
-              # with rwaltr). Cron jobs must deliver=discord to reach a phone.
-              DISCORD_HOME_CHANNEL: "1553131461014462616"
-              DISCORD_HOME_CHANNEL_NAME: Teletran
+              # The Matrix adapter is the primary interactive channel. The
+              # 1Password-backed Secret supplies sender and room allowlists.
+              MATRIX_HOMESERVER: https://matrix.waltr.tech
+              MATRIX_USER_ID: "@teletran:matrix.waltr.tech"
+              MATRIX_REQUIRE_MENTION: "true"
+              MATRIX_E2EE_MODE: required
               # Keep mise from refusing the repo's .mise.toml as untrusted; the
               # sidecar installs the pinned toolchain from it.
               MISE_TRUSTED_CONFIG_PATHS: /opt/data/workspace/home-ops
@@ -291,14 +290,16 @@ spec:
             envFrom:
               - secretRef:
                   name: hermes-secret
+              - secretRef:
+                  name: hermes-kanidm-oauth2-credentials
             probes:
               liveness:
                 enabled: true
                 custom: true
                 spec:
                   httpGet:
-                    path: /health
-                    port: *apiPort
+                    path: /api/health
+                    port: *dashboardPort
                   periodSeconds: 30
                   timeoutSeconds: 5
                   failureThreshold: 5
@@ -307,8 +308,8 @@ spec:
                 custom: true
                 spec:
                   httpGet:
-                    path: /health
-                    port: *apiPort
+                    path: /api/health
+                    port: *dashboardPort
                   periodSeconds: 10
                   timeoutSeconds: 5
                   failureThreshold: 5
@@ -317,8 +318,8 @@ spec:
                 custom: true
                 spec:
                   httpGet:
-                    path: /health
-                    port: *apiPort
+                    path: /api/health
+                    port: *dashboardPort
                   periodSeconds: 10
                   timeoutSeconds: 5
                   failureThreshold: 60
@@ -349,7 +350,7 @@ spec:
           gitcreds:
             image:
               repository: nousresearch/hermes-agent
-              tag: v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+              tag: v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
             command:
               - /bin/bash
               - -c
@@ -360,12 +361,12 @@ spec:
               GITHUB_APP_CLIENT_ID:
                 valueFrom:
                   secretKeyRef:
-                    name: hermes-secret
+                    name: hermes-gitcreds-secret
                     key: GITHUB_APP_CLIENT_ID
               GITHUB_APP_PRIVATE_KEY:
                 valueFrom:
                   secretKeyRef:
-                    name: hermes-secret
+                    name: hermes-gitcreds-secret
                     key: GITHUB_APP_PRIVATE_KEY
               GIT_CONFIG_GLOBAL: /opt/data/.gitconfig
             securityContext:
@@ -399,15 +400,13 @@ spec:
         ports:
           http:
             port: *dashboardPort
-          api:
-            port: *apiPort
     route:
       app:
         annotations:
           # Listed on the Homepage dashboard — see docs/homepage.md.
           gethomepage.dev/enabled: "true"
-          gethomepage.dev/name: Hermes
-          gethomepage.dev/description: Agent dashboard (basic auth)
+          gethomepage.dev/name: Teletran
+          gethomepage.dev/description: Sysadmin agent dashboard (Kanidm OIDC)
           gethomepage.dev/group: AI
           gethomepage.dev/icon: hermes.png
         hostnames:
@@ -498,10 +497,10 @@ spec:
                 - skills
                 - session_search
                 - cronjob
-              # Phone-facing Discord DM channel (Teletran). Explicit list (the
+              # Phone-facing Matrix channel (Teletran). Explicit list (the
               # `coding` preset moves between releases); an unlisted platform
               # falls back to the full ~50-schema preset.
-              discord:
+              matrix:
                 - terminal
                 - file
                 - web
@@ -523,18 +522,6 @@ spec:
                 enabled: "off"
               connectors:
                 enabled: false
-            # Keep the Discord DM channel quiet: no tool-progress bubbles and no
-            # busy acks. Interim assistant messages and long-running notifications
-            # stay on so a long turn does not look dead. Reactions are turned off
-            # separately via DISCORD_REACTIONS (adapter-level, not a display key).
-            display:
-              platforms:
-                discord:
-                  tool_progress: "off"
-                  busy_ack_detail: false
-                  busy_steer_ack_enabled: false
-                  interim_assistant_messages: true
-                  long_running_notifications: true
             terminal:
               backend: local
               cwd: /opt/data/workspace/home-ops
@@ -560,7 +547,7 @@ spec:
             - Fragments are fine as a readout.
             - A denial is a system message, not a debate.
             - Encouragement is rare, short, and odd.
-            - Phone chat: your owner reads on Discord mobile. Lead with the result,
+            - Phone chat: your owner reads on Matrix mobile. Lead with the result,
               short paragraphs, short lists, detail after the summary.
 
             Style reference. Match the register, not the wording:
