@@ -2382,6 +2382,42 @@ Eighth item of the series: `kubesearch-mcp` (perfectra1n/kubesearch-mcp 1.3.0) a
 
 Operating docs: `docs/kubesearch-mcp.md`, `docs/home-assistant-mcp.md`.
 
+### 2026-11-16 (later still) — the parity silence covered only the `pod` label, so the kube-state-metrics alerts kept paging
+
+Found by the 2026-11-14 alert review: `mikrotik-mcp` was crashlooping (identity
+initContainer with no `MIKROMCP_CLIENT_TOKEN`, and the 1Password item `microtik`
+has no `mcptoken` field, so the Secret never exists), and the
+`bjw-s-parity-deploys` silence that names it did not stop the pages. Cause: the
+CR matched `pod=<app>-.*` only, and the three alert names in the storm —
+`KubeDeploymentReplicasMismatch`, `KubeDeploymentRolloutStuck`,
+`HelmReleaseReconciliationFailure` — do not carry the app in `pod`. They carry
+`pod=kube-state-metrics-<hash>` and the app as `deployment`, or as `name` on a
+`customresource_kind: HelmRelease` that reports `namespace: o11y` (the exporter)
+with the real namespace in `exported_namespace`.
+
+- **Matchers combine with AND, so one CR covers one label shape.** Covering the other
+  shapes needs companion CRs, not a wider regex: added
+  `bjw-s-parity-deployment-scoped` (`deployment`) and
+  `bjw-s-parity-helmreleases` (`name` + `customresource_kind`), same window and
+  same app list as the pod CR.
+- **A namespace matcher would not have worked** for the HelmRelease alert: its
+  `namespace` is `o11y` because kube-state-metrics emits it, and the object's own
+  namespace is `exported_namespace`.
+- **`docs/alerting.md` claimed a silence is expired with
+  `PUT /api/v2/silence/<id>`; the v2 API has no `PUT` (405, silence stays
+  active).** Corrected to `DELETE /api/v2/silence/<id>`.
+- **A companion CR is only as good as its window.** These two were written against
+  the original `2026-11-16T06:00:00Z` end date, which the series then outlived: a
+  `2026-11-16` review found the PR conflicting on this file and its windows already
+  expired, so rebasing re-aligned all three CRs to the extended
+  `2026-11-23T06:00:00Z`. An expired silence CR renders and reconciles cleanly and
+  silences nothing — check `endsAt` against `date -u` before trusting a silence PR
+  to fix a live page.
+
+`mikrotik-mcp` itself was unblocked by the same-day work: the bearer token is now
+minted in `infra/terraform/bootstrap/` (#1020) and PR #1021 injects it into the
+initContainer, so the `microtik` item never needed a hand-added field.
+
 ## Matter/Thread commissioning pitfalls (Android/GMS + multi-VLAN)
 
 Living list of the non-obvious failure modes we hit wiring Matter + Thread into
