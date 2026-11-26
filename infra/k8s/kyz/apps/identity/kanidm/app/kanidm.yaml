@@ -83,7 +83,7 @@ spec:
   #
   # Kanidm cannot be downgraded once its database has migrated, so moving to a
   # newer server line requires a fresh volume — see docs/kanidm.md.
-  image: kanidm/server:1.11.2
+  image: kanidm/server:1.12.2
   replicaGroups:
     - name: default
       replicas: 1
