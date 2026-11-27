@@ -217,7 +217,7 @@ spec:
           gotenberg:
             image:
               repository: docker.io/gotenberg/gotenberg
-              tag: 8.40@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996
+              tag: 9.10@sha256:a7726e0f52a4344656031393f0f61fdf35cd28aaf697c7ac3aea9519d72d726e
             securityContext:
               allowPrivilegeEscalation: false
               runAsNonRoot: true
